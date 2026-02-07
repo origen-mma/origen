@@ -20,32 +20,33 @@ fn test_observing_scenario_fixtures_exist() {
         "Observing scenarios fixtures directory should exist"
     );
 
-    // Check O5a files
+    // Check O4HL .dat files
     let coincs = observing_dir.join("coincs.dat");
-    assert!(coincs.exists(), "O5a coincs.dat should exist");
+    assert!(coincs.exists(), "O4HL coincs.dat should exist");
     assert!(
         coincs.metadata().unwrap().len() > 0,
-        "O5a coincs.dat should not be empty"
+        "O4HL coincs.dat should not be empty"
     );
 
     let allsky = observing_dir.join("allsky.dat");
-    assert!(allsky.exists(), "O5a allsky.dat should exist");
+    assert!(allsky.exists(), "O4HL allsky.dat should exist");
 
     let injections = observing_dir.join("injections.dat");
-    assert!(injections.exists(), "O5a injections.dat should exist");
+    assert!(injections.exists(), "O4HL injections.dat should exist");
 
-    // Check O4HL files
-    assert!(observing_dir.join("O4HL_coincs.dat").exists());
-    assert!(observing_dir.join("O4HL_allsky.dat").exists());
-    assert!(observing_dir.join("O4HL_injections.dat").exists());
-
-    // Check O5c files
-    assert!(observing_dir.join("O5c_coincs.dat").exists());
-    assert!(observing_dir.join("O5c_allsky.dat").exists());
-    assert!(observing_dir.join("O5c_injections.dat").exists());
+    // Check FITS skymap files (0.fits through 9.fits)
+    for i in 0..10 {
+        let skymap = observing_dir.join(format!("{}.fits", i));
+        assert!(skymap.exists(), "{}.fits should exist", i);
+        assert!(
+            skymap.metadata().unwrap().len() > 0,
+            "{}.fits should not be empty",
+            i
+        );
+    }
 
     println!(
-        "✓ Found {} observing scenario files",
+        "✓ Found {} observing scenario files (3 .dat + 10 .fits)",
         std::fs::read_dir(&observing_dir).unwrap().count()
     );
 }
@@ -217,9 +218,9 @@ fn test_all_fixtures_total_size() {
     );
 
     assert!(
-        file_count >= 29,
-        "Should have at least 29 fixture files (got {})",
+        file_count >= 33,
+        "Should have at least 33 fixture files: 10 GRB XMLs + 10 ZTF CSVs + 3 O4HL .dat + 10 O4HL .fits (got {})",
         file_count
     );
-    assert!(total_size > 1_000_000, "Should have at least 1MB of data");
+    assert!(total_size > 8_000_000, "Should have at least 8MB of data (10 FITS files @ 759K each + other files)");
 }

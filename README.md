@@ -468,7 +468,9 @@ The tests verify:
 ### Test Fixtures
 
 Sample data files are provided in [`tests/fixtures/`](tests/fixtures/):
-- **Observing scenarios**: 9 GW simulation data files (O5a, O4HL, O5c runs)
+- **Observing scenarios (O4HL)**: 3 GW simulation data files + 10 HEALPix skymap FITS files
+  - `coincs.dat`, `allsky.dat`, `injections.dat`
+  - `0.fits` through `9.fits` - Skymap localizations
 - **GRB XMLs**: 10 VOEvent XML files (Fermi, Swift, Einstein Probe, SVOM)
 - **Optical light curves**: 10 ZTF CSV files with real transient data
 

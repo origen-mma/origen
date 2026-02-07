@@ -15,15 +15,15 @@ tests/fixtures/
 
 Sample data files from LIGO/Virgo observing run simulations:
 
-- **O5a** (Observing Run 5a): Advanced LIGO, Advanced Virgo at design sensitivity
-  - `coincs.dat`: Coincident multi-detector triggers
-  - `allsky.dat`: All-sky search background events
-  - `injections.dat`: Simulated GW signals injected for testing
-
 - **O4HL** (Observing Run 4, High-Low sensitivity): LIGO at high sensitivity, Virgo at low sensitivity
-- **O5c** (Observing Run 5c): Advanced LIGO+, Advanced Virgo+, KAGRA at target sensitivity
+  - `coincs.dat` (164K): Coincident multi-detector triggers
+  - `allsky.dat` (2.5M): All-sky search background events
+  - `injections.dat` (521K): Simulated GW signals injected for testing
+  - `0.fits` through `9.fits` (759K each): HEALPix skymap localizations for first 10 events
 
-**Format**: Space-separated columns with GPS time, SNR, FAR, sky position, etc.
+**Format**:
+- `.dat` files: Tab-separated columns with event ID, IFOs, SNR, FAR, sky position, etc.
+- `.fits` files: HEALPix FITS format skymaps with probability distributions
 
 **Source**: [observing-scenarios](https://git.ligo.org/emfollow/observing-scenarios)
 
@@ -80,30 +80,30 @@ ZTF (Zwicky Transient Facility) light curves for 10 transient objects:
 
 ## Usage in Tests
 
-### Rust Tests
-
 ```rust
 use std::path::PathBuf;
 
 #[test]
 fn test_load_observing_scenario() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../tests/fixtures/observing_scenarios/coincs.dat");
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("tests/fixtures/observing_scenarios/coincs.dat");
     // Load and parse...
 }
-```
 
-### Python Tests (sgn-llai compatibility)
-
-```python
-import os
-from pathlib import Path
-
-FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures"
-
-def test_grb_parsing():
-    grb_xml = FIXTURES_DIR / "grb_xmls" / "fermi_grb_gcn.xml"
-    # Parse and test...
+#[test]
+fn test_load_skymap() {
+    let skymap = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("tests/fixtures/observing_scenarios/0.fits");
+    // Parse FITS skymap...
+}
 ```
 
 ## Regenerating Fixtures
@@ -112,7 +112,8 @@ To update fixtures with new data:
 
 ```bash
 # Observing scenarios (requires observing-scenarios repo)
-cp /path/to/observing-scenarios/runs/O5a/bgp/*.dat tests/fixtures/observing_scenarios/
+cp /path/to/observing-scenarios/runs/O4HL/bgp/{allsky.dat,coincs.dat,injections.dat} tests/fixtures/observing_scenarios/
+for i in {0..9}; do cp /path/to/observing-scenarios/runs/O4HL/bgp/allsky/$i.fits tests/fixtures/observing_scenarios/; done
 
 # GRB XMLs (requires gwcelery repo)
 cp /path/to/gwcelery/src/gwcelery/tests/data/*grb*.xml tests/fixtures/grb_xmls/
