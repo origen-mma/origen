@@ -1,6 +1,6 @@
 use anyhow::Result;
 use mm_core::{OpticalAlert, ParsedSkymap};
-use mm_redis::RedisStateStore;
+use mm_redis::{RedisStateStore, Versionable};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::producer::{FutureProducer, FutureRecord};
@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::f64::consts::PI;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct GWEvent {
@@ -69,7 +69,11 @@ struct CorrelatorState {
 }
 
 impl CorrelatorState {
-    fn new(time_window_grb: f64, time_window_optical: f64, redis_store: Option<RedisStateStore>) -> Self {
+    fn new(
+        time_window_grb: f64,
+        time_window_optical: f64,
+        redis_store: Option<RedisStateStore>,
+    ) -> Self {
         Self {
             gw_events: BTreeMap::new(),
             grb_events: BTreeMap::new(),
@@ -95,14 +99,20 @@ impl CorrelatorState {
                 store
             }
             Err(e) => {
-                warn!("⚠️  Failed to connect to Redis: {}. Continuing without persistence.", e);
+                warn!(
+                    "⚠️  Failed to connect to Redis: {}. Continuing without persistence.",
+                    e
+                );
                 return Ok(Self::new(time_window_grb, time_window_optical, None));
             }
         };
 
         // Check Redis health
         if let Err(e) = redis_store.ping().await {
-            warn!("⚠️  Redis ping failed: {}. Continuing without persistence.", e);
+            warn!(
+                "⚠️  Redis ping failed: {}. Continuing without persistence.",
+                e
+            );
             return Ok(Self::new(time_window_grb, time_window_optical, None));
         }
 
@@ -461,8 +471,9 @@ async fn main() -> Result<()> {
 
     // Correlator state with Redis persistence
     let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-    let mut state = CorrelatorState::recover_from_redis(time_window_grb, time_window_optical, &redis_url)
-        .await?;
+    let mut state =
+        CorrelatorState::recover_from_redis(time_window_grb, time_window_optical, &redis_url)
+            .await?;
     let mut event_count = 0;
 
     // Main event loop

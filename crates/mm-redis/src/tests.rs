@@ -47,15 +47,15 @@ async fn test_store_and_retrieve() {
         .expect("Failed to store");
 
     // Retrieve
-    let retrieved: Option<TestEvent> = store
-        .get("test:event:42")
-        .await
-        .expect("Failed to get");
+    let retrieved: Option<TestEvent> = store.get("test:event:42").await.expect("Failed to get");
 
     assert_eq!(retrieved, Some(event));
 
     // Cleanup
-    store.delete("test:event:42").await.expect("Failed to delete");
+    store
+        .delete("test:event:42")
+        .await
+        .expect("Failed to delete");
 }
 
 #[tokio::test]
@@ -87,7 +87,10 @@ async fn test_time_range_queries() {
         };
 
         let key = format!("test:time:{}", i);
-        store.store(&key, event.clone(), 60).await.expect("Failed to store");
+        store
+            .store(&key, event.clone(), 60)
+            .await
+            .expect("Failed to store");
 
         // Add to sorted set
         store

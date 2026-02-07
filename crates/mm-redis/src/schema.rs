@@ -71,7 +71,9 @@ pub trait Versionable: Sized + Serialize + for<'de> Deserialize<'de> {
     }
 
     /// Extract from versioned container
-    fn from_versioned(stored: RedisStoredEvent<serde_json::Value>) -> Result<Self, serde_json::Error> {
+    fn from_versioned(
+        stored: RedisStoredEvent<serde_json::Value>,
+    ) -> Result<Self, serde_json::Error> {
         if stored.version != CURRENT_SCHEMA_VERSION {
             warn!(
                 "Deserializing older schema version {} (current: {})",
@@ -89,7 +91,7 @@ mod tests {
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct TestEvent {
         id: u32,
-        #[serde(default)]  // Handle missing field gracefully
+        #[serde(default)] // Handle missing field gracefully
         name: Option<String>,
     }
 
@@ -124,6 +126,6 @@ mod tests {
 
         let restored = RedisStoredEvent::<TestEvent>::from_json(json).unwrap();
         assert_eq!(restored.data.id, 42);
-        assert_eq!(restored.data.name, None);  // Uses serde default
+        assert_eq!(restored.data.name, None); // Uses serde default
     }
 }

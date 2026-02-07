@@ -2,7 +2,6 @@
 ///
 /// This module provides schema-versioned storage with graceful degradation
 /// for handling schema evolution over time.
-
 mod schema;
 mod store;
 

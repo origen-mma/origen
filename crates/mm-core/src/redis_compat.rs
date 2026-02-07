@@ -2,7 +2,6 @@
 ///
 /// This module provides Versionable trait implementations for all event types
 /// to enable schema-versioned storage in Redis.
-
 use crate::events::{GWEvent, GammaRayEvent, NeutrinoEvent, XRayEvent};
 use crate::optical::OpticalAlert;
 

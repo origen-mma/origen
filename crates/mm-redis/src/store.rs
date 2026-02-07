@@ -100,7 +100,12 @@ impl RedisStateStore {
     /// * `set_key` - Sorted set key (e.g., "gw_events")
     /// * `score` - Sort score (typically GPS time or MJD)
     /// * `member` - Set member (typically event ID)
-    pub async fn zadd<M>(&mut self, set_key: &str, score: f64, member: M) -> Result<(), RedisStoreError>
+    pub async fn zadd<M>(
+        &mut self,
+        set_key: &str,
+        score: f64,
+        member: M,
+    ) -> Result<(), RedisStoreError>
     where
         M: redis::ToRedisArgs + Send + Sync,
     {
@@ -172,11 +177,7 @@ impl RedisStateStore {
                 None => {
                     failed += 1;
                     // Remove stale reference from sorted set
-                    let _: () = self
-                        .conn_manager
-                        .zrem(set_key, &id)
-                        .await
-                        .unwrap_or(());
+                    let _: () = self.conn_manager.zrem(set_key, &id).await.unwrap_or(());
                 }
             }
         }
@@ -208,7 +209,9 @@ impl RedisStateStore {
 
     /// Check if Redis connection is alive
     pub async fn ping(&mut self) -> Result<(), RedisStoreError> {
-        let pong: String = redis::cmd("PING").query_async(&mut self.conn_manager).await?;
+        let pong: String = redis::cmd("PING")
+            .query_async(&mut self.conn_manager)
+            .await?;
         if pong == "PONG" {
             Ok(())
         } else {
