@@ -20,3 +20,19 @@ pub enum ParseError {
     #[error("Invalid format: {0}")]
     InvalidFormat(String),
 }
+
+/// Core module errors
+#[derive(Debug, Error)]
+pub enum CoreError {
+    #[error("Insufficient data: {0}")]
+    InsufficientData(String),
+
+    #[error("Invalid parameter: {0}")]
+    InvalidParameter(String),
+
+    #[error("Fitting error: {0}")]
+    FittingError(String),
+
+    #[error("Parse error: {0}")]
+    ParseError(#[from] ParseError),
+}

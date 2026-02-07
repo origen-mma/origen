@@ -13,6 +13,7 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 csv = { workspace = true }
 rand = { workspace = true }
+rand_distr = { workspace = true }
 tracing = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }

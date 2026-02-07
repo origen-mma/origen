@@ -222,5 +222,8 @@ fn test_all_fixtures_total_size() {
         "Should have at least 33 fixture files: 10 GRB XMLs + 10 ZTF CSVs + 3 O4HL .dat + 10 O4HL .fits (got {})",
         file_count
     );
-    assert!(total_size > 8_000_000, "Should have at least 8MB of data (10 FITS files @ 759K each + other files)");
+    assert!(
+        total_size > 8_000_000,
+        "Should have at least 8MB of data (10 FITS files @ 759K each + other files)"
+    );
 }
