@@ -153,7 +153,8 @@ async fn test_basic_state_recovery() {
 
     // Verify events are in Redis
     let stored1: Option<TestGWEvent> = store.get("event:gw:100").await.unwrap();
-    assert_eq!(stored1, Some(event1.clone()));
+    assert!(stored1.is_some());
+    assert_gw_event_eq(stored1.as_ref().unwrap(), &event1);
 
     // === PHASE 2: Service restart - recover state ===
 
