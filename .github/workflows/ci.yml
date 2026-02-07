@@ -26,9 +26,9 @@ jobs:
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
           sudo apt-get update
-          sudo apt-get install -y libcfitsio-dev
+          sudo apt-get install -y libcfitsio-dev libsasl2-dev
         elif [ "$RUNNER_OS" == "macOS" ]; then
-          brew install cfitsio
+          brew install cfitsio cyrus-sasl
         fi
       shell: bash
 
@@ -85,9 +85,9 @@ jobs:
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
           sudo apt-get update
-          sudo apt-get install -y libcfitsio-dev
+          sudo apt-get install -y libcfitsio-dev libsasl2-dev
         elif [ "$RUNNER_OS" == "macOS" ]; then
-          brew install cfitsio
+          brew install cfitsio cyrus-sasl
         fi
       shell: bash
 
@@ -130,7 +130,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libcfitsio-dev
+        sudo apt-get install -y libcfitsio-dev libsasl2-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
@@ -173,7 +173,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libcfitsio-dev
+        sudo apt-get install -y libcfitsio-dev libsasl2-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
