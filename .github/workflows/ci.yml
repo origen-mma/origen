@@ -22,6 +22,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install -y libcfitsio-dev
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          brew install cfitsio
+        fi
+      shell: bash
+
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@master
       with:
@@ -71,6 +81,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install -y libcfitsio-dev
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          brew install cfitsio
+        fi
+      shell: bash
+
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
 
@@ -106,6 +126,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcfitsio-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
@@ -144,6 +169,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcfitsio-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
