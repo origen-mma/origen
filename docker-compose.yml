@@ -76,9 +76,25 @@ services:
     depends_on:
       - prometheus
 
+  # Redis for state persistence
+  redis:
+    image: redis:7-alpine
+    container_name: mm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   zookeeper-data:
   zookeeper-logs:
   kafka-data:
   prometheus-data:
   grafana-data:
+  redis-data:

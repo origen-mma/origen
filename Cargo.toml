@@ -5,6 +5,7 @@ members = [
     "crates/mm-correlator",
     "crates/mm-boom",
     "crates/mm-config",
+    "crates/mm-redis",
     "crates/mm-service",
     "crates/mm-simulation",
 ]

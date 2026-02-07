@@ -5,6 +5,7 @@ pub mod io;
 pub mod lightcurve;
 pub mod optical;
 pub mod position;
+pub mod redis_compat;
 pub mod skymap;
 pub mod skymap_parser;
 pub mod skymap_storage;
