@@ -550,12 +550,42 @@ Astronomy:
 
 ## Development
 
+### Pre-commit Hooks
+
+Install [pre-commit](https://pre-commit.com/) to automatically format and lint code before commits:
+
+```bash
+# Install pre-commit (macOS)
+brew install pre-commit
+
+# Or with pip
+pip install pre-commit
+
+# Install git hooks
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+```
+
+The pre-commit hooks will automatically:
+- Format code with `cargo fmt`
+- Lint code with `cargo clippy`
+
+### Manual Commands
+
 ```bash
 # Format code
 cargo fmt
 
+# Check formatting without modifying files
+cargo fmt --check
+
 # Run linter
 cargo clippy -- -D warnings
+
+# Run linter on all targets
+cargo clippy --all-targets --all-features -- -D warnings
 
 # Watch mode (requires cargo-watch)
 cargo install cargo-watch
