@@ -1,6 +1,6 @@
 # Rust Multi-Messenger Superevent Manager
 
-[![CI](https://github.com/yourusername/rust-mm-superevent/workflows/CI/badge.svg)](https://github.com/yourusername/rust-mm-superevent/actions)
+[![CI](https://github.com/mcoughlin/origin/workflows/CI/badge.svg)](https://github.com/mcoughlin/origin/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
