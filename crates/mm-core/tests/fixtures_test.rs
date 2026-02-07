@@ -53,10 +53,7 @@ fn test_observing_scenario_fixtures_exist() {
 #[test]
 fn test_grb_xml_fixtures_exist() {
     let grb_dir = fixtures_dir().join("grb_xmls");
-    assert!(
-        grb_dir.exists(),
-        "GRB XMLs fixtures directory should exist"
-    );
+    assert!(grb_dir.exists(), "GRB XMLs fixtures directory should exist");
 
     // Check for expected GRB XML files
     let expected_files = vec![
@@ -154,9 +151,7 @@ fn test_parse_observing_scenario_data() {
     );
 
     // First field should be parseable as a number (event ID)
-    let _event_id: u32 = fields[0]
-        .parse()
-        .expect("First field should be event ID");
+    let _event_id: u32 = fields[0].parse().expect("First field should be event ID");
 
     // Third field should be parseable as SNR
     let _snr: f64 = fields[2].parse().expect("Third field should be SNR");
@@ -193,10 +188,7 @@ fn test_parse_optical_lightcurve() {
         // Parse flux
         let _flux: f64 = fields[1].parse().expect("Second field should be flux");
 
-        println!(
-            "✓ Parsed light curve with {} measurements",
-            lines.len() - 1
-        );
+        println!("✓ Parsed light curve with {} measurements", lines.len() - 1);
     }
 }
 
@@ -224,6 +216,10 @@ fn test_all_fixtures_total_size() {
         total_size as f64 / 1_048_576.0
     );
 
-    assert!(file_count >= 29, "Should have at least 29 fixture files (got {})", file_count);
+    assert!(
+        file_count >= 29,
+        "Should have at least 29 fixture files (got {})",
+        file_count
+    );
     assert!(total_size > 1_000_000, "Should have at least 1MB of data");
 }
