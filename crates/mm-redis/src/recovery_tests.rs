@@ -51,21 +51,51 @@ impl Versionable for TestOpticalAlert {
 // Helper functions for floating-point tolerant comparisons
 fn assert_gw_event_eq(left: &TestGWEvent, right: &TestGWEvent) {
     assert_eq!(left.simulation_id, right.simulation_id);
-    assert!((left.gpstime - right.gpstime).abs() < 1e-6, "gpstime mismatch: {} vs {}", left.gpstime, right.gpstime);
-    assert!((left.snr - right.snr).abs() < 1e-6, "snr mismatch: {} vs {}", left.snr, right.snr);
+    assert!(
+        (left.gpstime - right.gpstime).abs() < 1e-6,
+        "gpstime mismatch: {} vs {}",
+        left.gpstime,
+        right.gpstime
+    );
+    assert!(
+        (left.snr - right.snr).abs() < 1e-6,
+        "snr mismatch: {} vs {}",
+        left.snr,
+        right.snr
+    );
 }
 
 fn assert_grb_event_eq(left: &TestGRBEvent, right: &TestGRBEvent) {
     assert_eq!(left.simulation_id, right.simulation_id);
-    assert!((left.detection_time - right.detection_time).abs() < 1e-6, "detection_time mismatch: {} vs {}", left.detection_time, right.detection_time);
+    assert!(
+        (left.detection_time - right.detection_time).abs() < 1e-6,
+        "detection_time mismatch: {} vs {}",
+        left.detection_time,
+        right.detection_time
+    );
     assert_eq!(left.instrument, right.instrument);
 }
 
 fn assert_optical_alert_eq(left: &TestOpticalAlert, right: &TestOpticalAlert) {
     assert_eq!(left.object_id, right.object_id);
-    assert!((left.mjd - right.mjd).abs() < 1e-6, "mjd mismatch: {} vs {}", left.mjd, right.mjd);
-    assert!((left.ra - right.ra).abs() < 1e-6, "ra mismatch: {} vs {}", left.ra, right.ra);
-    assert!((left.dec - right.dec).abs() < 1e-6, "dec mismatch: {} vs {}", left.dec, right.dec);
+    assert!(
+        (left.mjd - right.mjd).abs() < 1e-6,
+        "mjd mismatch: {} vs {}",
+        left.mjd,
+        right.mjd
+    );
+    assert!(
+        (left.ra - right.ra).abs() < 1e-6,
+        "ra mismatch: {} vs {}",
+        left.ra,
+        right.ra
+    );
+    assert!(
+        (left.dec - right.dec).abs() < 1e-6,
+        "dec mismatch: {} vs {}",
+        left.dec,
+        right.dec
+    );
 }
 
 #[tokio::test]
