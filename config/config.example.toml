@@ -38,5 +38,8 @@ max_superevent_age = 7200.0
 
 [simulation]
 enabled = true
-ztf_csv_dir = "/Users/mcoughlin/Code/ORIGIN/lightcurves_csv"
+# For testing/development, use the test fixtures directory
+# For production, use your full ZTF CSV directory
+ztf_csv_dir = "tests/fixtures/lightcurves_csv"
 delay_ms = 0
+skymap_storage_dir = "/tmp/skymaps"
