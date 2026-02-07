@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::env;
 use std::f64::consts::PI;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +24,12 @@ struct GWEvent {
     skymap_path: String,
 }
 
+impl Versionable for GWEvent {
+    fn schema_name() -> &'static str {
+        "GWEvent"
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct GRBEvent {
     simulation_id: u32,
@@ -31,6 +39,22 @@ struct GRBEvent {
     error_radius: f64,
     instrument: String,
     skymap_path: String,
+}
+
+impl Versionable for GRBEvent {
+    fn schema_name() -> &'static str {
+        "GRBEvent"
+    }
+}
+
+// Newtype wrapper for OpticalAlert to work around orphan rule
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpticalAlertWrapper(OpticalAlert);
+
+impl Versionable for OpticalAlertWrapper {
+    fn schema_name() -> &'static str {
+        "OpticalAlert"
+    }
 }
 
 #[derive(Debug)]
@@ -65,14 +89,14 @@ struct CorrelatorState {
     time_window_grb: f64,     // GW-GRB window (seconds)
     time_window_optical: f64, // GW-Optical window (seconds)
     correlations: Vec<Correlation>,
-    _redis_store: Option<RedisStateStore>, // Optional for graceful degradation (TODO: use for persistence)
+    redis_store: Option<Arc<Mutex<RedisStateStore>>>, // Optional for graceful degradation
 }
 
 impl CorrelatorState {
     fn new(
         time_window_grb: f64,
         time_window_optical: f64,
-        redis_store: Option<RedisStateStore>,
+        redis_store: Option<Arc<Mutex<RedisStateStore>>>,
     ) -> Self {
         Self {
             gw_events: BTreeMap::new(),
@@ -81,7 +105,7 @@ impl CorrelatorState {
             time_window_grb,
             time_window_optical,
             correlations: Vec::new(),
-            _redis_store: redis_store,
+            redis_store,
         }
     }
 
@@ -134,7 +158,7 @@ impl CorrelatorState {
             time_window_grb,
             time_window_optical,
             correlations: Vec::new(),
-            _redis_store: Some(redis_store),
+            redis_store: Some(Arc::new(Mutex::new(redis_store))),
         })
     }
 
@@ -164,9 +188,23 @@ impl CorrelatorState {
         }
 
         let sim_id = event.simulation_id;
+        let gps_time = event.gpstime;
 
-        // TODO: Persist to Redis (requires Versionable trait implementation for GWEvent)
-        // Note: RedisStateStore is available in self.redis_store
+        // Persist to Redis (non-blocking)
+        if let Some(redis) = self.redis_store.clone() {
+            let event_clone = event.clone();
+            tokio::spawn(async move {
+                let key = format!("event:gw:{}", sim_id);
+                let ttl = 7200; // 2 hours
+                let mut store = redis.lock().await;
+                if let Err(e) = store.store(&key, event_clone, ttl).await {
+                    error!("Failed to persist GW event {} to Redis: {}", sim_id, e);
+                } else {
+                    // Add to sorted set for time-range queries
+                    let _ = store.zadd("gw_events", gps_time, sim_id.to_string()).await;
+                }
+            });
+        }
 
         self.gw_events.insert(sim_id, event);
     }
@@ -197,9 +235,25 @@ impl CorrelatorState {
         }
 
         let sim_id = event.simulation_id;
+        let detection_time = event.detection_time;
 
-        // TODO: Persist to Redis (requires Versionable trait implementation for GRBEvent)
-        // Note: RedisStateStore is available in self.redis_store
+        // Persist to Redis (non-blocking)
+        if let Some(redis) = self.redis_store.clone() {
+            let event_clone = event.clone();
+            tokio::spawn(async move {
+                let key = format!("event:grb:{}", sim_id);
+                let ttl = 7200; // 2 hours
+                let mut store = redis.lock().await;
+                if let Err(e) = store.store(&key, event_clone, ttl).await {
+                    error!("Failed to persist GRB event {} to Redis: {}", sim_id, e);
+                } else {
+                    // Add to sorted set for time-range queries
+                    let _ = store
+                        .zadd("grb_events", detection_time, sim_id.to_string())
+                        .await;
+                }
+            });
+        }
 
         self.grb_events.insert(sim_id, event);
     }
@@ -246,9 +300,27 @@ impl CorrelatorState {
         }
 
         let object_id = alert.object_id.clone();
+        let mjd = alert.mjd;
 
-        // TODO: Persist to Redis (requires Versionable trait implementation for OpticalAlert)
-        // Note: OpticalAlert from mm-core already implements Versionable, just needs async handling
+        // Persist to Redis (non-blocking)
+        if let Some(redis) = self.redis_store.clone() {
+            let wrapped_alert = OpticalAlertWrapper(alert.clone());
+            let object_id_clone = object_id.clone();
+            tokio::spawn(async move {
+                let key = format!("event:optical:{}", object_id_clone);
+                let ttl = 86400; // 1 day
+                let mut store = redis.lock().await;
+                if let Err(e) = store.store(&key, wrapped_alert, ttl).await {
+                    error!(
+                        "Failed to persist optical alert {} to Redis: {}",
+                        object_id_clone, e
+                    );
+                } else {
+                    // Add to sorted set for time-range queries
+                    let _ = store.zadd("optical_alerts", mjd, object_id_clone).await;
+                }
+            });
+        }
 
         self.optical_alerts.insert(object_id, alert);
     }
