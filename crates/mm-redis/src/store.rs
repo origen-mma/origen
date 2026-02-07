@@ -1,5 +1,4 @@
 use redis::{aio::ConnectionManager, AsyncCommands, Client};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
@@ -8,8 +7,8 @@ use crate::schema::{RedisStoredEvent, Versionable};
 
 /// Redis state store for multi-messenger events
 pub struct RedisStateStore {
-    client: Client,
-    conn_manager: ConnectionManager,
+    _client: Client,
+    pub(crate) conn_manager: ConnectionManager,
 }
 
 #[derive(Debug, Error)]
@@ -33,7 +32,7 @@ impl RedisStateStore {
         info!("Successfully connected to Redis");
 
         Ok(Self {
-            client,
+            _client: client,
             conn_manager,
         })
     }
@@ -56,7 +55,7 @@ impl RedisStateStore {
         let versioned = event.to_versioned();
         let json = versioned.to_json()?;
 
-        self.conn_manager.set_ex(key, json, ttl_seconds).await?;
+        let _: () = self.conn_manager.set_ex(key, json, ttl_seconds).await?;
 
         debug!("Stored {} with TTL {}s", key, ttl_seconds);
         Ok(())
@@ -247,6 +246,7 @@ impl RedisStateStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct TestEvent {

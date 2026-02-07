@@ -6,7 +6,7 @@
 mod schema;
 mod store;
 
-pub use schema::{RedisStoredEvent, CURRENT_SCHEMA_VERSION};
+pub use schema::{RedisStoredEvent, Versionable, CURRENT_SCHEMA_VERSION};
 pub use store::{RedisStateStore, RedisStoreError};
 
 #[cfg(test)]

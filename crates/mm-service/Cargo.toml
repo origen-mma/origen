@@ -100,6 +100,7 @@ mm-gcn = { path = "../mm-gcn" }
 mm-correlator = { path = "../mm-correlator" }
 mm-boom = { path = "../mm-boom" }
 mm-config = { path = "../mm-config" }
+mm-redis = { path = "../mm-redis" }
 mm-simulation = { path = "../mm-simulation" }
 gcn-kafka = { workspace = true }
 rand = { workspace = true }

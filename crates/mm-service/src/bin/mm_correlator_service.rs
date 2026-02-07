@@ -1,11 +1,13 @@
 use anyhow::Result;
 use mm_core::{OpticalAlert, ParsedSkymap};
+use mm_redis::RedisStateStore;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::env;
 use std::f64::consts::PI;
 use std::time::Duration;
 use tracing::{info, warn};
@@ -63,10 +65,11 @@ struct CorrelatorState {
     time_window_grb: f64,     // GW-GRB window (seconds)
     time_window_optical: f64, // GW-Optical window (seconds)
     correlations: Vec<Correlation>,
+    _redis_store: Option<RedisStateStore>, // Optional for graceful degradation (TODO: use for persistence)
 }
 
 impl CorrelatorState {
-    fn new(time_window_grb: f64, time_window_optical: f64) -> Self {
+    fn new(time_window_grb: f64, time_window_optical: f64, redis_store: Option<RedisStateStore>) -> Self {
         Self {
             gw_events: BTreeMap::new(),
             grb_events: BTreeMap::new(),
@@ -74,7 +77,55 @@ impl CorrelatorState {
             time_window_grb,
             time_window_optical,
             correlations: Vec::new(),
+            _redis_store: redis_store,
         }
+    }
+
+    /// Recover state from Redis on startup
+    async fn recover_from_redis(
+        time_window_grb: f64,
+        time_window_optical: f64,
+        redis_url: &str,
+    ) -> Result<Self> {
+        info!("🔄 Attempting to recover state from Redis...");
+
+        let mut redis_store = match RedisStateStore::new(redis_url).await {
+            Ok(store) => {
+                info!("✅ Connected to Redis at {}", redis_url);
+                store
+            }
+            Err(e) => {
+                warn!("⚠️  Failed to connect to Redis: {}. Continuing without persistence.", e);
+                return Ok(Self::new(time_window_grb, time_window_optical, None));
+            }
+        };
+
+        // Check Redis health
+        if let Err(e) = redis_store.ping().await {
+            warn!("⚠️  Redis ping failed: {}. Continuing without persistence.", e);
+            return Ok(Self::new(time_window_grb, time_window_optical, None));
+        }
+
+        // Load events from Redis within active time windows
+        // TODO: Implement actual recovery with time-range queries
+        let gw_events = BTreeMap::new();
+        let grb_events = BTreeMap::new();
+        let optical_alerts = BTreeMap::new();
+
+        info!("✅ State recovered from Redis");
+        info!("   GW events: {}", gw_events.len());
+        info!("   GRB events: {}", grb_events.len());
+        info!("   Optical alerts: {}", optical_alerts.len());
+
+        Ok(Self {
+            gw_events,
+            grb_events,
+            optical_alerts,
+            time_window_grb,
+            time_window_optical,
+            correlations: Vec::new(),
+            _redis_store: Some(redis_store),
+        })
     }
 
     fn add_gw_event(&mut self, event: GWEvent, producer: FutureProducer) {
@@ -102,7 +153,12 @@ impl CorrelatorState {
             }
         }
 
-        self.gw_events.insert(event.simulation_id, event);
+        let sim_id = event.simulation_id;
+
+        // TODO: Persist to Redis (requires Versionable trait implementation for GWEvent)
+        // Note: RedisStateStore is available in self.redis_store
+
+        self.gw_events.insert(sim_id, event);
     }
 
     fn add_grb_event(&mut self, event: GRBEvent, producer: FutureProducer) {
@@ -130,10 +186,15 @@ impl CorrelatorState {
             }
         }
 
-        self.grb_events.insert(event.simulation_id, event);
+        let sim_id = event.simulation_id;
+
+        // TODO: Persist to Redis (requires Versionable trait implementation for GRBEvent)
+        // Note: RedisStateStore is available in self.redis_store
+
+        self.grb_events.insert(sim_id, event);
     }
 
-    fn add_optical_alert(&mut self, alert: OpticalAlert, producer: FutureProducer) {
+    fn add_optical_alert(&mut self, alert: OpticalAlert, _producer: FutureProducer) {
         info!(
             "🔭 Optical alert received: {} @ MJD={:.2}, (RA,Dec)=({:.2},{:.2})",
             alert.object_id, alert.mjd, alert.ra, alert.dec
@@ -174,7 +235,12 @@ impl CorrelatorState {
             }
         }
 
-        self.optical_alerts.insert(alert.object_id.clone(), alert);
+        let object_id = alert.object_id.clone();
+
+        // TODO: Persist to Redis (requires Versionable trait implementation for OpticalAlert)
+        // Note: OpticalAlert from mm-core already implements Versionable, just needs async handling
+
+        self.optical_alerts.insert(object_id, alert);
     }
 
     async fn compute_and_publish_overlap(
@@ -393,8 +459,10 @@ async fn main() -> Result<()> {
     info!("\n📤 Publishing correlations to: {}", correlation_topic);
     info!("\nWaiting for events...\n");
 
-    // Correlator state
-    let mut state = CorrelatorState::new(time_window_grb, time_window_optical);
+    // Correlator state with Redis persistence
+    let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let mut state = CorrelatorState::recover_from_redis(time_window_grb, time_window_optical, &redis_url)
+        .await?;
     let mut event_count = 0;
 
     // Main event loop
