@@ -1,0 +1,42 @@
+[gcn]
+client_id = "CHANGE_ME"
+client_secret = "CHANGE_ME"
+topics = [
+    "igwn.gwalert",
+    "gcn.notices.swift.bat.guano",
+    "gcn.notices.einstein_probe.wxt.alert",
+    "gcn.notices.icecube.lvk_nu_track_search",
+    "gcn.notices.icecube.gold_bronze_track_alerts",
+    "gcn.circulars",
+]
+
+[boom]
+bootstrap_servers = "kaboom.caltech.edu:9093"
+sasl_username = "CHANGE_ME"
+sasl_password = "CHANGE_ME"
+group_id = "origin"
+topics = [
+    "babamul.ztf.no-lsst-match.stellar",
+    "babamul.ztf.no-lsst-match.hosted",
+    "babamul.ztf.no-lsst-match.hostless",
+    "babamul.ztf.ztfbh-partnership.stellar",
+    "babamul.ztf.ztfbh-partnership.hosted",
+    "babamul.ztf.ztfbh-partnership.hostless",
+    "babamul.ztf.ztf-partnership.stellar",
+    "babamul.ztf.ztf-partnership.hosted",
+    "babamul.ztf.ztf-partnership.hostless",
+]
+
+[correlator]
+time_window_before = -1.0
+time_window_after = 86400.0
+spatial_threshold = 5.0
+far_threshold = 0.03333333333333333
+background_rate = 1.0
+trials_factor = 7.0
+max_superevent_age = 7200.0
+
+[simulation]
+enabled = true
+ztf_csv_dir = "/Users/mcoughlin/Code/ORIGIN/lightcurves_csv"
+delay_ms = 0

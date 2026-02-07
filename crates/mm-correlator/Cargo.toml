@@ -1,0 +1,21 @@
+[package]
+name = "mm-correlator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+mm-core = { path = "../mm-core" }
+ordered-float = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8"
+
+# Phase 3: Will add spatial matching dependencies
+# healpix = { workspace = true }

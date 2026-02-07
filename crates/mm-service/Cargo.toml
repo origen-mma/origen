@@ -1,0 +1,116 @@
+[package]
+name = "mm-service"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "mm-service"
+path = "src/main.rs"
+
+[[bin]]
+name = "analyze-ztf"
+path = "src/bin/analyze_ztf.rs"
+
+[[bin]]
+name = "mm-correlator-demo"
+path = "src/bin/mm_correlator_demo.rs"
+
+[[bin]]
+name = "generate-config"
+path = "src/bin/generate_config.rs"
+
+[[bin]]
+name = "fermi-skymap-demo"
+path = "src/bin/fermi_skymap_demo.rs"
+
+[[bin]]
+name = "healpix-demo"
+path = "src/bin/healpix_demo.rs"
+
+[[bin]]
+name = "real-skymap-demo"
+path = "src/bin/real_skymap_demo.rs"
+
+[[bin]]
+name = "ligo-skymap-demo"
+path = "src/bin/ligo_skymap_demo.rs"
+
+[[bin]]
+name = "mm-simulation-demo"
+path = "src/bin/mm_simulation_demo.rs"
+
+[[bin]]
+name = "test-voevent-parser"
+path = "src/bin/test_voevent_parser.rs"
+
+[[bin]]
+name = "plot-injection-skymap"
+path = "src/bin/plot_injection_skymap.rs"
+
+[[bin]]
+name = "calculate-pp-values"
+path = "src/bin/calculate_pp_values.rs"
+
+[[bin]]
+name = "demo-grb-overlay"
+path = "src/bin/demo_grb_overlay.rs"
+
+[[bin]]
+name = "generate-grb-simulations"
+path = "src/bin/generate_grb_simulations.rs"
+
+[[bin]]
+name = "demo-grb-overlay-simulated"
+path = "src/bin/demo_grb_overlay_simulated.rs"
+
+[[bin]]
+name = "generate-grb-skymaps"
+path = "src/bin/generate_grb_skymaps.rs"
+
+[[bin]]
+name = "compute-overlap"
+path = "src/bin/compute_overlap.rs"
+
+[[bin]]
+name = "batch-compute-overlap"
+path = "src/bin/batch_compute_overlap.rs"
+
+[[bin]]
+name = "stream-events"
+path = "src/bin/stream_events.rs"
+
+[[bin]]
+name = "mm-correlator-service"
+path = "src/bin/mm_correlator_service.rs"
+
+[[bin]]
+name = "correlation-exporter"
+path = "src/bin/correlation_exporter.rs"
+
+[[bin]]
+name = "stream-optical-alerts"
+path = "src/bin/stream_optical_alerts.rs"
+
+[dependencies]
+mm-core = { path = "../mm-core" }
+mm-gcn = { path = "../mm-gcn" }
+mm-correlator = { path = "../mm-correlator" }
+mm-boom = { path = "../mm-boom" }
+mm-config = { path = "../mm-config" }
+mm-simulation = { path = "../mm-simulation" }
+gcn-kafka = { workspace = true }
+rand = { workspace = true }
+rdkafka = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+cdshealpix = { workspace = true }
+fitsio = { workspace = true }
+moc = { workspace = true }
+csv = { workspace = true }

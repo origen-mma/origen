@@ -1,0 +1,22 @@
+[package]
+name = "mm-simulation"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+mm-core = { path = "../mm-core" }
+mm-correlator = { path = "../mm-correlator" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+cdshealpix = { workspace = true }
+fitsio = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+
+# XML parsing for VOEvent
+quick-xml = "0.36"
