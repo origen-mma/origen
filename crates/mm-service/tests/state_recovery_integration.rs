@@ -166,10 +166,16 @@ async fn test_correlator_state_recovery() {
 
     let mut state1 = TestCorrelatorState::new(redis_arc.clone());
 
+    // Use current Unix time for test events
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+
     // Add GW events
     let gw1 = TestGWEvent {
         simulation_id: 500,
-        gpstime: 1412546900.0,
+        gpstime: now - 3600.0, // 1 hour ago
         pipeline: "SGNL".to_string(),
         snr: 25.5,
         far: 1e-12,
@@ -179,7 +185,7 @@ async fn test_correlator_state_recovery() {
 
     let gw2 = TestGWEvent {
         simulation_id: 501,
-        gpstime: 1412547000.0,
+        gpstime: now - 1800.0, // 30 minutes ago
         pipeline: "pycbc".to_string(),
         snr: 20.1,
         far: 5e-10,
@@ -190,7 +196,7 @@ async fn test_correlator_state_recovery() {
     // Add GRB event (correlated with gw1)
     let grb1 = TestGRBEvent {
         simulation_id: 500,
-        detection_time: 1412546902.0,
+        detection_time: now - 3598.0, // 2 seconds after gw1
         ra: 180.0,
         dec: 30.0,
         error_radius: 5.0,
