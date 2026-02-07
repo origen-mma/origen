@@ -123,6 +123,16 @@ jobs:
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
     - uses: actions/checkout@v4
@@ -141,6 +151,13 @@ jobs:
         cargo build --release --bin stream-events
         cargo build --release --bin stream-optical-alerts
         cargo build --release --bin correlation-exporter
+
+    - name: Run Redis integration tests
+      run: |
+        cargo test -p mm-redis -- --ignored --test-threads=1
+        cargo test -p mm-service --test state_recovery_integration -- --ignored --test-threads=1
+      env:
+        REDIS_URL: redis://localhost:6379
 
   docker:
     name: Docker Build
