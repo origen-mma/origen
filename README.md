@@ -497,7 +497,28 @@ Run the test suite to see real ZTF light curve fitting in action:
 cargo test -p mm-core --test lightcurve_fitting_test -- --nocapture
 ```
 
-**Real output from ZTF transients:**
+**Visual Results** - SVI fits on real ZTF transients:
+
+<table>
+<tr>
+<td width="33%">
+<img src="docs/plots/ZTF25aaaalin_Bazin_Supernova-like.png" alt="Supernova-like transient fit">
+<br><b>Supernova-like</b><br>36 measurements, Bazin model<br>t0 = 60674.730 ± 0.368 MJD
+</td>
+<td width="33%">
+<img src="docs/plots/ZTF25aaaawig_PowerLaw_Fast_transient.png" alt="Fast transient fit">
+<br><b>Fast transient</b><br>50 measurements, PowerLaw model<br>t0 = 60670.552 ± 0.344 MJD
+</td>
+<td width="33%">
+<img src="docs/plots/ZTF25aaabnwi_MetzgerKN_Kilonova_candidate.png" alt="Kilonova candidate fit">
+<br><b>Kilonova candidate</b><br>867 measurements, MetzgerKN model<br>t0 = 60483.478 ± 0.359 MJD
+</td>
+</tr>
+</table>
+
+*Blue points: observed data with error bars. Red line: SVI model fit. Green line: estimated t0 (merger/explosion time).*
+
+**Console output from ZTF transients:**
 
 ```
 test test_fit_bazin_model ...

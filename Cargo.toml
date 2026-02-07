@@ -56,6 +56,7 @@ ordered-float = "4.2"
 rand = "0.8"
 rand_distr = "0.4"
 quick-xml = "0.36"  # XML parsing for VOEvent
+plotters = "0.3"    # Plotting for visualizations
 
 # HTTP client for skymap downloads
 reqwest = { version = "0.12", features = ["rustls-tls"] }
