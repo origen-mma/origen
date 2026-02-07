@@ -207,6 +207,19 @@ impl RedisStateStore {
         Ok(())
     }
 
+    /// Delete multiple keys at once
+    pub async fn delete_keys(&mut self, keys: &[&str]) -> Result<(), RedisStoreError> {
+        if keys.is_empty() {
+            return Ok(());
+        }
+        let _: () = redis::cmd("DEL")
+            .arg(keys)
+            .query_async(&mut self.conn_manager)
+            .await?;
+        debug!("Deleted {} keys", keys.len());
+        Ok(())
+    }
+
     /// Check if Redis connection is alive
     pub async fn ping(&mut self) -> Result<(), RedisStoreError> {
         let pong: String = redis::cmd("PING")
