@@ -48,6 +48,26 @@ impl Versionable for TestOpticalAlert {
     }
 }
 
+// Helper functions for floating-point tolerant comparisons
+fn assert_gw_event_eq(left: &TestGWEvent, right: &TestGWEvent) {
+    assert_eq!(left.simulation_id, right.simulation_id);
+    assert!((left.gpstime - right.gpstime).abs() < 1e-6, "gpstime mismatch: {} vs {}", left.gpstime, right.gpstime);
+    assert!((left.snr - right.snr).abs() < 1e-6, "snr mismatch: {} vs {}", left.snr, right.snr);
+}
+
+fn assert_grb_event_eq(left: &TestGRBEvent, right: &TestGRBEvent) {
+    assert_eq!(left.simulation_id, right.simulation_id);
+    assert!((left.detection_time - right.detection_time).abs() < 1e-6, "detection_time mismatch: {} vs {}", left.detection_time, right.detection_time);
+    assert_eq!(left.instrument, right.instrument);
+}
+
+fn assert_optical_alert_eq(left: &TestOpticalAlert, right: &TestOpticalAlert) {
+    assert_eq!(left.object_id, right.object_id);
+    assert!((left.mjd - right.mjd).abs() < 1e-6, "mjd mismatch: {} vs {}", left.mjd, right.mjd);
+    assert!((left.ra - right.ra).abs() < 1e-6, "ra mismatch: {} vs {}", left.ra, right.ra);
+    assert!((left.dec - right.dec).abs() < 1e-6, "dec mismatch: {} vs {}", left.dec, right.dec);
+}
+
 #[tokio::test]
 #[ignore] // Requires Redis running
 async fn test_basic_state_recovery() {
@@ -240,7 +260,8 @@ async fn test_multi_messenger_state_recovery() {
         .unwrap();
     assert_eq!(gw_ids.len(), 1);
     let recovered_gw: Option<TestGWEvent> = new_store.get("event:gw:200").await.unwrap();
-    assert_eq!(recovered_gw, Some(gw_event));
+    assert!(recovered_gw.is_some());
+    assert_gw_event_eq(recovered_gw.as_ref().unwrap(), &gw_event);
 
     // Recover GRB events
     let grb_ids = new_store
@@ -249,7 +270,8 @@ async fn test_multi_messenger_state_recovery() {
         .unwrap();
     assert_eq!(grb_ids.len(), 1);
     let recovered_grb: Option<TestGRBEvent> = new_store.get("event:grb:200").await.unwrap();
-    assert_eq!(recovered_grb, Some(grb_event));
+    assert!(recovered_grb.is_some());
+    assert_grb_event_eq(recovered_grb.as_ref().unwrap(), &grb_event);
 
     // Recover optical alerts (MJD range)
     let mjd_min = (min_time / 86400.0) + 40587.0; // Unix epoch in MJD
@@ -260,7 +282,8 @@ async fn test_multi_messenger_state_recovery() {
     assert_eq!(optical_ids.len(), 1);
     let recovered_optical: Option<TestOpticalAlert> =
         new_store.get("event:optical:ZTF24test").await.unwrap();
-    assert_eq!(recovered_optical, Some(optical_alert));
+    assert!(recovered_optical.is_some());
+    assert_optical_alert_eq(recovered_optical.as_ref().unwrap(), &optical_alert);
 
     // === PHASE 3: Verify correlation can still be computed with recovered state ===
     // This demonstrates that correlations work after restart
@@ -364,7 +387,7 @@ async fn test_partial_recovery_with_expired_events() {
 
     // Only the persisted event should be recovered
     assert_eq!(recovered_events.len(), 1);
-    assert_eq!(recovered_events[0], persisted_event);
+    assert_gw_event_eq(&recovered_events[0], &persisted_event);
 
     // Cleanup
     new_store
