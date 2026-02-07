@@ -64,15 +64,21 @@ async fn test_basic_state_recovery() {
 
     // === PHASE 1: Initial service run - store events ===
 
+    // Use current Unix time for test events
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+
     // Simulate receiving two GW events
     let event1 = TestGWEvent {
         simulation_id: 100,
-        gpstime: 1412546713.52,
+        gpstime: now - 3600.0, // 1 hour ago
         snr: 24.5,
     };
     let event2 = TestGWEvent {
         simulation_id: 101,
-        gpstime: 1412546815.23,
+        gpstime: now - 1800.0, // 30 minutes ago
         snr: 18.3,
     };
 
@@ -163,10 +169,16 @@ async fn test_multi_messenger_state_recovery() {
 
     // === PHASE 1: Store correlated events ===
 
+    // Use current Unix time for test events
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+
     // GW event
     let gw_event = TestGWEvent {
         simulation_id: 200,
-        gpstime: 1412546900.0,
+        gpstime: now - 3600.0, // 1 hour ago
         snr: 30.2,
     };
     store
@@ -181,7 +193,7 @@ async fn test_multi_messenger_state_recovery() {
     // GRB event (correlated by simulation_id)
     let grb_event = TestGRBEvent {
         simulation_id: 200,
-        detection_time: 1412546902.5, // 2.5 seconds after GW
+        detection_time: now - 3597.5, // 2.5 seconds after GW
         instrument: "Fermi-GBM".to_string(),
     };
     store
@@ -196,7 +208,7 @@ async fn test_multi_messenger_state_recovery() {
     // Optical alert (within 1 day)
     let optical_alert = TestOpticalAlert {
         object_id: "ZTF24test".to_string(),
-        mjd: 57023.456, // MJD corresponding to GW time
+        mjd: now - 1800.0, // 30 minutes ago
         ra: 123.456,
         dec: -45.123,
     };
@@ -284,10 +296,16 @@ async fn test_partial_recovery_with_expired_events() {
         .await
         .unwrap();
 
+    // Use current Unix time for test events
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+
     // Store event with short TTL (will expire)
     let expired_event = TestGWEvent {
         simulation_id: 300,
-        gpstime: 1412546713.0,
+        gpstime: now - 3600.0,
         snr: 15.0,
     };
     store
@@ -302,7 +320,7 @@ async fn test_partial_recovery_with_expired_events() {
     // Store event with long TTL (will persist)
     let persisted_event = TestGWEvent {
         simulation_id: 301,
-        gpstime: 1412546800.0,
+        gpstime: now - 1800.0,
         snr: 22.0,
     };
     store
