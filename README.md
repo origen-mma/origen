@@ -36,8 +36,8 @@ Get the three-way correlation system running in 5 minutes:
 ### 1. Clone and Build
 
 ```bash
-git clone https://github.com/yourusername/rust-mm-superevent.git
-cd rust-mm-superevent
+git clone https://github.com/mcoughlin/origin.git
+cd origin
 cargo build --release
 ```
 
@@ -208,6 +208,7 @@ After running the demo:
 - **mm-gcn**: GCN Kafka consumer and alert parsers
 - **mm-correlator**: Superevent correlation engine with RAVEN algorithm
 - **mm-boom**: BOOM Kafka consumer and simulation mode
+- **mm-redis**: Redis state persistence with schema versioning and recovery
 - **mm-config**: Configuration management with TOML and environment variables
 - **mm-service**: Main binaries and services
 
@@ -229,8 +230,23 @@ After running the demo:
 
 ### Phase 5 ✅ Partial
 - **Configuration management** ✅ - TOML files with environment variable overrides
+- **Redis state persistence** ✅ - Automatic recovery on restart with schema versioning
 - Kafka producer for publishing multi-messenger superevents 🚧
 - Prometheus metrics 🚧
+
+### Redis State Persistence ✅
+
+The correlator now persists state to Redis, enabling service restarts without data loss!
+
+**Features:**
+- Automatic state recovery on service restart
+- Schema-versioned storage with graceful degradation
+- TTL management: 2 hours for GW/GRB events, 1 day for optical alerts
+- Time-range queries using Redis sorted sets
+- Non-blocking persistence via tokio::spawn
+- Graceful degradation when Redis unavailable
+
+See [`crates/mm-redis/RECOVERY_DEMO.md`](crates/mm-redis/RECOVERY_DEMO.md) for detailed documentation.
 
 ## Installation
 
@@ -414,6 +430,8 @@ Significance threshold: `FAR < 1/30` (1 per month)
 
 ## Testing
 
+### Unit & Integration Tests
+
 Run all tests:
 
 ```bash
@@ -425,7 +443,38 @@ Run specific test suite:
 ```bash
 cargo test --package mm-correlator
 cargo test --package mm-core
+cargo test --package mm-redis
 ```
+
+### Redis State Recovery Tests
+
+These tests require Redis to be running:
+
+```bash
+# Start Redis
+docker compose up -d redis
+
+# Run Redis integration tests (with --ignored flag)
+cargo test -p mm-redis -- --ignored --test-threads=1
+cargo test -p mm-service --test state_recovery_integration -- --ignored --test-threads=1
+```
+
+The tests verify:
+- Events are persisted to Redis
+- Service can restart and recover state
+- Time-based filtering works correctly
+- TTL expiration is handled properly
+
+### Test Fixtures
+
+Sample data files are provided in [`tests/fixtures/`](tests/fixtures/):
+- **Observing scenarios**: 9 GW simulation data files (O5a, O4HL, O5c runs)
+- **GRB XMLs**: 10 VOEvent XML files (Fermi, Swift, Einstein Probe, SVOM)
+- **Optical light curves**: 10 ZTF CSV files with real transient data
+
+These fixtures enable tests to run without external data dependencies or downloads.
+
+See [`tests/fixtures/README.md`](tests/fixtures/README.md) for details.
 
 ## Data Formats
 
