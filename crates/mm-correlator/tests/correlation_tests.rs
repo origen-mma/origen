@@ -4,10 +4,10 @@ use std::f64::consts::PI;
 fn test_temporal_correlation() {
     // Test events within time window are correlated
     let gw_time: f64 = 1000.0;
-    let grb_time_1: f64 = 1003.0;  // 3 seconds later
-    let grb_time_2: f64 = 1050.0;  // 50 seconds later
+    let grb_time_1: f64 = 1003.0; // 3 seconds later
+    let grb_time_2: f64 = 1050.0; // 50 seconds later
 
-    let time_window: f64 = 5.0;  // ±5 second window
+    let time_window: f64 = 5.0; // ±5 second window
 
     // GRB1 should be within window
     assert!((grb_time_1 - gw_time).abs() <= time_window);
@@ -40,12 +40,11 @@ fn test_spatial_separation() {
     let ra1: f64 = 0.0;
     let dec1: f64 = 0.0;
 
-    let ra2: f64 = 10.0 * PI / 180.0;  // 10 degrees
+    let ra2: f64 = 10.0 * PI / 180.0; // 10 degrees
     let dec2: f64 = 0.0;
 
     // Calculate angular separation
-    let cos_sep = dec1.sin() * dec2.sin() +
-                  dec1.cos() * dec2.cos() * (ra1 - ra2).cos();
+    let cos_sep = dec1.sin() * dec2.sin() + dec1.cos() * dec2.cos() * (ra1 - ra2).cos();
     let separation_rad = cos_sep.acos();
     let separation_deg = separation_rad * 180.0 / PI;
 
@@ -68,7 +67,8 @@ fn test_overlap_computation_simple() {
     grb_probs[npix as usize - 1] = 1.0;
 
     // Joint probability should be zero (no overlap)
-    let joint_probs: Vec<f64> = gw_probs.iter()
+    let joint_probs: Vec<f64> = gw_probs
+        .iter()
         .zip(grb_probs.iter())
         .map(|(a, b)| a * b)
         .collect();
@@ -91,7 +91,8 @@ fn test_overlap_computation_complete() {
     grb_probs[100] = 1.0;
 
     // Joint probability should be 1.0
-    let joint_probs: Vec<f64> = gw_probs.iter()
+    let joint_probs: Vec<f64> = gw_probs
+        .iter()
         .zip(grb_probs.iter())
         .map(|(a, b)| a * b)
         .collect();
@@ -106,10 +107,8 @@ fn test_credible_region_calculation() {
     let probs = vec![0.5, 0.3, 0.1, 0.05, 0.05];
 
     // Sort by probability (descending)
-    let mut indexed_probs: Vec<(usize, f64)> = probs.iter()
-        .enumerate()
-        .map(|(i, &p)| (i, p))
-        .collect();
+    let mut indexed_probs: Vec<(usize, f64)> =
+        probs.iter().enumerate().map(|(i, &p)| (i, p)).collect();
     indexed_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
     // Find 90% CR

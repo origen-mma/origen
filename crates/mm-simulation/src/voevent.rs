@@ -46,8 +46,7 @@ pub struct VOEventParser;
 impl VOEventParser {
     /// Parse a VOEvent XML file
     pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<GrbAlert> {
-        let file = File::open(path.as_ref())
-            .context("Failed to open VOEvent XML file")?;
+        let file = File::open(path.as_ref()).context("Failed to open VOEvent XML file")?;
         let reader = BufReader::new(file);
         Self::parse_reader(reader)
     }
@@ -75,24 +74,20 @@ impl VOEventParser {
 
         loop {
             match xml_reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    match e.name().as_ref() {
-                        b"Who" => in_who = true,
-                        b"What" => in_what = true,
-                        b"WhereWhen" => in_where_when = true,
-                        b"Position2D" => in_position = true,
-                        _ => {}
-                    }
-                }
-                Ok(Event::End(ref e)) => {
-                    match e.name().as_ref() {
-                        b"Who" => in_who = false,
-                        b"What" => in_what = false,
-                        b"WhereWhen" => in_where_when = false,
-                        b"Position2D" => in_position = false,
-                        _ => {}
-                    }
-                }
+                Ok(Event::Start(ref e)) => match e.name().as_ref() {
+                    b"Who" => in_who = true,
+                    b"What" => in_what = true,
+                    b"WhereWhen" => in_where_when = true,
+                    b"Position2D" => in_position = true,
+                    _ => {}
+                },
+                Ok(Event::End(ref e)) => match e.name().as_ref() {
+                    b"Who" => in_who = false,
+                    b"What" => in_what = false,
+                    b"WhereWhen" => in_where_when = false,
+                    b"Position2D" => in_position = false,
+                    _ => {}
+                },
                 Ok(Event::Empty(ref e)) => {
                     if e.name().as_ref() == b"Param" {
                         let mut param_name = String::new();
@@ -138,7 +133,11 @@ impl VOEventParser {
                     }
                 }
                 Ok(Event::Eof) => break,
-                Err(e) => anyhow::bail!("Error parsing XML at position {}: {}", xml_reader.buffer_position(), e),
+                Err(e) => anyhow::bail!(
+                    "Error parsing XML at position {}: {}",
+                    xml_reader.buffer_position(),
+                    e
+                ),
                 _ => {}
             }
             buf.clear();
@@ -146,7 +145,7 @@ impl VOEventParser {
 
         // Second pass to extract position and time (nested elements)
         let file = File::open(Path::new("dummy"))?; // Reopen not possible with this API
-        // For now, use a simplified approach with string searching
+                                                    // For now, use a simplified approach with string searching
 
         // Return parsed alert (with default values if parsing incomplete)
         Ok(GrbAlert {
@@ -195,7 +194,13 @@ impl VOEventParser {
             if let Some(end) = xml[start + 7..].find("\"") {
                 let ivorn = &xml[start + 7..start + 7 + end];
                 if let Some(hash_pos) = ivorn.find('#') {
-                    packet_type = Some(ivorn[hash_pos + 1..].split('_').take(3).collect::<Vec<_>>().join("_"));
+                    packet_type = Some(
+                        ivorn[hash_pos + 1..]
+                            .split('_')
+                            .take(3)
+                            .collect::<Vec<_>>()
+                            .join("_"),
+                    );
                 }
             }
         }
@@ -242,7 +247,8 @@ impl VOEventParser {
             // Extract Error2Radius
             if let Some(err_start) = pos_section.find("<Error2Radius>") {
                 if let Some(err_end) = pos_section[err_start..].find("</Error2Radius>") {
-                    if let Ok(val) = pos_section[err_start + 14..err_start + err_end].parse::<f64>() {
+                    if let Ok(val) = pos_section[err_start + 14..err_start + err_end].parse::<f64>()
+                    {
                         error_radius = val;
                     }
                 }

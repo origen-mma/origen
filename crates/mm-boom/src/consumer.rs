@@ -1,7 +1,7 @@
 use rdkafka::{
-    ClientConfig, Message,
     consumer::{Consumer, StreamConsumer},
     error::KafkaError,
+    ClientConfig, Message,
 };
 use thiserror::Error;
 use tracing::{debug, error, info};
@@ -60,10 +60,7 @@ pub struct BoomConsumer {
 impl BoomConsumer {
     /// Create a new BOOM Kafka consumer
     pub fn new(config: BoomConsumerConfig) -> Result<Self, BoomConsumerError> {
-        info!(
-            "Creating BOOM consumer: {}",
-            config.bootstrap_servers
-        );
+        info!("Creating BOOM consumer: {}", config.bootstrap_servers);
 
         let consumer: StreamConsumer = ClientConfig::new()
             .set("bootstrap.servers", &config.bootstrap_servers)

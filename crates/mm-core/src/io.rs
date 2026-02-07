@@ -14,9 +14,7 @@ struct CsvRow {
 
 /// Load a light curve from CSV file
 /// Format: mjd,flux,flux_err,filter
-pub fn load_lightcurve_csv<P: AsRef<Path>>(
-    path: P,
-) -> Result<LightCurve, Box<dyn Error>> {
+pub fn load_lightcurve_csv<P: AsRef<Path>>(path: P) -> Result<LightCurve, Box<dyn Error>> {
     let file = File::open(&path)?;
     let mut rdr = csv::Reader::from_reader(file);
 
@@ -31,12 +29,7 @@ pub fn load_lightcurve_csv<P: AsRef<Path>>(
 
     for result in rdr.deserialize() {
         let row: CsvRow = result?;
-        lc.add_measurement(Photometry::new(
-            row.mjd,
-            row.flux,
-            row.flux_err,
-            row.filter,
-        ));
+        lc.add_measurement(Photometry::new(row.mjd, row.flux, row.flux_err, row.filter));
     }
 
     lc.sort_by_time();
@@ -44,9 +37,7 @@ pub fn load_lightcurve_csv<P: AsRef<Path>>(
 }
 
 /// Load all light curves from a directory
-pub fn load_lightcurves_dir<P: AsRef<Path>>(
-    dir: P,
-) -> Result<Vec<LightCurve>, Box<dyn Error>> {
+pub fn load_lightcurves_dir<P: AsRef<Path>>(dir: P) -> Result<Vec<LightCurve>, Box<dyn Error>> {
     let mut lightcurves = Vec::new();
 
     for entry in std::fs::read_dir(dir)? {

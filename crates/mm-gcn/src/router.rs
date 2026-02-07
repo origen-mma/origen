@@ -1,5 +1,5 @@
+use crate::parsers::{grb, gw, neutrino, xray};
 use mm_core::{Event, ParseError};
-use crate::parsers::{gw, grb, xray, neutrino};
 
 pub struct AlertRouter;
 

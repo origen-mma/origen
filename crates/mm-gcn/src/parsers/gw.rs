@@ -20,11 +20,13 @@ struct EventInfo {
 }
 
 pub fn parse_gw_alert(payload: &str) -> Result<Event, ParseError> {
-    let alert: GWAlertPayload = serde_json::from_str(payload)
-        .map_err(|e| ParseError::JsonError(e.to_string()))?;
+    let alert: GWAlertPayload =
+        serde_json::from_str(payload).map_err(|e| ParseError::JsonError(e.to_string()))?;
 
     let event_info = alert.event.ok_or(ParseError::MissingField("event"))?;
-    let gps_time = event_info.time.ok_or(ParseError::MissingField("event.time"))?;
+    let gps_time = event_info
+        .time
+        .ok_or(ParseError::MissingField("event.time"))?;
 
     Ok(Event::GravitationalWave(GWEvent {
         superevent_id: alert.superevent_id,

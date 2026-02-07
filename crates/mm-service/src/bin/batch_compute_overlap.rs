@@ -8,8 +8,8 @@ use tracing::info;
 #[derive(Debug)]
 struct InjectionParams {
     simulation_id: u32,
-    longitude: f64,  // radians
-    latitude: f64,   // radians
+    longitude: f64, // radians
+    latitude: f64,  // radians
 }
 
 #[derive(Debug)]
@@ -124,18 +124,21 @@ fn main() -> Result<()> {
     info!("  Average GW 90% CR:    {:.1} sq deg", avg_gw);
     info!("  Average GRB 90% CR:   {:.1} sq deg", avg_grb);
     info!("  Average Overlap:      {:.1} sq deg", avg_overlap);
-    info!("  Overlap/GW ratio:     {:.1}%", 100.0 * avg_overlap / avg_gw);
-    info!("  Overlap/GRB ratio:    {:.1}%", 100.0 * avg_overlap / avg_grb);
+    info!(
+        "  Overlap/GW ratio:     {:.1}%",
+        100.0 * avg_overlap / avg_gw
+    );
+    info!(
+        "  Overlap/GRB ratio:    {:.1}%",
+        100.0 * avg_overlap / avg_grb
+    );
 
     info!("\n✅ Run: python plot_overlap_histogram.py");
 
     Ok(())
 }
 
-fn compute_overlap(
-    gw_skymap: &ParsedSkymap,
-    grb_skymap: &ParsedSkymap,
-) -> Result<f64> {
+fn compute_overlap(gw_skymap: &ParsedSkymap, grb_skymap: &ParsedSkymap) -> Result<f64> {
     // Resample to common resolution
     let target_nside = gw_skymap.nside.min(grb_skymap.nside);
 
@@ -143,7 +146,8 @@ fn compute_overlap(
     let grb_probs = resample_skymap(&grb_skymap.probabilities, grb_skymap.nside, target_nside);
 
     // Multiply probability maps: combined = GW × GRB
-    let mut combined_probs: Vec<f64> = gw_probs.iter()
+    let mut combined_probs: Vec<f64> = gw_probs
+        .iter()
         .zip(grb_probs.iter())
         .map(|(gw_p, grb_p)| gw_p * grb_p)
         .collect();
@@ -159,7 +163,8 @@ fn compute_overlap(
     }
 
     // Find 90% credible region
-    let mut indexed_probs: Vec<(usize, f64)> = combined_probs.iter()
+    let mut indexed_probs: Vec<(usize, f64)> = combined_probs
+        .iter()
         .enumerate()
         .map(|(i, &p)| (i, p))
         .collect();
@@ -280,10 +285,7 @@ fn export_stats(stats: &[OverlapStats], path: &str) -> Result<()> {
         writeln!(
             file,
             "{},{:.6},{:.6},{:.6}",
-            stat.simulation_id,
-            stat.gw_90cr_area,
-            stat.grb_90cr_area,
-            stat.overlap_area
+            stat.simulation_id, stat.gw_90cr_area, stat.grb_90cr_area, stat.overlap_area
         )?;
     }
 

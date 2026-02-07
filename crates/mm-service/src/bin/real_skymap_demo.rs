@@ -1,12 +1,10 @@
 use anyhow::Result;
-use mm_core::{ParsedSkymap, SkyPosition, SkymapOrdering, CredibleRegion};
-use mm_correlator::spatial::{
-    calculate_spatial_probability_from_skymap,
-    calculate_spatial_significance,
-    calculate_skymap_offset,
-    is_in_credible_region,
-};
 use cdshealpix::nested::center;
+use mm_core::{CredibleRegion, ParsedSkymap, SkyPosition, SkymapOrdering};
+use mm_correlator::spatial::{
+    calculate_skymap_offset, calculate_spatial_probability_from_skymap,
+    calculate_spatial_significance, is_in_credible_region,
+};
 use tracing::info;
 
 fn main() -> Result<()> {
@@ -17,9 +15,9 @@ fn main() -> Result<()> {
 
     // Simulate a Fermi-like skymap using 2D Gaussian
     info!("Creating simulated Fermi GBM skymap...");
-    let center_ra = 180.0;   // degrees
-    let center_dec = 45.0;   // degrees
-    let sigma = 5.0;         // degrees (Fermi GBM typical error ~5-10°)
+    let center_ra = 180.0; // degrees
+    let center_dec = 45.0; // degrees
+    let sigma = 5.0; // degrees (Fermi GBM typical error ~5-10°)
     let nside = 128;
 
     let skymap = create_gaussian_skymap(center_ra, center_dec, sigma, nside)?;
@@ -33,9 +31,9 @@ fn main() -> Result<()> {
     info!("  NSIDE: {}", skymap.nside);
     info!("  Ordering: {:?}", skymap.ordering);
     info!("  Total pixels: {}", skymap.probabilities.len());
-    info!("  Max probability position: (RA={:.2}°, Dec={:.2}°)",
-        skymap.max_prob_position.ra,
-        skymap.max_prob_position.dec
+    info!(
+        "  Max probability position: (RA={:.2}°, Dec={:.2}°)",
+        skymap.max_prob_position.ra, skymap.max_prob_position.dec
     );
     info!("  Total sky area: {:.2} sq deg", skymap.total_area);
     info!("  50% CR area: {:.2} sq deg", skymap.area_50());
@@ -44,17 +42,35 @@ fn main() -> Result<()> {
     // Test positions: center and various offsets
     let test_positions = vec![
         ("Center", SkyPosition::new(center_ra, center_dec, 2.0)),
-        ("Offset 0.5°", SkyPosition::new(center_ra + 0.5, center_dec, 2.0)),
-        ("Offset 2.0°", SkyPosition::new(center_ra + 2.0, center_dec, 2.0)),
-        ("Offset 5.0°", SkyPosition::new(center_ra + 5.0, center_dec, 2.0)),
-        ("Offset 10.0°", SkyPosition::new(center_ra + 10.0, center_dec, 2.0)),
-        ("Far away", SkyPosition::new(center_ra + 30.0, center_dec, 2.0)),
+        (
+            "Offset 0.5°",
+            SkyPosition::new(center_ra + 0.5, center_dec, 2.0),
+        ),
+        (
+            "Offset 2.0°",
+            SkyPosition::new(center_ra + 2.0, center_dec, 2.0),
+        ),
+        (
+            "Offset 5.0°",
+            SkyPosition::new(center_ra + 5.0, center_dec, 2.0),
+        ),
+        (
+            "Offset 10.0°",
+            SkyPosition::new(center_ra + 10.0, center_dec, 2.0),
+        ),
+        (
+            "Far away",
+            SkyPosition::new(center_ra + 30.0, center_dec, 2.0),
+        ),
     ];
 
     info!("🔬 Testing Spatial Queries with cdshealpix:\n");
 
     for (label, position) in &test_positions {
-        info!("Position: {} (RA={:.2}°, Dec={:.2}°)", label, position.ra, position.dec);
+        info!(
+            "Position: {} (RA={:.2}°, Dec={:.2}°)",
+            label, position.ra, position.dec
+        );
 
         // Query probability at this position (using cdshealpix hash)
         let prob = calculate_spatial_probability_from_skymap(position, &skymap);

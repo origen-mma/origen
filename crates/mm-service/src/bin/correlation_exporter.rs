@@ -4,8 +4,8 @@ use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::Message;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
-use tokio::net::TcpListener;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 use tracing::{info, warn};
 
 #[derive(Debug, Deserialize)]
@@ -188,7 +188,10 @@ async fn consume_correlations(metrics: Arc<Mutex<Metrics>>) -> Result<()> {
                         Ok(correlation) => {
                             let mut m = metrics.lock().unwrap();
                             m.update(&correlation);
-                            info!("📈 Updated metrics: {} total correlations", m.total_correlations);
+                            info!(
+                                "📈 Updated metrics: {} total correlations",
+                                m.total_correlations
+                            );
                         }
                         Err(e) => {
                             warn!("Failed to parse correlation: {}", e);

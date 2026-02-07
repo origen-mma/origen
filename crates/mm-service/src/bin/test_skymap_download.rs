@@ -16,7 +16,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Downloading test file from: {}", test_url);
 
-    match storage.download_skymap(test_url, "test_event", "test-instrument").await {
+    match storage
+        .download_skymap(test_url, "test_event", "test-instrument")
+        .await
+    {
         Ok(path) => {
             info!("✓ Download successful!");
             info!("  Saved to: {:?}", path);

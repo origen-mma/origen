@@ -1,4 +1,4 @@
-use mm_core::{SkyPosition, ParsedSkymap};
+use mm_core::{ParsedSkymap, SkyPosition};
 
 /// Calculate joint False Alarm Rate (FAR) using RAVEN formula
 /// FAR = time_prob × spatial_prob × trials_factor
@@ -61,11 +61,7 @@ pub fn calculate_spatial_probability_from_skymap(
 }
 
 /// Check if a position is within a credible region of a skymap
-pub fn is_in_credible_region(
-    position: &SkyPosition,
-    skymap: &ParsedSkymap,
-    level: f64,
-) -> bool {
+pub fn is_in_credible_region(position: &SkyPosition, skymap: &ParsedSkymap, level: f64) -> bool {
     skymap.is_in_credible_region(position, level)
 }
 
@@ -73,10 +69,7 @@ pub fn is_in_credible_region(
 /// Returns a score from 0-1 based on:
 /// - Probability at position
 /// - Whether it's within 50% or 90% credible region
-pub fn calculate_spatial_significance(
-    position: &SkyPosition,
-    skymap: &ParsedSkymap,
-) -> f64 {
+pub fn calculate_spatial_significance(position: &SkyPosition, skymap: &ParsedSkymap) -> f64 {
     let prob = skymap.probability_at_position(position);
 
     // Boost significance if within credible regions
@@ -98,10 +91,7 @@ pub fn calculate_spatial_significance(
 }
 
 /// Calculate angular separation and compare to skymap credible regions
-pub fn calculate_skymap_offset(
-    position: &SkyPosition,
-    skymap: &ParsedSkymap,
-) -> SkymapOffset {
+pub fn calculate_skymap_offset(position: &SkyPosition, skymap: &ParsedSkymap) -> SkymapOffset {
     let max_prob_pos = &skymap.max_prob_position;
     let angular_separation = position.angular_separation(max_prob_pos);
 

@@ -85,12 +85,7 @@ impl SkymapStorage {
                     return Ok(filepath);
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Download attempt {}/{} failed: {}",
-                        attempt,
-                        max_retries,
-                        e
-                    );
+                    tracing::warn!("Download attempt {}/{} failed: {}", attempt, max_retries, e);
                     last_error = Some(e);
 
                     if attempt < max_retries {
@@ -165,7 +160,8 @@ impl SkymapStorage {
             let path = entry.path();
 
             if path.is_dir() {
-                let instrument = path.file_name()
+                let instrument = path
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown")
                     .to_string();

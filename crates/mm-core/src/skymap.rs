@@ -48,29 +48,21 @@ impl MockSkymap {
     /// - 50% of samples fall within radius_50
     /// - 90% of samples fall within radius_90
     pub fn sample_position(&self, rng: &mut impl rand::Rng) -> SkyPosition {
-        // Sample from Rayleigh distribution to get realistic 2D offset
-        // Use inverse CDF sampling
+        // Use simple inverse CDF sampling for 2D circular regions
+        // For a 2D Gaussian, the cumulative probability within radius r is:
+        // P(R ≤ r) = 1 - exp(-r²/(2σ²))
+        //
+        // To ensure 50% of samples fall within radius_50:
+        // We need: 0.5 = 1 - exp(-radius_50²/(2σ²))
+        // So: σ = radius_50 / sqrt(-2*ln(0.5)) ≈ radius_50 / 1.177
+
+        let sigma = self.radius_50 / (-2.0 * (1.0 - 0.5_f64).ln()).sqrt();
+
+        // Sample u uniformly in [0, 1]
         let u = rng.gen::<f64>();
 
-        // For 50% probability, use radius_50
-        // For 90% probability, use radius_90
-        // Interpolate between them using a Rayleigh-like distribution
-
-        let radius_deg = if u < 0.5 {
-            // Sample within 50% CR
-            let u_scaled = u / 0.5; // Scale to [0, 1]
-            self.radius_50 * (-2.0 * (1.0 - u_scaled).ln()).sqrt()
-        } else if u < 0.9 {
-            // Sample between 50% and 90% CR
-            let u_scaled = (u - 0.5) / 0.4; // Scale to [0, 1]
-            let r_min = self.radius_50;
-            let r_max = self.radius_90;
-            r_min + (r_max - r_min) * (-2.0 * (1.0 - u_scaled).ln()).sqrt()
-        } else {
-            // Sample outside 90% CR (10% of the time)
-            let u_scaled = (u - 0.9) / 0.1;
-            self.radius_90 * (1.0 + u_scaled * 2.0) // Extend beyond 90%
-        };
+        // Inverse CDF: r = σ * sqrt(-2 * ln(1 - u))
+        let radius_deg = sigma * (-2.0 * (1.0 - u).ln()).sqrt();
 
         // Sample random angle
         let angle = rng.gen::<f64>() * 2.0 * PI;

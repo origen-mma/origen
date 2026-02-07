@@ -1,7 +1,7 @@
 use anyhow::Result;
 use mm_core::{OpticalAlert, PhotometryPoint, Survey};
-use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::config::ClientConfig;
+use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -37,7 +37,9 @@ fn extract_coordinates_from_filename(filename: &str) -> (f64, f64) {
     // For now, use placeholder coordinates
     // In production, these would come from a catalog or alert packet
     // Use hash of filename to generate pseudo-random but consistent coordinates
-    let hash = filename.chars().fold(0u64, |acc, c| acc.wrapping_mul(31).wrapping_add(c as u64));
+    let hash = filename
+        .chars()
+        .fold(0u64, |acc, c| acc.wrapping_mul(31).wrapping_add(c as u64));
     let ra = (hash % 360) as f64;
     let dec = ((hash / 360) % 180) as f64 - 90.0;
     (ra, dec)
@@ -83,14 +85,17 @@ async fn main() -> Result<()> {
     let rate_hz: f64 = if args.len() > 1 {
         args[1].parse()?
     } else {
-        0.1  // Default: 1 alert per 10 seconds
+        0.1 // Default: 1 alert per 10 seconds
     };
     let delay_ms = (1000.0 / rate_hz) as u64;
 
     // Simulation mode: use MJD values that match GW simulation GPS times
     let simulation_mode = args.len() > 2 && args[2] == "--simulation";
 
-    info!("Streaming rate: {:.3} Hz ({} ms between alerts)", rate_hz, delay_ms);
+    info!(
+        "Streaming rate: {:.3} Hz ({} ms between alerts)",
+        rate_hz, delay_ms
+    );
     if simulation_mode {
         info!("🎯 SIMULATION MODE: Using MJD times matching GW simulation (GPS 0-10s)");
     }
@@ -120,7 +125,11 @@ async fn main() -> Result<()> {
         let (ra, dec) = extract_coordinates_from_filename(filename);
 
         // Get first detection time
-        let first_mjd = light_curve.iter().map(|p| p.mjd).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let first_mjd = light_curve
+            .iter()
+            .map(|p| p.mjd)
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
 
         // In simulation mode, override MJD to match GW simulation GPS times
         // GPS epoch = MJD 44244.0
@@ -129,7 +138,7 @@ async fn main() -> Result<()> {
         let detection_mjd = if simulation_mode {
             // Spread optical alerts across ~10 days to overlap with GW simulations
             // Each GW event is ~30 seconds apart, so spread optical over similar timeframe
-            let offset_days = (alert_count as f64 * 0.5) / 86400.0;  // 0.5 seconds between optical in days
+            let offset_days = (alert_count as f64 * 0.5) / 86400.0; // 0.5 seconds between optical in days
             44244.0 + offset_days
         } else {
             first_mjd
@@ -142,7 +151,7 @@ async fn main() -> Result<()> {
             ra,
             dec,
             survey: Survey::ZTF,
-            magnitude: None,  // Will be computed from flux
+            magnitude: None, // Will be computed from flux
             mag_err: None,
             filter: light_curve[0].filter.clone(),
             light_curve,
@@ -153,11 +162,11 @@ async fn main() -> Result<()> {
         // Publish to Kafka
         let payload = serde_json::to_string(&alert)?;
         let key = alert.object_id.clone();
-        let record = FutureRecord::to(optical_topic)
-            .payload(&payload)
-            .key(&key);
+        let record = FutureRecord::to(optical_topic).payload(&payload).key(&key);
 
-        producer.send(record, Duration::from_secs(0)).await
+        producer
+            .send(record, Duration::from_secs(0))
+            .await
             .map_err(|(e, _)| anyhow::anyhow!("Failed to send optical alert: {}", e))?;
 
         alert_count += 1;

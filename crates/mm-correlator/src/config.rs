@@ -34,13 +34,13 @@ pub struct CorrelatorConfig {
 impl Default for CorrelatorConfig {
     fn default() -> Self {
         Self {
-            time_window_before: -1.0,           // -1 second
-            time_window_after: 86400.0,         // +1 day
-            spatial_threshold: 5.0,             // 5 degrees
-            background_rate: 1.0,               // 1/year
-            far_threshold: 1.0 / 30.0,          // 1/month
-            trials_factor: 7.0,                 // 7 bands
-            max_superevent_age: 604800.0,       // 1 week
+            time_window_before: -1.0,     // -1 second
+            time_window_after: 86400.0,   // +1 day
+            spatial_threshold: 5.0,       // 5 degrees
+            background_rate: 1.0,         // 1/year
+            far_threshold: 1.0 / 30.0,    // 1/month
+            trials_factor: 7.0,           // 7 bands
+            max_superevent_age: 604800.0, // 1 week
         }
     }
 }
@@ -56,7 +56,7 @@ impl CorrelatorConfig {
         Self {
             time_window_before: -1.0,
             time_window_after: 3600.0,  // 1 hour instead of 1 day
-            spatial_threshold: 10.0,     // More permissive for testing
+            spatial_threshold: 10.0,    // More permissive for testing
             max_superevent_age: 3600.0, // 1 hour
             ..Self::default()
         }

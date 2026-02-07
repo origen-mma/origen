@@ -10,8 +10,8 @@ use tracing::info;
 #[derive(Debug)]
 struct InjectionParams {
     simulation_id: u32,
-    longitude: f64,  // radians
-    latitude: f64,   // radians
+    longitude: f64, // radians
+    latitude: f64,  // radians
     distance: f64,
     mass1: f64,
     mass2: f64,
@@ -27,8 +27,8 @@ struct SimulatedGrb {
     error_radius: f64,
     instrument: String,
     trigger_id: String,
-    offset: f64,  // Actual offset in degrees
-    prob_at_grb: f64,  // GW probability at simulated GRB position
+    offset: f64,      // Actual offset in degrees
+    prob_at_grb: f64, // GW probability at simulated GRB position
     in_50cr: bool,
     in_90cr: bool,
 }
@@ -109,12 +109,8 @@ fn main() -> Result<()> {
 
         // Sample GRB position from error distribution
         // For well-calibrated localizations, we sample uniformly within the error circle
-        let (grb_ra, grb_dec) = sample_position_in_circle(
-            true_ra,
-            true_dec,
-            grb_alert.error_radius,
-            &mut rng,
-        );
+        let (grb_ra, grb_dec) =
+            sample_position_in_circle(true_ra, true_dec, grb_alert.error_radius, &mut rng);
 
         // Calculate offset
         let offset = angular_separation(true_ra, true_dec, grb_ra, grb_dec);
@@ -158,9 +154,16 @@ fn main() -> Result<()> {
     info!("\n=== Simulation Statistics ===");
     info!("Total simulations: {}", simulations.len());
 
-    let avg_error = simulations.iter().map(|s| s.error_radius).sum::<f64>() / simulations.len() as f64;
-    let min_error = simulations.iter().map(|s| s.error_radius).fold(f64::INFINITY, f64::min);
-    let max_error = simulations.iter().map(|s| s.error_radius).fold(f64::NEG_INFINITY, f64::max);
+    let avg_error =
+        simulations.iter().map(|s| s.error_radius).sum::<f64>() / simulations.len() as f64;
+    let min_error = simulations
+        .iter()
+        .map(|s| s.error_radius)
+        .fold(f64::INFINITY, f64::min);
+    let max_error = simulations
+        .iter()
+        .map(|s| s.error_radius)
+        .fold(f64::NEG_INFINITY, f64::max);
 
     info!("GRB error radii:");
     info!("  Average: {:.2}°", avg_error);
@@ -175,8 +178,16 @@ fn main() -> Result<()> {
     let in_90cr_count = simulations.iter().filter(|s| s.in_90cr).count();
 
     info!("\nGW skymap overlap:");
-    info!("  In 50% CR: {} ({:.1}%)", in_50cr_count, 100.0 * in_50cr_count as f64 / simulations.len() as f64);
-    info!("  In 90% CR: {} ({:.1}%)", in_90cr_count, 100.0 * in_90cr_count as f64 / simulations.len() as f64);
+    info!(
+        "  In 50% CR: {} ({:.1}%)",
+        in_50cr_count,
+        100.0 * in_50cr_count as f64 / simulations.len() as f64
+    );
+    info!(
+        "  In 90% CR: {} ({:.1}%)",
+        in_90cr_count,
+        100.0 * in_90cr_count as f64 / simulations.len() as f64
+    );
 
     info!("\n✅ Run: python plot_grb_pp.py");
 
@@ -194,7 +205,7 @@ fn sample_position_in_circle(
     // - Sample radius from sqrt(uniform(0, R²))
     // - Sample angle uniformly from [0, 2π)
 
-    let r = radius_deg * rng.gen::<f64>().sqrt();  // sqrt for uniform area distribution
+    let r = radius_deg * rng.gen::<f64>().sqrt(); // sqrt for uniform area distribution
     let theta = rng.gen::<f64>() * 2.0 * std::f64::consts::PI;
 
     // Offset in Cartesian coordinates (small angle approximation is fine for small offsets)
@@ -275,7 +286,10 @@ fn export_pp_data(simulations: &[SimulatedGrb], path: &str) -> Result<()> {
         let within_circle = *norm_offset <= 1.0;
 
         // Find original simulation
-        let sim = simulations.iter().find(|s| s.simulation_id == *sim_id).unwrap();
+        let sim = simulations
+            .iter()
+            .find(|s| s.simulation_id == *sim_id)
+            .unwrap();
 
         writeln!(
             file,

@@ -79,7 +79,7 @@ impl OpticalAlert {
         let first_flux = self.light_curve.first().unwrap().flux;
         let last_flux = self.light_curve.last().unwrap().flux;
 
-        last_flux > first_flux * 1.5  // Rising if flux increased by 50%
+        last_flux > first_flux * 1.5 // Rising if flux increased by 50%
     }
 }
 
@@ -117,10 +117,10 @@ impl Survey {
     /// Get typical position uncertainty in arcseconds
     pub fn position_uncertainty(&self) -> f64 {
         match self {
-            Survey::ZTF => 0.5,      // ~0.5 arcsec
-            Survey::LSST => 0.1,     // ~0.1 arcsec
-            Survey::DECam => 0.3,    // ~0.3 arcsec
-            Survey::ATLAS => 1.0,    // ~1.0 arcsec
+            Survey::ZTF => 0.5,   // ~0.5 arcsec
+            Survey::LSST => 0.1,  // ~0.1 arcsec
+            Survey::DECam => 0.3, // ~0.3 arcsec
+            Survey::ATLAS => 1.0, // ~1.0 arcsec
         }
     }
 }
@@ -128,9 +128,9 @@ impl Survey {
 /// Classification result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Classification {
-    pub classifier: String,  // "acai", "btsbot", etc.
-    pub class_name: String,  // "SN Ia", "Kilonova", etc.
-    pub score: f64,          // 0-1
+    pub classifier: String, // "acai", "btsbot", etc.
+    pub class_name: String, // "SN Ia", "Kilonova", etc.
+    pub score: f64,         // 0-1
 }
 
 #[cfg(test)]
@@ -141,7 +141,7 @@ mod tests {
     fn test_mjd_to_gps() {
         let alert = OpticalAlert {
             object_id: "ZTF25test".to_string(),
-            mjd: 60675.0,  // ~2025
+            mjd: 60675.0, // ~2025
             ra: 123.45,
             dec: 67.89,
             survey: Survey::ZTF,
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_flux_to_magnitude() {
-        let flux = 100.0;  // nJy
+        let flux = 100.0; // nJy
         let mag = flux_to_magnitude(flux).unwrap();
 
         // AB mag = -2.5*log10(100) + 31.4 = -2.5*2 + 31.4 = 26.4
@@ -188,7 +188,7 @@ mod tests {
                 },
                 PhotometryPoint {
                     mjd: 60676.0,
-                    flux: 20.0,  // Doubled
+                    flux: 20.0, // Doubled
                     flux_err: 2.0,
                     filter: "g".to_string(),
                 },

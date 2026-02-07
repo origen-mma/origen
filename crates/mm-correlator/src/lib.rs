@@ -5,9 +5,9 @@ pub mod superevent;
 pub mod temporal;
 
 pub use config::CorrelatorConfig;
-pub use correlator::{SupereventCorrelator, CorrelatorStats, CorrelatorError};
+pub use correlator::{CorrelatorError, CorrelatorStats, SupereventCorrelator};
 pub use superevent::{
-    MultiMessengerSuperevent, OpticalCandidate, SupereventClassification,
-    GWComponent, GammaRayCandidate, XRayCandidate, NeutrinoCandidate,
+    GWComponent, GammaRayCandidate, MultiMessengerSuperevent, NeutrinoCandidate, OpticalCandidate,
+    SupereventClassification, XRayCandidate,
 };
 pub use temporal::TemporalIndex;

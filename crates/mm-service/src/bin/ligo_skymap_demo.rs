@@ -1,10 +1,8 @@
 use anyhow::Result;
 use mm_core::{ParsedSkymap, SkyPosition};
 use mm_correlator::spatial::{
-    calculate_spatial_probability_from_skymap,
-    calculate_spatial_significance,
-    calculate_skymap_offset,
-    is_in_credible_region,
+    calculate_skymap_offset, calculate_spatial_probability_from_skymap,
+    calculate_spatial_significance, is_in_credible_region,
 };
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -13,11 +11,11 @@ use tracing::info;
 #[derive(Debug)]
 struct InjectionParams {
     simulation_id: u32,
-    longitude: f64,  // radians (RA)
-    latitude: f64,   // radians (Dec)
-    distance: f64,   // Mpc
-    mass1: f64,      // solar masses
-    mass2: f64,      // solar masses
+    longitude: f64, // radians (RA)
+    latitude: f64,  // radians (Dec)
+    distance: f64,  // Mpc
+    mass1: f64,     // solar masses
+    mass2: f64,     // solar masses
 }
 
 fn main() -> Result<()> {
@@ -71,9 +69,15 @@ fn main() -> Result<()> {
 
         info!("");
         info!("🎯 True Injection Parameters:");
-        info!("  Position: (RA={:.2}°, Dec={:.2}°)", injection_ra, injection_dec);
+        info!(
+            "  Position: (RA={:.2}°, Dec={:.2}°)",
+            injection_ra, injection_dec
+        );
         info!("  Distance: {:.1} Mpc", injection.distance);
-        info!("  Masses: {:.1} + {:.1} M☉", injection.mass1, injection.mass2);
+        info!(
+            "  Masses: {:.1} + {:.1} M☉",
+            injection.mass1, injection.mass2
+        );
 
         // Query skymap at injection position
         let injection_pos = SkyPosition::new(injection_ra, injection_dec, 0.1);
@@ -97,14 +101,17 @@ fn main() -> Result<()> {
 
         // Get offset from max probability
         let offset = calculate_skymap_offset(&injection_pos, &skymap);
-        info!("  Angular sep from max prob: {:.2}°", offset.angular_separation);
+        info!(
+            "  Angular sep from max prob: {:.2}°",
+            offset.angular_separation
+        );
 
         // Get max probability position
         info!("");
         info!("📍 Skymap Max Probability:");
-        info!("  Position: (RA={:.2}°, Dec={:.2}°)",
-            skymap.max_prob_position.ra,
-            skymap.max_prob_position.dec
+        info!(
+            "  Position: (RA={:.2}°, Dec={:.2}°)",
+            skymap.max_prob_position.ra, skymap.max_prob_position.dec
         );
 
         // Calculate how far off the reconstruction is

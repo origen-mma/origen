@@ -1,5 +1,5 @@
 use anyhow::Result;
-use mm_core::{ParsedSkymap, OpticalAlert};
+use mm_core::{OpticalAlert, ParsedSkymap};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::producer::{FutureProducer, FutureRecord};
@@ -53,15 +53,15 @@ struct CorrelationMessage {
     overlap_area: f64,
     overlap_fraction_gw: f64,
     overlap_fraction_grb: f64,
-    timestamp: f64,  // Unix timestamp when correlation was computed
+    timestamp: f64, // Unix timestamp when correlation was computed
 }
 
 struct CorrelatorState {
     gw_events: BTreeMap<u32, GWEvent>,
     grb_events: BTreeMap<u32, GRBEvent>,
     optical_alerts: BTreeMap<String, OpticalAlert>,
-    time_window_grb: f64,      // GW-GRB window (seconds)
-    time_window_optical: f64,  // GW-Optical window (seconds)
+    time_window_grb: f64,     // GW-GRB window (seconds)
+    time_window_optical: f64, // GW-Optical window (seconds)
     correlations: Vec<Correlation>,
 }
 
@@ -78,14 +78,19 @@ impl CorrelatorState {
     }
 
     fn add_gw_event(&mut self, event: GWEvent, producer: FutureProducer) {
-        info!("📡 GW event received: sim_id={}, GPS={:.2}", event.simulation_id, event.gpstime);
+        info!(
+            "📡 GW event received: sim_id={}, GPS={:.2}",
+            event.simulation_id, event.gpstime
+        );
 
         // Check for matching GRB events
         if let Some(grb_event) = self.grb_events.get(&event.simulation_id) {
             let time_offset = (grb_event.detection_time - event.gpstime).abs();
             if time_offset <= self.time_window_grb {
-                info!("✨ Correlation found! GW {} ↔ GRB {} (Δt={:.2}s)",
-                     event.simulation_id, grb_event.simulation_id, time_offset);
+                info!(
+                    "✨ Correlation found! GW {} ↔ GRB {} (Δt={:.2}s)",
+                    event.simulation_id, grb_event.simulation_id, time_offset
+                );
 
                 // Compute overlap asynchronously and publish to Kafka
                 tokio::spawn(Self::compute_and_publish_overlap(
@@ -101,15 +106,19 @@ impl CorrelatorState {
     }
 
     fn add_grb_event(&mut self, event: GRBEvent, producer: FutureProducer) {
-        info!("🌟 GRB event received: sim_id={}, GPS={:.2}, inst={}",
-              event.simulation_id, event.detection_time, event.instrument);
+        info!(
+            "🌟 GRB event received: sim_id={}, GPS={:.2}, inst={}",
+            event.simulation_id, event.detection_time, event.instrument
+        );
 
         // Check for matching GW events
         if let Some(gw_event) = self.gw_events.get(&event.simulation_id) {
             let time_offset = (event.detection_time - gw_event.gpstime).abs();
             if time_offset <= self.time_window_grb {
-                info!("✨ Correlation found! GW {} ↔ GRB {} (Δt={:.2}s)",
-                     gw_event.simulation_id, event.simulation_id, time_offset);
+                info!(
+                    "✨ Correlation found! GW {} ↔ GRB {} (Δt={:.2}s)",
+                    gw_event.simulation_id, event.simulation_id, time_offset
+                );
 
                 // Compute overlap asynchronously and publish to Kafka
                 tokio::spawn(Self::compute_and_publish_overlap(
@@ -125,8 +134,10 @@ impl CorrelatorState {
     }
 
     fn add_optical_alert(&mut self, alert: OpticalAlert, producer: FutureProducer) {
-        info!("🔭 Optical alert received: {} @ MJD={:.2}, (RA,Dec)=({:.2},{:.2})",
-              alert.object_id, alert.mjd, alert.ra, alert.dec);
+        info!(
+            "🔭 Optical alert received: {} @ MJD={:.2}, (RA,Dec)=({:.2},{:.2})",
+            alert.object_id, alert.mjd, alert.ra, alert.dec
+        );
 
         let optical_gps = alert.gps_time();
 
@@ -145,13 +156,20 @@ impl CorrelatorState {
             // Check for three-way correlations (GW + GRB + Optical)
             for (sim_id, time_offset) in matched_gw {
                 if let Some(grb_event) = self.grb_events.get(&sim_id) {
-                    info!("   🎯 THREE-WAY CORRELATION! GW {} ↔ GRB {} ↔ Optical {}",
-                         sim_id, grb_event.instrument, alert.object_id);
-                    info!("      Time offsets: GW→Optical={:.1}s, GW→GRB={:.1}s",
-                         time_offset, (grb_event.detection_time - self.gw_events[&sim_id].gpstime).abs());
+                    info!(
+                        "   🎯 THREE-WAY CORRELATION! GW {} ↔ GRB {} ↔ Optical {}",
+                        sim_id, grb_event.instrument, alert.object_id
+                    );
+                    info!(
+                        "      Time offsets: GW→Optical={:.1}s, GW→GRB={:.1}s",
+                        time_offset,
+                        (grb_event.detection_time - self.gw_events[&sim_id].gpstime).abs()
+                    );
                 } else {
-                    info!("   🌟 GW-Optical correlation: GW {} ↔ Optical {} (Δt={:.1}s)",
-                         sim_id, alert.object_id, time_offset);
+                    info!(
+                        "   🌟 GW-Optical correlation: GW {} ↔ Optical {} (Δt={:.1}s)",
+                        sim_id, alert.object_id, time_offset
+                    );
                 }
             }
         }
@@ -173,10 +191,12 @@ impl CorrelatorState {
                 info!("🎯 Overlap computed for sim_id={}:", gw_event.simulation_id);
                 info!("   GW 90% CR:    {:>8.1} sq deg", gw_area);
                 info!("   GRB 90% CR:   {:>8.1} sq deg", grb_area);
-                info!("   Overlap:      {:>8.1} sq deg ({:.1}% of GW, {:.1}% of GRB)",
-                     overlap_area,
-                     100.0 * overlap_frac_gw,
-                     100.0 * overlap_frac_grb);
+                info!(
+                    "   Overlap:      {:>8.1} sq deg ({:.1}% of GW, {:.1}% of GRB)",
+                    overlap_area,
+                    100.0 * overlap_frac_gw,
+                    100.0 * overlap_frac_grb
+                );
 
                 // Create correlation message
                 let correlation = CorrelationMessage {
@@ -201,14 +221,14 @@ impl CorrelatorState {
                 match serde_json::to_string(&correlation) {
                     Ok(payload) => {
                         let key = gw_event.simulation_id.to_string();
-                        let record = FutureRecord::to(topic)
-                            .payload(&payload)
-                            .key(&key);
+                        let record = FutureRecord::to(topic).payload(&payload).key(&key);
 
                         match producer.send(record, Duration::from_secs(0)).await {
                             Ok(_) => {
-                                info!("📤 Published correlation for sim_id={} to {}",
-                                     gw_event.simulation_id, topic);
+                                info!(
+                                    "📤 Published correlation for sim_id={} to {}",
+                                    gw_event.simulation_id, topic
+                                );
                             }
                             Err((e, _)) => {
                                 warn!("❌ Failed to publish correlation: {}", e);
@@ -221,15 +241,18 @@ impl CorrelatorState {
                 }
             }
             Err(e) => {
-                warn!("❌ Failed to compute overlap for sim_id={}: {}",
-                     gw_event.simulation_id, e);
+                warn!(
+                    "❌ Failed to compute overlap for sim_id={}: {}",
+                    gw_event.simulation_id, e
+                );
             }
         }
     }
 
-    async fn compute_overlap_async(gw_event: &GWEvent, grb_event: &GRBEvent)
-        -> Result<(f64, f64, f64)>
-    {
+    async fn compute_overlap_async(
+        gw_event: &GWEvent,
+        grb_event: &GRBEvent,
+    ) -> Result<(f64, f64, f64)> {
         // Load skymaps
         let gw_skymap = ParsedSkymap::from_fits(&gw_event.skymap_path)?;
         let grb_skymap = ParsedSkymap::from_fits(&grb_event.skymap_path)?;
@@ -253,7 +276,8 @@ fn compute_overlap(gw_skymap: &ParsedSkymap, grb_skymap: &ParsedSkymap) -> Resul
     let grb_probs = resample_skymap(&grb_skymap.probabilities, grb_skymap.nside, target_nside);
 
     // Multiply probability maps
-    let mut combined_probs: Vec<f64> = gw_probs.iter()
+    let mut combined_probs: Vec<f64> = gw_probs
+        .iter()
         .zip(grb_probs.iter())
         .map(|(gw_p, grb_p)| gw_p * grb_p)
         .collect();
@@ -269,7 +293,8 @@ fn compute_overlap(gw_skymap: &ParsedSkymap, grb_skymap: &ParsedSkymap) -> Resul
     }
 
     // Find 90% credible region
-    let mut indexed_probs: Vec<(usize, f64)> = combined_probs.iter()
+    let mut indexed_probs: Vec<(usize, f64)> = combined_probs
+        .iter()
         .enumerate()
         .map(|(i, &p)| (i, p))
         .collect();
@@ -330,11 +355,15 @@ async fn main() -> Result<()> {
     info!("=== Multi-Messenger Correlator Service ===\n");
 
     // Configuration
-    let time_window_grb = 5.0;       // ±5 seconds for GW-GRB
-    let time_window_optical = 86400.0;  // ±1 day for GW-Optical
+    let time_window_grb = 5.0; // ±5 seconds for GW-GRB
+    let time_window_optical = 86400.0; // ±1 day for GW-Optical
     info!("Time windows:");
     info!("  GW-GRB:     ±{} seconds", time_window_grb);
-    info!("  GW-Optical: ±{} seconds ({:.1} days)\n", time_window_optical, time_window_optical / 86400.0);
+    info!(
+        "  GW-Optical: ±{} seconds ({:.1} days)\n",
+        time_window_optical,
+        time_window_optical / 86400.0
+    );
 
     // Kafka consumer
     let consumer: StreamConsumer = ClientConfig::new()
@@ -386,18 +415,14 @@ async fn main() -> Result<()> {
 
                 // Route to appropriate handler
                 match topic {
-                    t if t == gw_topic => {
-                        match serde_json::from_str::<GWEvent>(payload) {
-                            Ok(event) => state.add_gw_event(event, producer.clone()),
-                            Err(e) => warn!("Failed to parse GW event: {}", e),
-                        }
-                    }
-                    t if t == grb_topic => {
-                        match serde_json::from_str::<GRBEvent>(payload) {
-                            Ok(event) => state.add_grb_event(event, producer.clone()),
-                            Err(e) => warn!("Failed to parse GRB event: {}", e),
-                        }
-                    }
+                    t if t == gw_topic => match serde_json::from_str::<GWEvent>(payload) {
+                        Ok(event) => state.add_gw_event(event, producer.clone()),
+                        Err(e) => warn!("Failed to parse GW event: {}", e),
+                    },
+                    t if t == grb_topic => match serde_json::from_str::<GRBEvent>(payload) {
+                        Ok(event) => state.add_grb_event(event, producer.clone()),
+                        Err(e) => warn!("Failed to parse GRB event: {}", e),
+                    },
                     t if t == optical_topic => {
                         match serde_json::from_str::<OpticalAlert>(payload) {
                             Ok(alert) => state.add_optical_alert(alert, producer.clone()),

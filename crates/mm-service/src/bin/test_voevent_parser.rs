@@ -21,7 +21,10 @@ fn main() -> Result<()> {
     info!("  Instrument: {}", grb_alert.instrument);
     info!("  Trigger ID: {}", grb_alert.trigger_id);
     info!("  Trigger Time: {}", grb_alert.trigger_time);
-    info!("  Position: (RA={:.4}°, Dec={:.4}°)", grb_alert.ra, grb_alert.dec);
+    info!(
+        "  Position: (RA={:.4}°, Dec={:.4}°)",
+        grb_alert.ra, grb_alert.dec
+    );
     info!("  Error Radius: {:.2}°", grb_alert.error_radius);
     info!("  Packet Type: {:?}", grb_alert.packet_type);
     info!("  Duration: {:?} s", grb_alert.duration);

@@ -74,8 +74,8 @@ pub struct GammaRayEvent {
     pub trigger_time: f64,
     pub position: Option<SkyPosition>,
     pub significance: f64,
-    pub skymap_url: Option<String>,  // URL to HEALPix FITS skymap
-    pub error_radius: Option<f64>,   // Position error radius (degrees)
+    pub skymap_url: Option<String>, // URL to HEALPix FITS skymap
+    pub error_radius: Option<f64>,  // Position error radius (degrees)
 }
 
 /// X-ray transient event (from Einstein Probe)

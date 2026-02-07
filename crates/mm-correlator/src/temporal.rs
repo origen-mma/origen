@@ -27,16 +27,22 @@ impl TemporalIndex {
 
     /// Find superevents within a time window
     /// Returns all superevents where alert_time is within [t_start, t_end]
-    pub fn find_in_window(&self, alert_time: f64, window_before: f64, window_after: f64) -> Vec<(f64, String)> {
+    pub fn find_in_window(
+        &self,
+        alert_time: f64,
+        window_before: f64,
+        window_after: f64,
+    ) -> Vec<(f64, String)> {
         let search_start = alert_time + window_before; // window_before is negative
         let search_end = alert_time + window_after;
 
         let mut results = Vec::new();
 
         // Find all t_0 values where the superevent window overlaps with search window
-        for (t_0, superevent_id) in self.times.range(
-            OrderedFloat(search_start)..=OrderedFloat(search_end)
-        ) {
+        for (t_0, superevent_id) in self
+            .times
+            .range(OrderedFloat(search_start)..=OrderedFloat(search_end))
+        {
             results.push((t_0.0, superevent_id.clone()));
         }
 

@@ -26,11 +26,12 @@ pub fn parse_swift_bat(payload: &str) -> Result<Event, ParseError> {
         let trigger_id = alert.trigger_id.unwrap_or_else(|| "unknown".to_string());
         let trigger_time = alert.trigger_time.unwrap_or(0.0);
 
-        let position = if let (Some(ra), Some(dec), Some(error)) = (alert.ra, alert.dec, alert.error) {
-            Some(SkyPosition::new(ra, dec, error * 3600.0)) // Convert degrees to arcsec
-        } else {
-            None
-        };
+        let position =
+            if let (Some(ra), Some(dec), Some(error)) = (alert.ra, alert.dec, alert.error) {
+                Some(SkyPosition::new(ra, dec, error * 3600.0)) // Convert degrees to arcsec
+            } else {
+                None
+            };
 
         return Ok(Event::GammaRay(GammaRayEvent {
             trigger_id,

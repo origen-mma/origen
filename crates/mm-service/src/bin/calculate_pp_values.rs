@@ -7,8 +7,8 @@ use tracing::info;
 #[derive(Debug)]
 struct InjectionParams {
     simulation_id: u32,
-    longitude: f64,  // radians
-    latitude: f64,   // radians
+    longitude: f64, // radians
+    latitude: f64,  // radians
     distance: f64,
     mass1: f64,
     mass2: f64,
@@ -77,7 +77,11 @@ fn main() -> Result<()> {
         ));
     }
 
-    info!("\nProcessed {} / {} injections successfully", results.len(), injections.len());
+    info!(
+        "\nProcessed {} / {} injections successfully",
+        results.len(),
+        injections.len()
+    );
     info!("Failed to parse {} skymaps\n", failed_count);
 
     // Sort by integrated probability for P-P plot
@@ -93,14 +97,14 @@ fn main() -> Result<()> {
         writeln!(
             file,
             "{},{:.10e},{:.6},{},{},{:.4},{:.4},{:.1},{},{}",
-            result.0,  // simulation_id
-            result.1,  // prob_at_injection
-            result.2,  // integrated_prob
-            result.3 as u8,  // in_50cr
-            result.4 as u8,  // in_90cr
-            result.5,  // ra
-            result.6,  // dec
-            result.7,  // distance
+            result.0,       // simulation_id
+            result.1,       // prob_at_injection
+            result.2,       // integrated_prob
+            result.3 as u8, // in_50cr
+            result.4 as u8, // in_90cr
+            result.5,       // ra
+            result.6,       // dec
+            result.7,       // distance
             rank + 1,
             expected_uniform,
         )?;
@@ -115,8 +119,16 @@ fn main() -> Result<()> {
 
     info!("\n=== Calibration Statistics ===");
     info!("Total successful: {}", total);
-    info!("Injections in 50% CR: {} ({:.1}%)", in_50cr_count, 100.0 * in_50cr_count as f64 / total as f64);
-    info!("Injections in 90% CR: {} ({:.1}%)", in_90cr_count, 100.0 * in_90cr_count as f64 / total as f64);
+    info!(
+        "Injections in 50% CR: {} ({:.1}%)",
+        in_50cr_count,
+        100.0 * in_50cr_count as f64 / total as f64
+    );
+    info!(
+        "Injections in 90% CR: {} ({:.1}%)",
+        in_90cr_count,
+        100.0 * in_90cr_count as f64 / total as f64
+    );
 
     // Expected values for well-calibrated localizations:
     info!("\nExpected for perfect calibration:");

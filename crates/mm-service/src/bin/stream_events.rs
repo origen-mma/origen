@@ -20,7 +20,7 @@ struct GWEvent {
 #[derive(Debug, Serialize, Deserialize)]
 struct GRBEvent {
     simulation_id: u32,
-    detection_time: f64,  // GPS time
+    detection_time: f64, // GPS time
     ra: f64,
     dec: f64,
     error_radius: f64,
@@ -78,11 +78,14 @@ async fn main() -> Result<()> {
     let rate_hz: f64 = if args.len() > 1 {
         args[1].parse()?
     } else {
-        1.0  // Default: 1 event per second
+        1.0 // Default: 1 event per second
     };
     let delay_ms = (1000.0 / rate_hz) as u64;
 
-    info!("Streaming rate: {:.1} Hz ({} ms between events)", rate_hz, delay_ms);
+    info!(
+        "Streaming rate: {:.1} Hz ({} ms between events)",
+        rate_hz, delay_ms
+    );
     info!("Press Ctrl+C to stop\n");
 
     // Stream events
@@ -99,24 +102,27 @@ async fn main() -> Result<()> {
             simulation_id: injection.simulation_id,
             gpstime: injection.gpstime,
             pipeline: "SGNL".to_string(),
-            snr: 10.0 + (injection.simulation_id % 20) as f32,  // Simulated SNR
-            far: 1e-8,  // Simulated FAR
+            snr: 10.0 + (injection.simulation_id % 20) as f32, // Simulated SNR
+            far: 1e-8,                                         // Simulated FAR
             skymap_path: format!("{}/allsky/{}.fits", base_path, injection.simulation_id),
         };
 
         let gw_payload = serde_json::to_string(&gw_event)?;
         let key = injection.simulation_id.to_string();
-        let record = FutureRecord::to(gw_topic)
-            .payload(&gw_payload)
-            .key(&key);
+        let record = FutureRecord::to(gw_topic).payload(&gw_payload).key(&key);
 
-        producer.send(record, Duration::from_secs(0)).await
+        producer
+            .send(record, Duration::from_secs(0))
+            .await
             .map_err(|(e, _)| anyhow::anyhow!("Failed to send GW event: {}", e))?;
 
         gw_count += 1;
 
         // Publish corresponding GRB event (with time delay)
-        if let Some(grb) = grb_params.iter().find(|g| g.simulation_id == injection.simulation_id) {
+        if let Some(grb) = grb_params
+            .iter()
+            .find(|g| g.simulation_id == injection.simulation_id)
+        {
             // Simulate GRB detection with random time offset (0-10 seconds)
             let time_offset = (injection.simulation_id % 10) as f64;
 
@@ -127,16 +133,19 @@ async fn main() -> Result<()> {
                 dec: grb.dec,
                 error_radius: grb.error_radius,
                 instrument: grb.instrument.clone(),
-                skymap_path: format!("simulated_grbs/O4HL/bgp/allsky/{}.fits", injection.simulation_id),
+                skymap_path: format!(
+                    "simulated_grbs/O4HL/bgp/allsky/{}.fits",
+                    injection.simulation_id
+                ),
             };
 
             let grb_payload = serde_json::to_string(&grb_event)?;
             let key = injection.simulation_id.to_string();
-            let record = FutureRecord::to(grb_topic)
-                .payload(&grb_payload)
-                .key(&key);
+            let record = FutureRecord::to(grb_topic).payload(&grb_payload).key(&key);
 
-            producer.send(record, Duration::from_secs(0)).await
+            producer
+                .send(record, Duration::from_secs(0))
+                .await
                 .map_err(|(e, _)| anyhow::anyhow!("Failed to send GRB event: {}", e))?;
 
             grb_count += 1;

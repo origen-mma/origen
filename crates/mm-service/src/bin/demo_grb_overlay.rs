@@ -10,8 +10,8 @@ use tracing::info;
 #[derive(Debug)]
 struct InjectionParams {
     simulation_id: u32,
-    longitude: f64,  // radians
-    latitude: f64,   // radians
+    longitude: f64, // radians
+    latitude: f64,  // radians
     distance: f64,
     mass1: f64,
     mass2: f64,
@@ -60,7 +60,10 @@ fn main() -> Result<()> {
     info!("✅ GRB alert loaded");
     info!("  Instrument: {}", grb_alert.instrument);
     info!("  Trigger ID: {}", grb_alert.trigger_id);
-    info!("  Original position: (RA={:.2}°, Dec={:.2}°)", grb_alert.ra, grb_alert.dec);
+    info!(
+        "  Original position: (RA={:.2}°, Dec={:.2}°)",
+        grb_alert.ra, grb_alert.dec
+    );
     info!("  Error radius: {:.2}°\n", grb_alert.error_radius);
 
     // Get true injection position
@@ -70,7 +73,10 @@ fn main() -> Result<()> {
     info!("🎯 True GW injection position:");
     info!("  RA={:.4}°, Dec={:.4}°", true_ra, true_dec);
     info!("  Distance: {:.1} Mpc", injection.distance);
-    info!("  Masses: {:.1} + {:.1} M☉\n", injection.mass1, injection.mass2);
+    info!(
+        "  Masses: {:.1} + {:.1} M☉\n",
+        injection.mass1, injection.mass2
+    );
 
     // For this demo, we'll place the GRB at the true position
     // (In full simulation, we'd rotate the actual GRB skymap)
@@ -117,12 +123,22 @@ fn export_overlay_data(
     let mut file = File::create(output_path)?;
     writeln!(file, "pixel_idx,ra,dec,probability,in_50cr,in_90cr")?;
 
-    let cr_50_pixels: std::collections::HashSet<usize> =
-        skymap.credible_regions[0].pixel_indices.iter().copied().collect();
-    let cr_90_pixels: std::collections::HashSet<usize> =
-        skymap.credible_regions[1].pixel_indices.iter().copied().collect();
+    let cr_50_pixels: std::collections::HashSet<usize> = skymap.credible_regions[0]
+        .pixel_indices
+        .iter()
+        .copied()
+        .collect();
+    let cr_90_pixels: std::collections::HashSet<usize> = skymap.credible_regions[1]
+        .pixel_indices
+        .iter()
+        .copied()
+        .collect();
 
-    let sample_rate = if skymap.probabilities.len() > 50000 { 8 } else { 1 };
+    let sample_rate = if skymap.probabilities.len() > 50000 {
+        8
+    } else {
+        1
+    };
 
     for (idx, &prob) in skymap.probabilities.iter().enumerate() {
         if idx % sample_rate != 0 {
@@ -136,8 +152,11 @@ fn export_overlay_data(
         let in_50 = cr_50_pixels.contains(&idx);
         let in_90 = cr_90_pixels.contains(&idx);
 
-        writeln!(file, "{},{:.6},{:.6},{:.10e},{},{}",
-                 idx, ra, dec, prob, in_50 as u8, in_90 as u8)?;
+        writeln!(
+            file,
+            "{},{:.6},{:.6},{:.10e},{},{}",
+            idx, ra, dec, prob, in_50 as u8, in_90 as u8
+        )?;
     }
 
     // Export metadata
@@ -149,8 +168,16 @@ fn export_overlay_data(
     writeln!(meta_file, "gw_distance: {:.1}", injection.distance)?;
     writeln!(meta_file, "gw_mass1: {:.1}", injection.mass1)?;
     writeln!(meta_file, "gw_mass2: {:.1}", injection.mass2)?;
-    writeln!(meta_file, "gw_max_prob_ra: {:.6}", skymap.max_prob_position.ra)?;
-    writeln!(meta_file, "gw_max_prob_dec: {:.6}", skymap.max_prob_position.dec)?;
+    writeln!(
+        meta_file,
+        "gw_max_prob_ra: {:.6}",
+        skymap.max_prob_position.ra
+    )?;
+    writeln!(
+        meta_file,
+        "gw_max_prob_dec: {:.6}",
+        skymap.max_prob_position.dec
+    )?;
     writeln!(meta_file, "grb_ra: {:.6}", grb_ra)?;
     writeln!(meta_file, "grb_dec: {:.6}", grb_dec)?;
     writeln!(meta_file, "grb_error_radius: {:.2}", grb_error_radius)?;

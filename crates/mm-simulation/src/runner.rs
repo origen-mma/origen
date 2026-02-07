@@ -19,12 +19,12 @@ use crate::voevent::{GrbAlert, VOEventParser};
 #[derive(Debug, Clone)]
 pub struct LigoInjection {
     pub simulation_id: u32,
-    pub ra: f64,          // radians
-    pub dec: f64,         // radians
-    pub distance: f64,    // Mpc
-    pub mass1: f64,       // solar masses
-    pub mass2: f64,       // solar masses
-    pub gps_time: f64,    // Will be set randomly
+    pub ra: f64,       // radians
+    pub dec: f64,      // radians
+    pub distance: f64, // Mpc
+    pub mass1: f64,    // solar masses
+    pub mass2: f64,    // solar masses
+    pub gps_time: f64, // Will be set randomly
 }
 
 /// Simulation configuration
@@ -57,11 +57,11 @@ pub struct SimulationResult {
     pub gw_dec: f64,
     pub grb_ra: f64,
     pub grb_dec: f64,
-    pub spatial_separation: f64,  // degrees
-    pub temporal_offset: f64,     // seconds
+    pub spatial_separation: f64, // degrees
+    pub temporal_offset: f64,    // seconds
     pub in_50_cr: bool,
     pub in_90_cr: bool,
-    pub correlated: bool,         // Did correlator associate them?
+    pub correlated: bool, // Did correlator associate them?
     pub spatial_significance: f64,
 }
 
@@ -92,8 +92,7 @@ impl SimulationRunner {
 
     /// Load LIGO injection parameters from injections.dat
     fn load_injections(path: &Path) -> Result<Vec<LigoInjection>> {
-        let file = fs::File::open(path)
-            .context("Failed to open injections.dat")?;
+        let file = fs::File::open(path).context("Failed to open injections.dat")?;
         let reader = BufReader::new(file);
         let mut injections = Vec::new();
 
@@ -111,12 +110,12 @@ impl SimulationRunner {
 
             injections.push(LigoInjection {
                 simulation_id: parts[0].parse()?,
-                ra: parts[1].parse()?,           // radians
-                dec: parts[2].parse()?,          // radians
-                distance: parts[4].parse()?,     // Mpc
-                mass1: parts[5].parse()?,        // solar masses
-                mass2: parts[6].parse()?,        // solar masses
-                gps_time: 0.0,                   // Will be set randomly
+                ra: parts[1].parse()?,       // radians
+                dec: parts[2].parse()?,      // radians
+                distance: parts[4].parse()?, // Mpc
+                mass1: parts[5].parse()?,    // solar masses
+                mass2: parts[6].parse()?,    // solar masses
+                gps_time: 0.0,               // Will be set randomly
             });
         }
 
@@ -170,15 +169,22 @@ impl SimulationRunner {
             let gw_gps_time = base_gps_time + (i as f64) * 86400.0; // Space events 1 day apart
 
             // Set GRB time with random offset
-            let time_offset = rng.gen_range(-self.config.time_offset_range..self.config.time_offset_range);
+            let time_offset =
+                rng.gen_range(-self.config.time_offset_range..self.config.time_offset_range);
             let grb_gps_time = gw_gps_time + time_offset;
 
             // Load GW skymap
-            let skymap_path = self.config.skymap_dir.join(format!("{}.fits", injection.simulation_id));
+            let skymap_path = self
+                .config
+                .skymap_dir
+                .join(format!("{}.fits", injection.simulation_id));
             let gw_skymap = match ParsedSkymap::from_fits(&skymap_path) {
                 Ok(s) => s,
                 Err(e) => {
-                    warn!("Failed to parse skymap for injection {}: {}", injection.simulation_id, e);
+                    warn!(
+                        "Failed to parse skymap for injection {}: {}",
+                        injection.simulation_id, e
+                    );
                     continue;
                 }
             };
@@ -253,9 +259,21 @@ impl SimulationRunner {
 
         info!("\n=== Simulation Statistics ===");
         info!("Total simulations: {}", total);
-        info!("GRBs in 50% CR: {} ({:.1}%)", in_50_cr, 100.0 * in_50_cr as f64 / total as f64);
-        info!("GRBs in 90% CR: {} ({:.1}%)", in_90_cr, 100.0 * in_90_cr as f64 / total as f64);
-        info!("Correlated by system: {} ({:.1}%)", correlated, 100.0 * correlated as f64 / total as f64);
+        info!(
+            "GRBs in 50% CR: {} ({:.1}%)",
+            in_50_cr,
+            100.0 * in_50_cr as f64 / total as f64
+        );
+        info!(
+            "GRBs in 90% CR: {} ({:.1}%)",
+            in_90_cr,
+            100.0 * in_90_cr as f64 / total as f64
+        );
+        info!(
+            "Correlated by system: {} ({:.1}%)",
+            correlated,
+            100.0 * correlated as f64 / total as f64
+        );
         info!("Average spatial separation: {:.2}°", avg_sep);
         info!("Median spatial separation: {:.2}°", median_sep);
     }
@@ -270,8 +288,8 @@ fn angular_separation(ra1: f64, dec1: f64, ra2: f64, dec2: f64) -> f64 {
     let ra2_rad = ra2 * PI / 180.0;
     let dec2_rad = dec2 * PI / 180.0;
 
-    let cos_sep = dec1_rad.sin() * dec2_rad.sin() +
-                  dec1_rad.cos() * dec2_rad.cos() * (ra1_rad - ra2_rad).cos();
+    let cos_sep = dec1_rad.sin() * dec2_rad.sin()
+        + dec1_rad.cos() * dec2_rad.cos() * (ra1_rad - ra2_rad).cos();
 
     cos_sep.acos() * 180.0 / PI
 }

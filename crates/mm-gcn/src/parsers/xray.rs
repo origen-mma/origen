@@ -13,11 +13,13 @@ struct EinsteinProbeAlert {
 }
 
 pub fn parse_einstein_probe(payload: &str) -> Result<Event, ParseError> {
-    let alert: EinsteinProbeAlert = serde_json::from_str(payload)
-        .map_err(|e| ParseError::JsonError(e.to_string()))?;
+    let alert: EinsteinProbeAlert =
+        serde_json::from_str(payload).map_err(|e| ParseError::JsonError(e.to_string()))?;
 
     let event_id = alert.event_id.unwrap_or_else(|| "unknown".to_string());
-    let trigger_time = alert.trigger_time.ok_or(ParseError::MissingField("trigger_time"))?;
+    let trigger_time = alert
+        .trigger_time
+        .ok_or(ParseError::MissingField("trigger_time"))?;
 
     let position = if let (Some(ra), Some(dec)) = (alert.ra, alert.dec) {
         let error_radius = alert.error_radius.unwrap_or(10.0);

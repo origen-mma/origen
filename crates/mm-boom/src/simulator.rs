@@ -1,4 +1,6 @@
-use mm_core::{estimate_explosion_time, io::load_lightcurves_dir, LightCurve, MockSkymap, SkyPosition};
+use mm_core::{
+    estimate_explosion_time, io::load_lightcurves_dir, LightCurve, MockSkymap, SkyPosition,
+};
 use rand::SeedableRng;
 use std::error::Error;
 use std::path::Path;
@@ -64,7 +66,10 @@ impl BoomSimulator {
     where
         F: FnMut(&LightCurve, &SkyPosition, f64) -> Result<(), Box<dyn Error>>,
     {
-        info!("Starting simulation with {} light curves", self.lightcurves.len());
+        info!(
+            "Starting simulation with {} light curves",
+            self.lightcurves.len()
+        );
 
         let mut processed = 0;
 

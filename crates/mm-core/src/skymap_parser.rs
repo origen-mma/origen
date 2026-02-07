@@ -1,7 +1,7 @@
+use cdshealpix::nested::{center, hash};
 use fitsio::FitsFile;
 use std::path::Path;
 use thiserror::Error;
-use cdshealpix::nested::{hash, center};
 
 use crate::SkyPosition;
 
@@ -75,8 +75,8 @@ pub enum SkymapParseError {
 impl ParsedSkymap {
     /// Parse a HEALPix FITS skymap file (supports both flat and multi-order)
     pub fn from_fits<P: AsRef<Path>>(path: P) -> Result<Self, SkymapParseError> {
-        let mut fptr = FitsFile::open(&path)
-            .map_err(|e| SkymapParseError::FitsIo(e.to_string()))?;
+        let mut fptr =
+            FitsFile::open(&path).map_err(|e| SkymapParseError::FitsIo(e.to_string()))?;
 
         // Try to read from primary HDU or first extension
         let hdu = fptr
@@ -126,10 +126,7 @@ impl ParsedSkymap {
             return Err(SkymapParseError::InvalidProbSum(prob_sum));
         }
 
-        let normalized_probs: Vec<f64> = probabilities
-            .iter()
-            .map(|&p| p / prob_sum)
-            .collect();
+        let normalized_probs: Vec<f64> = probabilities.iter().map(|&p| p / prob_sum).collect();
 
         // Sort indices by probability (descending) for credible region calculation
         let mut indexed_probs: Vec<(usize, f64)> = normalized_probs
@@ -203,7 +200,8 @@ impl ParsedSkymap {
         // Calculate area
         let npix = 12 * nside * nside;
         let pixel_area = 4.0 * std::f64::consts::PI / (npix as f64); // steradians
-        let area = (pixel_indices.len() as f64) * pixel_area * (180.0 / std::f64::consts::PI).powi(2);
+        let area =
+            (pixel_indices.len() as f64) * pixel_area * (180.0 / std::f64::consts::PI).powi(2);
 
         CredibleRegion {
             level,
@@ -291,7 +289,11 @@ impl ParsedSkymap {
         };
 
         // Find the credible region at this level
-        if let Some(region) = self.credible_regions.iter().find(|r| (r.level - level).abs() < 0.01) {
+        if let Some(region) = self
+            .credible_regions
+            .iter()
+            .find(|r| (r.level - level).abs() < 0.01)
+        {
             region.pixel_indices.contains(&actual_idx)
         } else {
             false
@@ -318,18 +320,20 @@ impl ParsedSkymap {
 
     /// Parse multi-order (MOC) FITS skymap
     fn from_fits_multiorder<P: AsRef<Path>>(path: P) -> Result<Self, SkymapParseError> {
-        let mut fptr = FitsFile::open(path)
-            .map_err(|e| SkymapParseError::FitsIo(e.to_string()))?;
+        let mut fptr = FitsFile::open(path).map_err(|e| SkymapParseError::FitsIo(e.to_string()))?;
 
-        let hdu = fptr.hdu(1)
+        let hdu = fptr
+            .hdu(1)
             .map_err(|e| SkymapParseError::FitsIo(e.to_string()))?;
 
         // Read UNIQ column (encodes order + pixel index)
-        let uniq: Vec<i64> = hdu.read_col(&mut fptr, "UNIQ")
+        let uniq: Vec<i64> = hdu
+            .read_col(&mut fptr, "UNIQ")
             .map_err(|e| SkymapParseError::MissingColumn(format!("UNIQ: {}", e)))?;
 
         // Read probability column (try different names)
-        let probdensity: Vec<f64> = hdu.read_col(&mut fptr, "PROBDENSITY")
+        let probdensity: Vec<f64> = hdu
+            .read_col(&mut fptr, "PROBDENSITY")
             .or_else(|_| hdu.read_col(&mut fptr, "PROB"))
             .map_err(|e| SkymapParseError::MissingColumn(format!("PROBDENSITY/PROB: {}", e)))?;
 
@@ -397,7 +401,8 @@ impl ParsedSkymap {
         ];
 
         let max_prob_idx = indexed_probs[0].0;
-        let max_prob_position = Self::pixel_to_sky_position(max_prob_idx, nside, SkymapOrdering::Nested)?;
+        let max_prob_position =
+            Self::pixel_to_sky_position(max_prob_idx, nside, SkymapOrdering::Nested)?;
 
         let pixel_area = 4.0 * std::f64::consts::PI / (npix as f64);
         let total_area = pixel_area * (npix as f64) * (180.0 / std::f64::consts::PI).powi(2);

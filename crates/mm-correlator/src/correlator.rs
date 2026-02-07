@@ -1,7 +1,9 @@
 use crate::{
     config::CorrelatorConfig,
     spatial::{calculate_joint_far, calculate_spatial_probability, positions_match},
-    superevent::{MultiMessengerSuperevent, OpticalCandidate, SupereventClassification, GammaRayCandidate},
+    superevent::{
+        GammaRayCandidate, MultiMessengerSuperevent, OpticalCandidate, SupereventClassification,
+    },
     temporal::TemporalIndex,
 };
 use mm_core::{Event, GWEvent, GammaRayEvent, LightCurve, Photometry, SkyPosition};
@@ -54,8 +56,8 @@ impl SupereventCorrelator {
         match event {
             Event::GravitationalWave(gw) => self.process_gw_event(gw),
             Event::GammaRay(grb) => self.process_grb_event(grb),
-            Event::XRay(_) => Ok(Vec::new()),      // TODO: Phase 4
-            Event::Neutrino(_) => Ok(Vec::new()),  // TODO: Phase 4
+            Event::XRay(_) => Ok(Vec::new()),     // TODO: Phase 4
+            Event::Neutrino(_) => Ok(Vec::new()), // TODO: Phase 4
             Event::Circular { .. } => Ok(Vec::new()),
         }
     }
@@ -71,14 +73,12 @@ impl SupereventCorrelator {
         let superevent = MultiMessengerSuperevent::new_from_gw(
             gw.superevent_id.clone(),
             gps_time,
-            gw.position.clone(),  // Pass GW position for spatial correlation
+            gw.position.clone(), // Pass GW position for spatial correlation
         );
 
         // Add to indices
-        self.temporal_index
-            .insert(gps_time, superevent_id.clone());
-        self.superevents
-            .insert(superevent_id.clone(), superevent);
+        self.temporal_index.insert(gps_time, superevent_id.clone());
+        self.superevents.insert(superevent_id.clone(), superevent);
 
         Ok(vec![superevent_id])
     }
@@ -98,15 +98,12 @@ impl SupereventCorrelator {
         if candidates.is_empty() {
             // No GW event found, create standalone GRB superevent
             let superevent_id = format!("MMGRB{}", grb.trigger_id);
-            let superevent = MultiMessengerSuperevent::new_from_grb(
-                grb.trigger_id.clone(),
-                trigger_time,
-            );
+            let superevent =
+                MultiMessengerSuperevent::new_from_grb(grb.trigger_id.clone(), trigger_time);
 
             self.temporal_index
                 .insert(trigger_time, superevent_id.clone());
-            self.superevents
-                .insert(superevent_id.clone(), superevent);
+            self.superevents.insert(superevent_id.clone(), superevent);
 
             affected_superevents.push(superevent_id);
         } else {
@@ -154,7 +151,7 @@ impl SupereventCorrelator {
             // Search backwards in time (GW before optical)
             let candidates = self.temporal_index.find_in_window(
                 gps_time,
-                -self.config.time_window_after, // Look back
+                -self.config.time_window_after,  // Look back
                 -self.config.time_window_before, // Look forward (small window)
             );
 
@@ -252,10 +249,13 @@ impl SupereventCorrelator {
         let with_optical = self
             .superevents
             .values()
-            .filter(|s| matches!(
-                s.classification,
-                SupereventClassification::GWWithOptical | SupereventClassification::MultiMessenger
-            ))
+            .filter(|s| {
+                matches!(
+                    s.classification,
+                    SupereventClassification::GWWithOptical
+                        | SupereventClassification::MultiMessenger
+                )
+            })
             .count();
 
         CorrelatorStats {
@@ -333,16 +333,13 @@ mod tests {
         let mjd = (optical_gps + 315964800.0 - 18.0) / 86400.0 + 40587.0;
 
         let mut lc = LightCurve::new("ZTF24test".to_string());
-        lc.add_measurement(Photometry::new(
-            mjd,
-            1000.0,
-            10.0,
-            "r".to_string(),
-        ));
+        lc.add_measurement(Photometry::new(mjd, 1000.0, 10.0, "r".to_string()));
 
         // Nearby position (within threshold)
         let position = SkyPosition::new(123.5, 45.0, 0.1);
-        let matches = correlator.process_optical_lightcurve(&lc, &position).unwrap();
+        let matches = correlator
+            .process_optical_lightcurve(&lc, &position)
+            .unwrap();
 
         // Should match due to proximity in time and space
         if matches.is_empty() {

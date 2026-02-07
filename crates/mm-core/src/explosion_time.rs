@@ -19,7 +19,9 @@ pub fn estimate_explosion_time(lc: &LightCurve) -> Option<f64> {
         .iter()
         .enumerate()
         .max_by(|(_, a), (_, b)| {
-            a.flux.partial_cmp(&b.flux).unwrap_or(std::cmp::Ordering::Equal)
+            a.flux
+                .partial_cmp(&b.flux)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(idx, _)| idx)?;
 
@@ -121,6 +123,10 @@ mod tests {
 
         // Should be reasonably close (within a few days)
         let diff_days = (first_detection_gps - t0) / 86400.0;
-        assert!(diff_days < 5.0, "t0 is {} days before first detection", diff_days);
+        assert!(
+            diff_days < 5.0,
+            "t0 is {} days before first detection",
+            diff_days
+        );
     }
 }

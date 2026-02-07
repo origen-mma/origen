@@ -90,7 +90,9 @@ impl LightCurve {
     /// Sort measurements by time (MJD)
     pub fn sort_by_time(&mut self) {
         self.measurements.sort_by(|a, b| {
-            a.mjd.partial_cmp(&b.mjd).unwrap_or(std::cmp::Ordering::Equal)
+            a.mjd
+                .partial_cmp(&b.mjd)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 
@@ -123,7 +125,11 @@ impl LightCurve {
     pub fn peak_flux(&self) -> Option<(f64, &Photometry)> {
         self.measurements
             .iter()
-            .max_by(|a, b| a.flux.partial_cmp(&b.flux).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.flux
+                    .partial_cmp(&b.flux)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|p| (p.flux, p))
     }
 }

@@ -9,8 +9,8 @@ use tracing::info;
 #[derive(Debug)]
 struct InjectionParams {
     simulation_id: u32,
-    longitude: f64,  // radians
-    latitude: f64,   // radians
+    longitude: f64, // radians
+    latitude: f64,  // radians
     distance: f64,
     mass1: f64,
     mass2: f64,
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     let sim_id: usize = if args.len() > 1 {
         args[1].parse()?
     } else {
-        1  // Default
+        1 // Default
     };
 
     // Configuration
@@ -55,14 +55,16 @@ fn main() -> Result<()> {
 
     // Load GRB parameters
     let grb_params = read_grb_params(grb_params_file)?;
-    let grb = grb_params.iter().find(|g| g.simulation_id == sim_id as u32)
+    let grb = grb_params
+        .iter()
+        .find(|g| g.simulation_id == sim_id as u32)
         .ok_or_else(|| anyhow::anyhow!("GRB not found for simulation {}", sim_id))?;
 
     info!("✅ Loaded GW skymap and GRB parameters\n");
 
     // Compute areas
     let gw_90cr_area = gw_skymap.area_90();
-    let grb_90cr_area = PI * grb.error_radius.powi(2);  // Area of circle
+    let grb_90cr_area = PI * grb.error_radius.powi(2); // Area of circle
 
     info!("Credible Region Areas:");
     info!("  GW 90% CR:  {:.1} sq deg", gw_90cr_area);
@@ -77,8 +79,14 @@ fn main() -> Result<()> {
 
     info!("Overlap Statistics:");
     info!("  Overlap area: {:.1} sq deg", overlap_area);
-    info!("  Overlap / GW CR:  {:.1}%", 100.0 * overlap_area / gw_90cr_area);
-    info!("  Overlap / GRB CR: {:.1}%\n", 100.0 * overlap_area / grb_90cr_area);
+    info!(
+        "  Overlap / GW CR:  {:.1}%",
+        100.0 * overlap_area / gw_90cr_area
+    );
+    info!(
+        "  Overlap / GRB CR: {:.1}%\n",
+        100.0 * overlap_area / grb_90cr_area
+    );
 
     // Check if true position is in credible regions
     let true_ra = injection.longitude.to_degrees();
@@ -111,16 +119,15 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn compute_overlap(
-    gw_skymap: &ParsedSkymap,
-    grb_skymap: &ParsedSkymap,
-) -> Result<f64> {
+fn compute_overlap(gw_skymap: &ParsedSkymap, grb_skymap: &ParsedSkymap) -> Result<f64> {
     // Ensure both maps are at the same resolution
     // Resample to the coarser resolution to avoid numerical issues
     let target_nside = gw_skymap.nside.min(grb_skymap.nside);
 
-    info!("GW NSIDE: {}, GRB NSIDE: {}, target NSIDE: {}",
-          gw_skymap.nside, grb_skymap.nside, target_nside);
+    info!(
+        "GW NSIDE: {}, GRB NSIDE: {}, target NSIDE: {}",
+        gw_skymap.nside, grb_skymap.nside, target_nside
+    );
 
     // Resample GW map if needed
     let gw_probs = resample_skymap(&gw_skymap.probabilities, gw_skymap.nside, target_nside);
@@ -129,7 +136,8 @@ fn compute_overlap(
     let grb_probs = resample_skymap(&grb_skymap.probabilities, grb_skymap.nside, target_nside);
 
     // Multiply probability maps: combined = GW × GRB
-    let mut combined_probs: Vec<f64> = gw_probs.iter()
+    let mut combined_probs: Vec<f64> = gw_probs
+        .iter()
         .zip(grb_probs.iter())
         .map(|(gw_p, grb_p)| gw_p * grb_p)
         .collect();
@@ -145,7 +153,8 @@ fn compute_overlap(
     }
 
     // Find 90% credible region
-    let mut indexed_probs: Vec<(usize, f64)> = combined_probs.iter()
+    let mut indexed_probs: Vec<(usize, f64)> = combined_probs
+        .iter()
         .enumerate()
         .map(|(i, &p)| (i, p))
         .collect();
@@ -228,12 +237,22 @@ fn export_visualization_data(
 
     let output_path = format!("overlap_analysis_{}.csv", sim_id);
     let mut file = File::create(&output_path)?;
-    writeln!(file, "pixel_idx,ra,dec,probability,in_gw_90cr,in_grb_90cr,in_overlap")?;
+    writeln!(
+        file,
+        "pixel_idx,ra,dec,probability,in_gw_90cr,in_grb_90cr,in_overlap"
+    )?;
 
-    let gw_90cr_pixels: std::collections::HashSet<usize> =
-        skymap.credible_regions[1].pixel_indices.iter().copied().collect();
+    let gw_90cr_pixels: std::collections::HashSet<usize> = skymap.credible_regions[1]
+        .pixel_indices
+        .iter()
+        .copied()
+        .collect();
 
-    let sample_rate = if skymap.probabilities.len() > 50000 { 8 } else { 1 };
+    let sample_rate = if skymap.probabilities.len() > 50000 {
+        8
+    } else {
+        1
+    };
 
     for (idx, &prob) in skymap.probabilities.iter().enumerate() {
         if idx % sample_rate != 0 {
@@ -264,8 +283,16 @@ fn export_visualization_data(
     writeln!(meta_file, "gw_distance: {:.1}", injection.distance)?;
     writeln!(meta_file, "gw_mass1: {:.1}", injection.mass1)?;
     writeln!(meta_file, "gw_mass2: {:.1}", injection.mass2)?;
-    writeln!(meta_file, "gw_max_prob_ra: {:.6}", skymap.max_prob_position.ra)?;
-    writeln!(meta_file, "gw_max_prob_dec: {:.6}", skymap.max_prob_position.dec)?;
+    writeln!(
+        meta_file,
+        "gw_max_prob_ra: {:.6}",
+        skymap.max_prob_position.ra
+    )?;
+    writeln!(
+        meta_file,
+        "gw_max_prob_dec: {:.6}",
+        skymap.max_prob_position.dec
+    )?;
     writeln!(meta_file, "gw_90cr_area: {:.1}", gw_90cr_area)?;
     writeln!(meta_file, "grb_ra: {:.6}", grb.ra)?;
     writeln!(meta_file, "grb_dec: {:.6}", grb.dec)?;

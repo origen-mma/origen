@@ -38,7 +38,11 @@ pub struct MultiMessengerSuperevent {
 
 impl MultiMessengerSuperevent {
     /// Create a new superevent from GW event
-    pub fn new_from_gw(gw_superevent_id: String, gps_time: f64, position: Option<SkyPosition>) -> Self {
+    pub fn new_from_gw(
+        gw_superevent_id: String,
+        gps_time: f64,
+        position: Option<SkyPosition>,
+    ) -> Self {
         let now = chrono::Utc::now().timestamp() as f64;
 
         Self {
@@ -86,8 +90,8 @@ impl MultiMessengerSuperevent {
         Self {
             id: format!("MMGRB{}", trigger_id),
             t_0: trigger_time,
-            t_start: trigger_time - 60.0,    // -60 seconds
-            t_end: trigger_time + 86400.0,   // +1 day
+            t_start: trigger_time - 60.0,  // -60 seconds
+            t_end: trigger_time + 86400.0, // +1 day
             gw_event: None,
             optical_candidates: Vec::new(),
             gamma_ray_candidates: Vec::new(),
@@ -131,7 +135,7 @@ pub struct GWComponent {
     pub instruments: Vec<String>,
     pub far: Option<f64>,
     pub skymap_available: bool,
-    pub position: Option<SkyPosition>,  // Sky position for correlation
+    pub position: Option<SkyPosition>, // Sky position for correlation
 }
 
 /// Optical counterpart candidate
@@ -140,9 +144,9 @@ pub struct OpticalCandidate {
     pub object_id: String,
     pub detection_time: f64, // GPS seconds
     pub position: SkyPosition,
-    pub time_offset: f64,     // Seconds from GW t_0
-    pub spatial_offset: f64,  // Degrees from GW skymap
-    pub significance: f64,    // SNR or similar
+    pub time_offset: f64,    // Seconds from GW t_0
+    pub spatial_offset: f64, // Degrees from GW skymap
+    pub significance: f64,   // SNR or similar
     pub joint_far: Option<f64>,
 }
 

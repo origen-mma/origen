@@ -6,7 +6,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         eprintln!("Usage: {} <path_to_lightcurves_dir>", args[0]);
-        eprintln!("Example: {} /Users/mcoughlin/Code/ORIGIN/lightcurves_csv", args[0]);
+        eprintln!(
+            "Example: {} /Users/mcoughlin/Code/ORIGIN/lightcurves_csv",
+            args[0]
+        );
         std::process::exit(1);
     }
 
@@ -46,10 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Convert first measurement to GPS time
             if let Some(first) = lc.measurements.first() {
                 let gps = first.to_gps_time();
-                println!(
-                    "First detection: MJD {:.2} = GPS {:.2}",
-                    first.mjd, gps
-                );
+                println!("First detection: MJD {:.2} = GPS {:.2}", first.mjd, gps);
             }
         }
 
@@ -69,8 +69,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Average SNR
-        let avg_snr: f64 = lc.measurements.iter().map(|p| p.snr()).sum::<f64>()
-            / lc.measurements.len() as f64;
+        let avg_snr: f64 =
+            lc.measurements.iter().map(|p| p.snr()).sum::<f64>() / lc.measurements.len() as f64;
         println!("Average SNR: {:.1}", avg_snr);
 
         println!();
@@ -86,16 +86,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Total measurements: {}", total_measurements);
 
     let avg_measurements = total_measurements as f64 / lightcurves.len() as f64;
-    println!(
-        "Average measurements per object: {:.1}",
-        avg_measurements
-    );
+    println!("Average measurements per object: {:.1}", avg_measurements);
 
     // Find most detections
-    if let Some(max_lc) = lightcurves
-        .iter()
-        .max_by_key(|lc| lc.measurements.len())
-    {
+    if let Some(max_lc) = lightcurves.iter().max_by_key(|lc| lc.measurements.len()) {
         println!(
             "Most detections: {} ({} points)",
             max_lc.object_id,

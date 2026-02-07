@@ -1,6 +1,8 @@
 use mm_boom::BoomSimulator;
 use mm_config::Config;
-use mm_core::{estimate_explosion_time, Event, GWEvent, GammaRayEvent, GpsTime, MockSkymap, SkyPosition};
+use mm_core::{
+    estimate_explosion_time, Event, GWEvent, GammaRayEvent, GpsTime, MockSkymap, SkyPosition,
+};
 use mm_correlator::SupereventCorrelator;
 use std::env;
 use tracing::{error, info, warn};
@@ -73,8 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("First light curve: {}", first_lc.object_id);
     info!(
         "  First detection: GPS {:.2} (MJD {:.2})",
-        first_detection,
-        first_lc.measurements[0].mjd
+        first_detection, first_lc.measurements[0].mjd
     );
     info!("  Estimated explosion time: GPS {:.2}", estimated_t0);
     info!(
@@ -86,9 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let gw_gps_time = estimated_t0 - 1800.0; // 30 minutes before estimated explosion
 
     info!("Setting GW trigger time to GPS {:.2}", gw_gps_time);
-    info!(
-        "  (30 minutes before estimated explosion time for realistic correlation)"
-    );
+    info!("  (30 minutes before estimated explosion time for realistic correlation)");
 
     // For demo, add a synthetic GW event with realistic time and position
     let gw_event = GWEvent {
@@ -107,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Also add a simulated Fermi GRB 30 seconds after the GW
     let grb_trigger_time = gw_gps_time + 30.0;
-    let grb_ra = gw_ra + 2.0;  // 2 degrees offset
+    let grb_ra = gw_ra + 2.0; // 2 degrees offset
     let grb_dec = gw_dec + 1.0; // 1 degree offset
     let grb_event = GammaRayEvent {
         trigger_id: "GRB240101A".to_string(),
@@ -120,7 +119,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     info!("Processing synthetic Fermi GRB: {}", grb_event.trigger_id);
-    info!("  GRB position: RA={:.2}°, Dec={:.2}° (offset from GW)", grb_ra, grb_dec);
+    info!(
+        "  GRB position: RA={:.2}°, Dec={:.2}° (offset from GW)",
+        grb_ra, grb_dec
+    );
     let grb_superevent_ids = correlator.process_gcn_event(Event::GammaRay(grb_event))?;
     info!("GRB associated with superevents: {:?}", grb_superevent_ids);
 
@@ -242,9 +244,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Show GRB candidates if any
             if !superevent.gamma_ray_candidates.is_empty() {
-                info!("  Gamma-ray candidates: {}", superevent.gamma_ray_candidates.len());
+                info!(
+                    "  Gamma-ray candidates: {}",
+                    superevent.gamma_ray_candidates.len()
+                );
                 for grb in &superevent.gamma_ray_candidates {
-                    info!("    - {}, time_offset={:.2}s", grb.trigger_id, grb.time_offset);
+                    info!(
+                        "    - {}, time_offset={:.2}s",
+                        grb.trigger_id, grb.time_offset
+                    );
                     if let Some(spatial_offset) = grb.spatial_offset {
                         info!("      Spatial offset: {:.2}°", spatial_offset);
                     }

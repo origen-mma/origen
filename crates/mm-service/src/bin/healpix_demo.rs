@@ -1,10 +1,8 @@
 use anyhow::Result;
-use mm_core::{ParsedSkymap, SkyPosition, CredibleRegion, SkymapOrdering};
+use mm_core::{CredibleRegion, ParsedSkymap, SkyPosition, SkymapOrdering};
 use mm_correlator::spatial::{
-    calculate_spatial_probability_from_skymap,
-    calculate_spatial_significance,
-    calculate_skymap_offset,
-    is_in_credible_region,
+    calculate_skymap_offset, calculate_spatial_probability_from_skymap,
+    calculate_spatial_significance, is_in_credible_region,
 };
 use tracing::info;
 
@@ -22,9 +20,9 @@ fn main() -> Result<()> {
     info!("  NSIDE: {}", mock_skymap.nside);
     info!("  Ordering: {:?}", mock_skymap.ordering);
     info!("  Total pixels: {}", mock_skymap.probabilities.len());
-    info!("  Max probability position: (RA={:.2}°, Dec={:.2}°)",
-        mock_skymap.max_prob_position.ra,
-        mock_skymap.max_prob_position.dec
+    info!(
+        "  Max probability position: (RA={:.2}°, Dec={:.2}°)",
+        mock_skymap.max_prob_position.ra, mock_skymap.max_prob_position.dec
     );
     info!("  Total sky area: {:.2} sq deg", mock_skymap.total_area);
     info!("  50% CR area: {:.2} sq deg", mock_skymap.area_50());
@@ -42,7 +40,10 @@ fn main() -> Result<()> {
     info!("🔬 Testing Spatial Correlation at Various Positions:\n");
 
     for (label, position) in &test_positions {
-        info!("Position: {} (RA={:.2}°, Dec={:.2}°)", label, position.ra, position.dec);
+        info!(
+            "Position: {} (RA={:.2}°, Dec={:.2}°)",
+            label, position.ra, position.dec
+        );
 
         // Query probability at this position
         let prob = calculate_spatial_probability_from_skymap(position, &mock_skymap);

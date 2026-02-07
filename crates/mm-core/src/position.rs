@@ -30,8 +30,7 @@ impl SkyPosition {
         let ra2 = other.ra * PI / 180.0;
         let dec2 = other.dec * PI / 180.0;
 
-        let cos_sep = dec1.sin() * dec2.sin()
-            + dec1.cos() * dec2.cos() * (ra1 - ra2).cos();
+        let cos_sep = dec1.sin() * dec2.sin() + dec1.cos() * dec2.cos() * (ra1 - ra2).cos();
 
         cos_sep.acos() * 180.0 / PI
     }

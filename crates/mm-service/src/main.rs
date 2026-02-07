@@ -18,8 +18,8 @@ async fn main() -> anyhow::Result<()> {
     info!("Starting GCN Kafka consumer...");
 
     // Load configuration
-    let config_path = env::var("MM_CONFIG_PATH")
-        .unwrap_or_else(|_| "config/config.toml".to_string());
+    let config_path =
+        env::var("MM_CONFIG_PATH").unwrap_or_else(|_| "config/config.toml".to_string());
 
     info!("Loading configuration from: {}", config_path);
 
@@ -93,8 +93,10 @@ async fn main() -> anyhow::Result<()> {
                                     }
 
                                     if let Some(pos) = event.sky_position() {
-                                        info!("Position: RA={:.3}, Dec={:.3}, Error={:.1}\"",
-                                              pos.ra, pos.dec, pos.uncertainty);
+                                        info!(
+                                            "Position: RA={:.3}, Dec={:.3}, Error={:.1}\"",
+                                            pos.ra, pos.dec, pos.uncertainty
+                                        );
                                     }
 
                                     // Pretty-print the event

@@ -1,6 +1,6 @@
 use anyhow::Result;
-use fitsio::FitsFile;
 use fitsio::tables::{ColumnDataType, ColumnDescription};
+use fitsio::FitsFile;
 use rand::seq::SliceRandom;
 use std::fs;
 use std::fs::File;
@@ -35,12 +35,16 @@ fn main() -> Result<()> {
     info!("Loaded {} simulated GRBs\n", grbs.len());
 
     // Collect valid error radii for sampling
-    let valid_error_radii: Vec<f64> = grbs.iter()
+    let valid_error_radii: Vec<f64> = grbs
+        .iter()
         .filter(|g| g.error_radius > 0.0)
         .map(|g| g.error_radius)
         .collect();
 
-    info!("Found {} valid error radii for sampling", valid_error_radii.len());
+    info!(
+        "Found {} valid error radii for sampling",
+        valid_error_radii.len()
+    );
 
     if valid_error_radii.is_empty() {
         return Err(anyhow::anyhow!("No valid error radii found in GRB data"));
@@ -79,7 +83,10 @@ fn main() -> Result<()> {
         match generate_grb_skymap(&modified_grb, &skymap_path) {
             Ok(_) => success_count += 1,
             Err(e) => {
-                eprintln!("Failed to generate skymap for simulation {}: {}", grb.simulation_id, e);
+                eprintln!(
+                    "Failed to generate skymap for simulation {}: {}",
+                    grb.simulation_id, e
+                );
                 failed_count += 1;
             }
         }
@@ -137,7 +144,8 @@ fn generate_grb_skymap(grb: &SimulatedGrb, output_path: &str) -> Result<()> {
                 // Use this order for annulus between current and next order
                 let next_order_threshold = 2.0_f64.powf((max_order - order - 1) as f64);
                 let current_order_threshold = 2.0_f64.powf((max_order - order) as f64);
-                distance_in_sigma >= next_order_threshold && distance_in_sigma < current_order_threshold
+                distance_in_sigma >= next_order_threshold
+                    && distance_in_sigma < current_order_threshold
             };
 
             if use_this_order && prob_density * pixel_area_sr > 1e-12 {
@@ -186,9 +194,9 @@ fn write_moc_fits(path: &str, moc_cells: &[(i64, f64)]) -> Result<()> {
 
     // Write MOC-specific headers
     hdu.write_key(&mut fptr, "PIXTYPE", "HEALPIX")?;
-    hdu.write_key(&mut fptr, "ORDERING", "NUNIQ")?;  // MOC uses NUNIQ ordering
+    hdu.write_key(&mut fptr, "ORDERING", "NUNIQ")?; // MOC uses NUNIQ ordering
     hdu.write_key(&mut fptr, "COORDSYS", "C")?;
-    hdu.write_key(&mut fptr, "MOCORDER", 7)?;  // Max order
+    hdu.write_key(&mut fptr, "MOCORDER", 7)?; // Max order
     hdu.write_key(&mut fptr, "INDXSCHM", "EXPLICIT")?;
 
     // Write columns
@@ -228,19 +236,17 @@ fn load_simulated_grbs(path: &str) -> Result<Vec<SimulatedGrb>> {
 }
 
 fn create_grb_params_file(grbs: &[SimulatedGrb], path: &str) -> Result<()> {
-    use std::io::Write;
     use rand::seq::SliceRandom;
+    use std::io::Write;
 
     let mut file = File::create(path)?;
 
     // Write header
-    writeln!(
-        file,
-        "simulation_id\tra\tdec\terror_radius\tinstrument"
-    )?;
+    writeln!(file, "simulation_id\tra\tdec\terror_radius\tinstrument")?;
 
     // Collect valid error radii for sampling
-    let valid_error_radii: Vec<f64> = grbs.iter()
+    let valid_error_radii: Vec<f64> = grbs
+        .iter()
         .filter(|g| g.error_radius > 0.0)
         .map(|g| g.error_radius)
         .collect();
@@ -258,11 +264,7 @@ fn create_grb_params_file(grbs: &[SimulatedGrb], path: &str) -> Result<()> {
         writeln!(
             file,
             "{}\t{:.6}\t{:.6}\t{:.2}\t{}",
-            grb.simulation_id,
-            grb.grb_ra,
-            grb.grb_dec,
-            effective_error_radius,
-            grb.instrument,
+            grb.simulation_id, grb.grb_ra, grb.grb_dec, effective_error_radius, grb.instrument,
         )?;
     }
 

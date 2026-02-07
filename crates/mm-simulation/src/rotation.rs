@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use cdshealpix::nested::{center, hash};
-use mm_core::{ParsedSkymap, SkyPosition, SkymapOrdering, CredibleRegion};
+use mm_core::{CredibleRegion, ParsedSkymap, SkyPosition, SkymapOrdering};
 use std::f64::consts::PI;
 
 /// Rotate a HEALPix skymap from source position to target position
@@ -84,11 +84,7 @@ pub fn rotate_skymap(
     // Find maximum probability position in rotated skymap
     let max_prob_idx = indexed_probs[0].0;
     let (max_lon, max_lat) = center(depth, max_prob_idx as u64);
-    let max_prob_position = SkyPosition::new(
-        max_lon.to_degrees(),
-        max_lat.to_degrees(),
-        1.0,
-    );
+    let max_prob_position = SkyPosition::new(max_lon.to_degrees(), max_lat.to_degrees(), 1.0);
 
     Ok(ParsedSkymap {
         probabilities: rotated_probs,

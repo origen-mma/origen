@@ -1,5 +1,5 @@
 use mm_config::Config;
-use mm_core::{Event, GammaRayEvent, GpsTime, MockSkymap, SkymapStorage, SkyPosition};
+use mm_core::{Event, GammaRayEvent, GpsTime, MockSkymap, SkyPosition, SkymapStorage};
 use mm_correlator::SupereventCorrelator;
 use std::env;
 use tracing::{error, info, warn};
@@ -111,7 +111,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Print multi-messenger superevents
     let mm_superevents = correlator.get_mm_superevents();
     info!("\n=== Multi-Messenger Superevents ===");
-    info!("Total multi-messenger superevents: {}", mm_superevents.len());
+    info!(
+        "Total multi-messenger superevents: {}",
+        mm_superevents.len()
+    );
 
     for superevent in mm_superevents {
         info!("\nSuperevent {}: ", superevent.id);
