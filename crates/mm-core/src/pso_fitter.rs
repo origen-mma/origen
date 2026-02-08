@@ -80,7 +80,7 @@ pub fn pso_model_select(data: &BandFitData) -> (SviModel, Vec<f64>, f64) {
 
         let solver = ParticleSwarm::new((lower, upper), 40);
         let res = Executor::new(problem, solver)
-            .configure(|state| state.max_iters(50))
+            .configure(|state| state.max_iters(200))  // Increased from 50 for better t0 accuracy
             .run();
 
         match res {

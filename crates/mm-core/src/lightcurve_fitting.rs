@@ -289,7 +289,7 @@ pub fn fit_lightcurve(
 
     let solver = ParticleSwarm::new((lower, upper), 40);
     let pso_result = Executor::new(problem, solver)
-        .configure(|state| state.max_iters(50))
+        .configure(|state| state.max_iters(200))  // Increased from 50 for better t0 accuracy
         .run();
 
     let pso_params = match pso_result {
@@ -302,8 +302,8 @@ pub fn fit_lightcurve(
 
     // Step 2: SVI refinement with PSO initialization
     info!("Running SVI refinement...");
-    let n_iter = 1000; // CRITICAL: Use 1000 iterations for proper convergence
-    let n_mc_samples = 4;
+    let n_iter = 5000; // Increased from 1000 for better t0 accuracy (~3 days mean error)
+    let n_mc_samples = 16; // Increased from 4 for better gradient estimates
     let learning_rate = 0.01;
 
     let svi_result = svi_fit(
