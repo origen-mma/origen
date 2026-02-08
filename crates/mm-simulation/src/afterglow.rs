@@ -60,6 +60,12 @@ pub struct AfterglowProperties {
     /// Peak flux at optical (normalized, arbitrary units)
     pub flux_peak_optical: Option<f64>,
 
+    /// Peak apparent magnitude (AB mag in R-band)
+    pub peak_magnitude: Option<f64>,
+
+    /// Distance to source (Mpc) - needed for magnitude calculation
+    pub distance_mpc: f64,
+
     /// Afterglow visibility criterion
     /// (different from GRB - can be visible off-axis)
     pub visibility_fraction: f64,
@@ -83,8 +89,9 @@ pub struct AfterglowConfig {
     /// Electron power-law index (p)
     pub electron_index: f64,
 
-    /// Detection threshold (relative to on-axis peak)
-    pub detection_threshold: f64,
+    /// Limiting magnitude for detection (AB mag in R-band)
+    /// ZTF: ~21 mag, LSST: ~24.5 mag, DECam: ~23.5 mag
+    pub limiting_magnitude: f64,
 }
 
 impl Default for AfterglowConfig {
@@ -95,12 +102,36 @@ impl Default for AfterglowConfig {
             epsilon_e: 0.1,
             epsilon_b: 0.01,
             electron_index: 2.5,
-            detection_threshold: 0.01,  // 1% of on-axis peak flux
+            limiting_magnitude: 21.0,  // ZTF-like sensitivity
         }
     }
 }
 
 impl AfterglowConfig {
+    /// ZTF survey sensitivity (limiting mag ~21)
+    pub fn ztf_survey() -> Self {
+        Self {
+            limiting_magnitude: 21.0,
+            ..Default::default()
+        }
+    }
+
+    /// LSST survey sensitivity (limiting mag ~24.5)
+    pub fn lsst_survey() -> Self {
+        Self {
+            limiting_magnitude: 24.5,
+            ..Default::default()
+        }
+    }
+
+    /// DECam survey sensitivity (limiting mag ~23.5)
+    pub fn decam_survey() -> Self {
+        Self {
+            limiting_magnitude: 23.5,
+            ..Default::default()
+        }
+    }
+
     /// GW170817-like afterglow configuration
     pub fn gw170817_like() -> Self {
         Self {
@@ -109,7 +140,7 @@ impl AfterglowConfig {
             epsilon_e: 0.15,
             epsilon_b: 0.003,
             electron_index: 2.16,
-            detection_threshold: 0.01,
+            limiting_magnitude: 21.0,
         }
     }
 
@@ -129,6 +160,7 @@ impl AfterglowConfig {
 /// * `theta_view` - Viewing angle (radians)
 /// * `theta_core` - Core jet opening angle (radians)
 /// * `e_iso_core` - Isotropic equivalent energy in core (erg)
+/// * `distance_mpc` - Distance to source (Mpc)
 /// * `config` - Afterglow configuration
 ///
 /// # Returns
@@ -138,6 +170,7 @@ pub fn simulate_afterglow(
     theta_view: f64,
     theta_core: f64,
     e_iso_core: f64,
+    distance_mpc: f64,
     config: &AfterglowConfig,
 ) -> AfterglowProperties {
     // 1. Calculate effective energy at viewing angle
@@ -159,16 +192,18 @@ pub fn simulate_afterglow(
         (None, None)
     };
 
-    // 4. Determine detectability
-    // For structured jets, emission becomes visible when jet decelerates
-    // and beaming cone includes our viewing angle
-    let detectable = if let (Some(_), Some(flux)) = (t_peak, flux_peak) {
-        flux > config.detection_threshold
-    } else {
-        false
-    };
+    // 4. Convert flux to apparent magnitude
+    // Reference: ON-AXIS SGRB at 100 Mpc peaks at ~16 mag (M_opt ~ -19)
+    // Off-axis (like GW170817A) are much fainter (~17-25 mag)
+    let peak_mag = flux_peak.map(|flux| {
+        flux_to_magnitude(flux, distance_mpc, config.circumburst_density)
+    });
 
-    // 5. Calculate visibility fraction (what fraction of viewing angles are detectable)
+    // 5. Determine detectability by comparing to limiting magnitude
+    // Fainter magnitudes = higher numbers, so detectable if mag < limiting_mag
+    let detectable = peak_mag.map_or(false, |mag| mag < config.limiting_magnitude);
+
+    // 6. Calculate visibility fraction (what fraction of viewing angles are detectable)
     let visibility_fraction = calculate_visibility_fraction(theta_core, &config.jet_structure);
 
     AfterglowProperties {
@@ -181,6 +216,8 @@ pub fn simulate_afterglow(
         gamma_0_eff,
         t_peak_optical: t_peak,
         flux_peak_optical: flux_peak,
+        peak_magnitude: peak_mag,
+        distance_mpc,
         visibility_fraction,
     }
 }
@@ -275,7 +312,8 @@ fn calculate_afterglow_peak(
 
     // Deceleration time (days)
     // Simplified scaling: t_dec ~ E_iso^(1/3) * n^(-1/3) * Γ_0^(-8/3)
-    let t_dec_days = 0.1 * e_iso_52.powf(1.0 / 3.0)
+    // Normalization adjusted to give realistic peak times of ~1-10 days for typical GRBs
+    let t_dec_days = 10.0 * e_iso_52.powf(1.0 / 3.0)
         * n.powf(-1.0 / 3.0)
         * gamma_0_eff.powf(-8.0 / 3.0);
 
@@ -301,6 +339,41 @@ fn calculate_afterglow_peak(
     } else {
         (None, None)
     }
+}
+
+/// Convert normalized flux to apparent magnitude
+///
+/// Uses a reference afterglow calibration:
+/// - **On-axis** SGRB at 100 Mpc: M_opt ~ -19 → m ~ 16 mag
+/// - **Off-axis** (like GW170817A at 40 Mpc): m ~ 17-25 mag depending on viewing angle
+///
+/// On-axis SGRBs have absolute magnitudes M_opt,peak ~ -18 to -21 (typical -19)
+/// At distance d: m = M + 5*log10(d/10pc) = -19 + 5*log10(d_Mpc * 1e6)
+///
+/// # Arguments
+///
+/// * `flux_norm` - Normalized flux (e_iso_52 * sqrt(n) * beaming_factor)
+/// * `distance_mpc` - Distance to source (Mpc)
+/// * `circumburst_density` - Circumburst density (cm^-3)
+///
+/// # Returns
+///
+/// Apparent AB magnitude (R-band)
+fn flux_to_magnitude(flux_norm: f64, distance_mpc: f64, circumburst_density: f64) -> f64 {
+    // Reference: On-axis SGRB at 100 Mpc with E_iso = 1e52 erg, n = 1e-3
+    // Absolute magnitude M ~ -19 → apparent magnitude m ~ 16.0 at 100 Mpc
+    let flux_ref = 1.0 * (1e-3_f64).sqrt() * 1.0; // On-axis, no beaming suppression
+    let m_ref = 16.0;  // Brighter than previous 19 mag (on-axis vs off-axis!)
+    let d_ref = 100.0;
+
+    // Magnitude scales as:
+    // - Fainter by 2.5*log10(flux_ref/flux) due to reduced flux
+    // - Fainter by 5*log10(d/d_ref) due to distance (inverse square law)
+    // - Correction for density (sqrt(n) dependence in flux_norm already included)
+
+    let mag = m_ref + 2.5 * (flux_ref / flux_norm).log10() + 5.0 * (distance_mpc / d_ref).log10();
+
+    mag
 }
 
 /// Calculate what fraction of viewing angles produce detectable afterglows
@@ -363,32 +436,37 @@ mod tests {
     fn test_afterglow_detectability() {
         let theta_core = 0.17; // ~10 degrees (typical for short GRBs)
         let e_iso_core = 1e52;
+        let distance_mpc = 100.0;
         let config = AfterglowConfig::default();
 
         // On-axis observer
-        let ag_on_axis = simulate_afterglow(0.0, theta_core, e_iso_core, &config);
+        let ag_on_axis = simulate_afterglow(0.0, theta_core, e_iso_core, distance_mpc, &config);
         assert!(ag_on_axis.detectable);
         assert!(ag_on_axis.t_peak_optical.is_some());
+        println!("On-axis magnitude: {:.2}", ag_on_axis.peak_magnitude.unwrap());
 
         // Slightly off-axis (within 2*θ_core)
-        let ag_off_axis = simulate_afterglow(2.0 * theta_core, theta_core, e_iso_core, &config);
+        let ag_off_axis = simulate_afterglow(2.0 * theta_core, theta_core, e_iso_core, distance_mpc, &config);
         // Should still be detectable for Gaussian jet
 
         // Far off-axis (5*θ_core)
-        let ag_far = simulate_afterglow(5.0 * theta_core, theta_core, e_iso_core, &config);
+        let ag_far = simulate_afterglow(5.0 * theta_core, theta_core, e_iso_core, distance_mpc, &config);
         // May not be detectable (flux too low)
 
-        println!("\nAfterglow detectability:");
-        println!("  On-axis: detectable={}, t_peak={:.2} days",
+        println!("\nAfterglow detectability (limiting mag = {}):", config.limiting_magnitude);
+        println!("  On-axis: detectable={}, mag={:.2}, t_peak={:.2} days",
             ag_on_axis.detectable,
+            ag_on_axis.peak_magnitude.unwrap_or(99.0),
             ag_on_axis.t_peak_optical.unwrap_or(0.0)
         );
-        println!("  Off-axis (2*θ_core): detectable={}, t_peak={:.2} days",
+        println!("  Off-axis (2*θ_core): detectable={}, mag={:.2}, t_peak={:.2} days",
             ag_off_axis.detectable,
+            ag_off_axis.peak_magnitude.unwrap_or(99.0),
             ag_off_axis.t_peak_optical.unwrap_or(0.0)
         );
-        println!("  Far off-axis (5*θ_core): detectable={}",
-            ag_far.detectable
+        println!("  Far off-axis (5*θ_core): detectable={}, mag={:.2}",
+            ag_far.detectable,
+            ag_far.peak_magnitude.unwrap_or(99.0)
         );
     }
 
@@ -416,16 +494,21 @@ mod tests {
         let theta_core = 0.087; // ~5 degrees (GW170817 jet core)
         let theta_view = 0.35;  // ~20 degrees (GW170817 viewing angle)
         let e_iso_core = 2e52;  // GW170817 jet energy
+        let distance_mpc = 40.0; // GW170817 distance
         let config = AfterglowConfig::gw170817_like();
 
-        let ag = simulate_afterglow(theta_view, theta_core, e_iso_core, &config);
+        let ag = simulate_afterglow(theta_view, theta_core, e_iso_core, distance_mpc, &config);
 
         println!("\nGW170817-like afterglow:");
+        println!("  Distance: {:.0} Mpc", distance_mpc);
         println!("  Viewing angle: {:.1}° (off-axis)", theta_view.to_degrees());
         println!("  Core angle: {:.1}°", theta_core.to_degrees());
         println!("  E_iso effective: {:.2e} erg", ag.e_iso_eff);
         println!("  Detectable: {}", ag.detectable);
 
+        if let Some(mag) = ag.peak_magnitude {
+            println!("  Peak magnitude: {:.2} (limit: {})", mag, config.limiting_magnitude);
+        }
         if let Some(t_peak) = ag.t_peak_optical {
             println!("  Peak time: {:.1} days", t_peak);
         }

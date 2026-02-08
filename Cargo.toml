@@ -57,6 +57,7 @@ rand = "0.8"
 rand_distr = "0.4"
 quick-xml = "0.36"  # XML parsing for VOEvent
 plotters = "0.3"    # Plotting for visualizations
+rayon = "1.10"      # Parallel iterators for grid search
 
 # Optimization (for PSO + SVI light curve fitting)
 argmin = "0.11"
@@ -64,3 +65,6 @@ argmin-math = { version = "0.5", features = ["vec"] }
 
 # HTTP client for skymap downloads
 reqwest = { version = "0.12", features = ["rustls-tls"] }
+
+# CLI argument parsing
+clap = { version = "4.5", features = ["derive"] }

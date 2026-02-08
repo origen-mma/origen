@@ -521,6 +521,7 @@ pub fn simulate_multimessenger_event(
         gw_params.inclination,
         grb.theta_jet_deg.to_radians(),
         e_iso_core,
+        gw_params.distance,
         &crate::afterglow::AfterglowConfig::default(),
     );
 
