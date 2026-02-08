@@ -98,7 +98,19 @@ fn generate_synthetic_kilonova_plot() {
     // Create synthetic light curve with both non-detections and detections
     let mut lightcurve = LightCurve::new("SYNTHETIC_KN".to_string());
     let mjd_offset = 60000.0;
-    for i in 0..all_obs_times.len() {
+
+    // Add non-detections (upper limits)
+    let limiting_flux = 15.0; // Same as used in generation
+    for i in 0..n_nondet {
+        lightcurve.add_measurement(Photometry::new_upper_limit(
+            mjd_offset + all_obs_times[i],
+            limiting_flux,  // Use the 5-sigma limiting flux, not the measured value
+            "r".to_string(),
+        ));
+    }
+
+    // Add detections
+    for i in n_nondet..all_obs_times.len() {
         lightcurve.add_measurement(Photometry::new(
             mjd_offset + all_obs_times[i],
             all_fluxes[i],

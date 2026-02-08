@@ -166,20 +166,21 @@ pub fn fit_lightcurve(
         )));
     }
 
-    // Step 3: Average duplicate measurements at same time
+    // Step 3: Average duplicate measurements at same time, preserving upper limit flags
     use std::collections::HashMap;
-    let mut time_groups: HashMap<i64, Vec<(f64, f64)>> = HashMap::new();
+    let mut time_groups: HashMap<i64, Vec<(f64, f64, bool)>> = HashMap::new();
     for m in &cleaned_measurements {
         let time_key = (m.mjd * 100.0).round() as i64; // Group within 0.01 day
         time_groups
             .entry(time_key)
             .or_insert_with(Vec::new)
-            .push((m.flux, m.flux_err));
+            .push((m.flux, m.flux_err, m.is_upper_limit));
     }
 
     let mut times = Vec::new();
     let mut flux = Vec::new();
     let mut flux_err = Vec::new();
+    let mut is_upper = Vec::new();
 
     let mut time_keys: Vec<_> = time_groups.keys().collect();
     time_keys.sort();
@@ -188,10 +189,13 @@ pub fn fit_lightcurve(
         let group = &time_groups[&key];
         let mjd = key as f64 / 100.0;
 
+        // Check if this time bin contains any upper limits
+        let any_upper = group.iter().any(|(_, _, u)| *u);
+
         // Weighted average of flux
         let mut weight_sum = 0.0;
         let mut flux_sum = 0.0;
-        for &(f, e) in group {
+        for &(f, e, _) in group {
             let w = 1.0 / (e * e);
             weight_sum += w;
             flux_sum += w * f;
@@ -202,6 +206,7 @@ pub fn fit_lightcurve(
         times.push(mjd);
         flux.push(avg_flux);
         flux_err.push(avg_err);
+        is_upper.push(any_upper);
     }
 
     debug!(
@@ -224,23 +229,42 @@ pub fn fit_lightcurve(
     let flux_norm: Vec<f64> = flux.iter().map(|f| f / peak_flux).collect();
     let flux_err_norm: Vec<f64> = flux_err.iter().map(|e| e / peak_flux).collect();
 
+    // Check for invalid values
+    if flux_norm.iter().any(|f| !f.is_finite()) {
+        return Err(CoreError::InsufficientData(
+            "Normalized flux contains NaN or Inf values".to_string(),
+        ));
+    }
+
     debug!(
-        "Fitting {} with {} model: {} measurements",
+        "Fitting {} with {} model: {} measurements (peak_flux={:.2}, {} upper limits)",
         lightcurve.object_id,
         svi_model.name(),
-        times.len()
+        times.len(),
+        peak_flux,
+        is_upper.iter().filter(|&&u| u).count()
     );
 
-    // Create band fit data
-    // TODO: Properly populate is_upper and upper_flux from Photometry.is_upper_limit
-    let n = times.len();
+    // Create band fit data with proper upper limit handling
+    let upper_flux_norm: Vec<f64> = flux_norm
+        .iter()
+        .zip(is_upper.iter())
+        .map(|(&f, &is_up)| {
+            if is_up {
+                f  // For upper limits, flux is the limiting value
+            } else {
+                f  // For detections, this field is unused but set to flux
+            }
+        })
+        .collect();
+
     let data = BandFitData {
         times: times.clone(),
         flux: flux_norm.clone(),
         flux_err: flux_err_norm.clone(),
         peak_flux_obs: peak_flux,
-        is_upper: vec![false; n],  // All detections for now
-        upper_flux: flux_norm,  // Use flux as upper limit placeholder
+        is_upper: is_upper.clone(),
+        upper_flux: upper_flux_norm,
     };
 
     // Step 1: PSO initialization for the requested model
@@ -304,7 +328,14 @@ pub fn fit_lightcurve(
         .run();
 
     let pso_params = match pso_result {
-        Ok(res) => res.state().get_best_param().unwrap().position.clone(),
+        Ok(res) => {
+            if let Some(best) = res.state().get_best_param() {
+                best.position.clone()
+            } else {
+                debug!("PSO found no valid particles, using heuristic initialization");
+                crate::pso_fitter::init_variational_means(svi_model, &data)
+            }
+        }
         Err(e) => {
             debug!("PSO failed: {}, using heuristic initialization", e);
             crate::pso_fitter::init_variational_means(svi_model, &data)
