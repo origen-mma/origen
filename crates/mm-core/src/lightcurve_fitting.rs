@@ -26,7 +26,7 @@
 
 use crate::error::CoreError;
 use crate::lightcurve::LightCurve;
-use crate::pso_fitter::{pso_model_select, BandFitData};
+use crate::pso_fitter::BandFitData;
 use crate::svi_fitter::svi_fit;
 use crate::svi_models::SviModel;
 use tracing::{debug, info};
@@ -169,15 +169,66 @@ pub fn fit_lightcurve(
         peak_flux_obs: peak_flux,
     };
 
-    // Step 1: PSO model selection
-    info!("Running PSO initialization...");
-    let (pso_model, pso_params, pso_chi2) = pso_model_select(&data);
+    // Step 1: PSO initialization for the requested model
+    // Use PSO to find good starting parameters, but respect user's model choice
+    info!("Running PSO initialization for {} model...", svi_model.name());
 
-    debug!(
-        "PSO selected model: {}, chi2: {:.4}",
-        pso_model.name(),
-        pso_chi2
-    );
+    use crate::pso_fitter::pso_bounds;
+    use argmin::core::{CostFunction, Executor, State};
+    use argmin::solver::particleswarm::ParticleSwarm;
+
+    #[derive(Clone)]
+    struct PsoCost {
+        times: Vec<f64>,
+        flux: Vec<f64>,
+        flux_err: Vec<f64>,
+        model: SviModel,
+    }
+
+    impl CostFunction for PsoCost {
+        type Param = Vec<f64>;
+        type Output = f64;
+
+        fn cost(&self, p: &Self::Param) -> Result<Self::Output, argmin::core::Error> {
+            let se_idx = self.model.sigma_extra_idx();
+            let sigma_extra = p[se_idx].exp();
+            let sigma_extra_sq = sigma_extra * sigma_extra;
+            let preds = crate::svi_models::eval_model_batch(self.model, p, &self.times);
+            let n = self.times.len().max(1) as f64;
+            let mut neg_ll = 0.0;
+            for i in 0..self.times.len() {
+                let pred = preds[i];
+                if !pred.is_finite() {
+                    return Ok(1e99);
+                }
+                let diff = pred - self.flux[i];
+                let total_var = self.flux_err[i] * self.flux_err[i] + sigma_extra_sq + 1e-10;
+                neg_ll += diff * diff / total_var + total_var.ln();
+            }
+            Ok(neg_ll / n)
+        }
+    }
+
+    let (lower, upper) = pso_bounds(svi_model);
+    let problem = PsoCost {
+        times: data.times.clone(),
+        flux: data.flux.clone(),
+        flux_err: data.flux_err.clone(),
+        model: svi_model,
+    };
+
+    let solver = ParticleSwarm::new((lower, upper), 40);
+    let pso_result = Executor::new(problem, solver)
+        .configure(|state| state.max_iters(50))
+        .run();
+
+    let pso_params = match pso_result {
+        Ok(res) => res.state().get_best_param().unwrap().position.clone(),
+        Err(e) => {
+            debug!("PSO failed: {}, using heuristic initialization", e);
+            crate::pso_fitter::init_variational_means(svi_model, &data)
+        }
+    };
 
     // Step 2: SVI refinement with PSO initialization
     info!("Running SVI refinement...");
@@ -186,7 +237,7 @@ pub fn fit_lightcurve(
     let learning_rate = 0.01;
 
     let svi_result = svi_fit(
-        pso_model,
+        svi_model,
         &data,
         n_iter,
         n_mc_samples,
@@ -214,18 +265,10 @@ pub fn fit_lightcurve(
     // Extract parameter uncertainties
     let parameter_errors: Vec<f64> = svi_result.log_sigma.iter().map(|ls| ls.exp()).collect();
 
-    // Convert FitModel from SviModel
-    let result_model = match svi_result.model {
-        SviModel::Bazin => FitModel::Bazin,
-        SviModel::Villar => FitModel::Villar,
-        SviModel::PowerLaw => FitModel::PowerLaw,
-        SviModel::MetzgerKN => FitModel::MetzgerKN,
-    };
-
     Ok(LightCurveFitResult {
         t0: t0_mjd,
         t0_err,
-        model: result_model,
+        model, // Use the originally requested model
         elbo: svi_result.elbo,
         parameters: svi_result.mu,
         parameter_errors,

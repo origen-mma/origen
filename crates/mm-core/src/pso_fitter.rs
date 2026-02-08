@@ -107,7 +107,7 @@ pub fn pso_model_select(data: &BandFitData) -> (SviModel, Vec<f64>, f64) {
 }
 
 /// PSO search bounds for each model
-fn pso_bounds(model: SviModel) -> (Vec<f64>, Vec<f64>) {
+pub fn pso_bounds(model: SviModel) -> (Vec<f64>, Vec<f64>) {
     match model {
         SviModel::Bazin => {
             // log_a, b, t0, log_tau_rise, log_tau_fall, log_sigma_extra

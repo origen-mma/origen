@@ -62,7 +62,7 @@ fn test_fit_bazin_model() {
             println!("  t0_err: {:.3} days", fit.t0_err);
             println!("  ELBO: {:.2}", fit.elbo);
 
-            assert!(fit.parameters.len() == 5); // Bazin has 5 params
+            assert!(fit.parameters.len() == 6); // Bazin has 6 params (includes log_sigma_extra)
         }
         Err(e) => {
             println!("Bazin fit failed: {}", e);
