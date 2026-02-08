@@ -126,23 +126,93 @@ pub fn fit_lightcurve(
         FitModel::MetzgerKN => SviModel::MetzgerKN,
     };
 
-    // Prepare data for fitting
+    // Prepare data for fitting with preprocessing
+
+    // Step 1: Sort by time
+    let mut measurements = lightcurve.measurements.clone();
+    measurements.sort_by(|a, b| a.mjd.partial_cmp(&b.mjd).unwrap());
+
+    // Step 2: Remove isolated outliers (detections >50 days from nearest neighbor)
+    let mut cleaned_measurements = Vec::new();
+    for i in 0..measurements.len() {
+        let mjd = measurements[i].mjd;
+        let prev_dist = if i > 0 {
+            mjd - measurements[i - 1].mjd
+        } else {
+            f64::INFINITY
+        };
+        let next_dist = if i < measurements.len() - 1 {
+            measurements[i + 1].mjd - mjd
+        } else {
+            f64::INFINITY
+        };
+        let min_dist = prev_dist.min(next_dist);
+
+        // Keep if within 50 days of nearest neighbor
+        if min_dist < 50.0 {
+            cleaned_measurements.push(measurements[i].clone());
+        } else {
+            debug!(
+                "Removing isolated detection at MJD {:.3} (distance: {:.1} days)",
+                mjd, min_dist
+            );
+        }
+    }
+
+    if cleaned_measurements.len() < 5 {
+        return Err(CoreError::InsufficientData(format!(
+            "After removing outliers, only {} measurements remain (need 5)",
+            cleaned_measurements.len()
+        )));
+    }
+
+    // Step 3: Average duplicate measurements at same time
+    use std::collections::HashMap;
+    let mut time_groups: HashMap<i64, Vec<(f64, f64)>> = HashMap::new();
+    for m in &cleaned_measurements {
+        let time_key = (m.mjd * 100.0).round() as i64; // Group within 0.01 day
+        time_groups
+            .entry(time_key)
+            .or_insert_with(Vec::new)
+            .push((m.flux, m.flux_err));
+    }
+
+    let mut times = Vec::new();
+    let mut flux = Vec::new();
+    let mut flux_err = Vec::new();
+
+    let mut time_keys: Vec<_> = time_groups.keys().collect();
+    time_keys.sort();
+
+    for &key in time_keys {
+        let group = &time_groups[&key];
+        let mjd = key as f64 / 100.0;
+
+        // Weighted average of flux
+        let mut weight_sum = 0.0;
+        let mut flux_sum = 0.0;
+        for &(f, e) in group {
+            let w = 1.0 / (e * e);
+            weight_sum += w;
+            flux_sum += w * f;
+        }
+        let avg_flux = flux_sum / weight_sum;
+        let avg_err = (1.0 / weight_sum).sqrt();
+
+        times.push(mjd);
+        flux.push(avg_flux);
+        flux_err.push(avg_err);
+    }
+
+    debug!(
+        "Preprocessed: {} → {} measurements",
+        measurements.len(),
+        times.len()
+    );
+
     // Convert MJD to days relative to first detection
-    let first_mjd = lightcurve
-        .measurements
-        .iter()
-        .map(|m| m.mjd)
-        .min_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap();
-
-    let times: Vec<f64> = lightcurve
-        .measurements
-        .iter()
-        .map(|m| m.mjd - first_mjd)
-        .collect();
-
-    let flux: Vec<f64> = lightcurve.measurements.iter().map(|m| m.flux).collect();
-    let flux_err: Vec<f64> = lightcurve.measurements.iter().map(|m| m.flux_err).collect();
+    let first_mjd = times[0];
+    let times: Vec<f64> = times.iter().map(|t| t - first_mjd).collect();
 
     // Normalize flux by peak for better numerical stability
     let peak_flux = flux
