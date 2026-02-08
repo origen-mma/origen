@@ -1,5 +1,5 @@
 /// Example program to load and analyze ZTF light curves
-use mm_core::{load_lightcurves_dir, LightCurve};
+use mm_core::load_lightcurves_dir;
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

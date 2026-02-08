@@ -1,8 +1,7 @@
 use apache_avro::Reader;
 use mm_core::{LightCurve, Photometry, SkyPosition};
-use serde::Deserialize;
 use std::error::Error;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Parse BOOM alert from Avro payload
 pub fn parse_boom_alert(payload: &[u8]) -> Result<BoomAlert, Box<dyn Error>> {

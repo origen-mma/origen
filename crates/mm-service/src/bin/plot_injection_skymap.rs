@@ -67,11 +67,11 @@ fn main() -> Result<()> {
         );
 
         // Test BOTH coordinate conventions
-        test_coordinate_convention(&injection, &skymap, "Standard (as-is)");
-        test_coordinate_convention_colatitude(&injection, &skymap, "Colatitude (90-lat)");
+        test_coordinate_convention(injection, &skymap, "Standard (as-is)");
+        test_coordinate_convention_colatitude(injection, &skymap, "Colatitude (90-lat)");
 
         // Export skymap data for plotting
-        export_skymap_for_plotting(&skymap, &injection, sim_id)?;
+        export_skymap_for_plotting(&skymap, injection, sim_id)?;
 
         info!("");
     }

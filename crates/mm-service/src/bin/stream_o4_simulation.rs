@@ -338,7 +338,7 @@ async fn main() -> Result<()> {
         if mm_event.has_grb() || (has_optical && optical_magnitude.is_some()) {
             let has_grb = mm_event.has_grb();
             let has_optical_detectable =
-                has_optical && optical_magnitude.map_or(false, |m| m < args.limiting_magnitude);
+                has_optical && optical_magnitude.is_some_and(|m| m < args.limiting_magnitude);
 
             let skymap_area_90 = (distance / 100.0).powi(2) * 100.0; // Simplified
 

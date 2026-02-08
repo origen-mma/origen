@@ -109,11 +109,14 @@ fn test_settings(
         .unwrap_or_else(|| vec![0.0; 5]);
 
     // SVI optimization
+    let n = times.len();
     let data = BandFitData {
         times: times.to_vec(),
         flux: flux.to_vec(),
         flux_err: flux_err.to_vec(),
         peak_flux_obs: flux.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        is_upper: vec![false; n],  // All detections, no upper limits
+        upper_flux: vec![0.0; n],  // Unused for detections
     };
 
     let svi_result = svi_fit(
@@ -123,6 +126,8 @@ fn test_settings(
         mc_samples,
         lr,
         Some(&pso_params),
+        true,           // enable_safeguards
+        (0.1, 10.0),    // scale_clamp_range
     );
 
     let fitted_t0 = svi_result.mu[3];

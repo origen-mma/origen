@@ -1,5 +1,5 @@
 use anyhow::Result;
-use mm_core::{ParsedSkymap, SkyPosition};
+use mm_core::ParsedSkymap;
 use mm_simulation::VOEventParser;
 use rand::Rng;
 use std::fs;

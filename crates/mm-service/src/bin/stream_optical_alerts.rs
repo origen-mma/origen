@@ -2,7 +2,7 @@ use anyhow::Result;
 use mm_core::{OpticalAlert, PhotometryPoint, Survey};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 use std::time::Duration;

@@ -233,19 +233,19 @@ fn plot_lightcurve_fit(
             &RED,
         ))?
         .label(format!("SVI Fit (ELBO: {:.1})", fit.elbo))
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
 
     // Mark t0 with vertical line
     let t0_relative = fit.t0 - first_mjd;
     chart.draw_series(std::iter::once(PathElement::new(
         vec![(t0_relative, y_min), (t0_relative, y_max)],
-        &GREEN.mix(0.7),
+        GREEN.mix(0.7),
     )))?;
 
     chart
         .configure_series_labels()
-        .background_style(&WHITE.mix(0.8))
-        .border_style(&BLACK)
+        .background_style(WHITE.mix(0.8))
+        .border_style(BLACK)
         .draw()?;
 
     root.present()?;

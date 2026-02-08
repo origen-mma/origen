@@ -1,6 +1,5 @@
 use anyhow::Result;
 use mm_core::{ParsedSkymap, SkyPosition};
-use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use tracing::info;

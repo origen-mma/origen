@@ -318,7 +318,7 @@ pub fn fit_lightcurve_with_config(
     let mut time_groups: HashMap<i64, Vec<(f64, f64, bool)>> = HashMap::new();
     for m in &cleaned_measurements {
         let time_key = (m.mjd * 100.0).round() as i64; // Group within 0.01 day
-        time_groups.entry(time_key).or_insert_with(Vec::new).push((
+        time_groups.entry(time_key).or_default().push((
             m.flux,
             m.flux_err,
             m.is_upper_limit,

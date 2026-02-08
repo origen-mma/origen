@@ -1,4 +1,3 @@
-use std::f64::consts::PI;
 
 #[test]
 fn test_temporal_correlation() {
@@ -104,7 +103,7 @@ fn test_overlap_computation_complete() {
 #[test]
 fn test_credible_region_calculation() {
     // Test 90% credible region area calculation
-    let probs = vec![0.5, 0.3, 0.1, 0.05, 0.05];
+    let probs = [0.5, 0.3, 0.1, 0.05, 0.05];
 
     // Sort by probability (descending)
     let mut indexed_probs: Vec<(usize, f64)> =
