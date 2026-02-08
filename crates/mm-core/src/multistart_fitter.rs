@@ -4,12 +4,12 @@
 //! and selects the best result based on ELBO (Evidence Lower Bound).
 //! This helps avoid getting stuck in poor local minima.
 
-use crate::lightcurve_fitting::{LightCurveFitResult, FitModel};
+use crate::error::CoreError;
 use crate::lightcurve::LightCurve;
-use crate::pso_fitter::{BandFitData, pso_bounds};
+use crate::lightcurve_fitting::{FitModel, LightCurveFitResult};
+use crate::pso_fitter::{pso_bounds, BandFitData};
 use crate::svi_fitter::svi_fit;
 use crate::svi_models::SviModel;
-use crate::error::CoreError;
 use argmin::core::{CostFunction, Error as ArgminError, Executor, State};
 use argmin::solver::particleswarm::ParticleSwarm;
 use rand::SeedableRng;
@@ -40,12 +40,12 @@ pub struct MultiStartConfig {
 impl Default for MultiStartConfig {
     fn default() -> Self {
         Self {
-            n_starts: 3,              // Try 3 times by default
+            n_starts: 3, // Try 3 times by default
             pso_iters: 200,
             svi_iters: 5000,
             svi_mc_samples: 16,
             svi_lr: 0.01,
-            early_stop_elbo: Some(50.0),  // Stop early if we get excellent fit
+            early_stop_elbo: Some(50.0), // Stop early if we get excellent fit
         }
     }
 }
@@ -70,8 +70,8 @@ impl MultiStartConfig {
             pso_iters: 300,
             svi_iters: 8000,
             svi_mc_samples: 32,
-            svi_lr: 0.005,  // Lower LR for stability
-            early_stop_elbo: None,  // Always try all starts
+            svi_lr: 0.005,         // Lower LR for stability
+            early_stop_elbo: None, // Always try all starts
         }
     }
 }
@@ -110,8 +110,7 @@ pub fn multistart_fit(
 ) -> Result<MultiStartResult, CoreError> {
     info!(
         "Starting multi-start optimization: {} starts for {}",
-        config.n_starts,
-        lightcurve.object_id
+        config.n_starts, lightcurve.object_id
     );
 
     // Convert to internal model type
@@ -134,12 +133,7 @@ pub fn multistart_fit(
 
         // Run PSO with unique random seed
         let pso_seed = (start_id as u64) * 12345 + 67890;
-        let pso_params = run_pso_with_seed(
-            &data,
-            svi_model,
-            config.pso_iters,
-            pso_seed,
-        )?;
+        let pso_params = run_pso_with_seed(&data, svi_model, config.pso_iters, pso_seed)?;
 
         // Run SVI from PSO initialization
         let svi_result = svi_fit(
@@ -149,13 +143,15 @@ pub fn multistart_fit(
             config.svi_mc_samples,
             config.svi_lr,
             Some(&pso_params),
+            true,                    // enable_safeguards
+            (0.1, 10.0),            // scale_clamp_range
         );
 
         let elbo = svi_result.elbo;
         let start_result = StartResult {
             start_id,
             elbo,
-            converged: true,  // TODO: track convergence properly
+            converged: true, // TODO: track convergence properly
             parameters: svi_result.mu.clone(),
             t0: data.mjd_offset + svi_result.mu[svi_model.t0_idx()],
             t0_err: svi_result.log_sigma[svi_model.t0_idx()].exp(),
@@ -163,7 +159,9 @@ pub fn multistart_fit(
 
         info!(
             "  Start {}: ELBO = {:.2}, t0 = {:.3}",
-            start_id + 1, elbo, start_result.t0
+            start_id + 1,
+            elbo,
+            start_result.t0
         );
 
         all_starts.push(start_result);
@@ -171,12 +169,7 @@ pub fn multistart_fit(
         // Track best result
         if elbo > best_elbo {
             best_elbo = elbo;
-            best_result = Some(convert_to_fit_result(
-                svi_result,
-                &data,
-                lightcurve,
-                model,
-            ));
+            best_result = Some(convert_to_fit_result(svi_result, &data, lightcurve, model));
         }
 
         // Early stop if we achieved excellent fit

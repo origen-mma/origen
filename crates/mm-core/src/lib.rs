@@ -5,7 +5,7 @@ pub mod fit_quality;
 pub mod io;
 pub mod lightcurve;
 pub mod lightcurve_fitting;
-pub mod multistart_fitter;
+// pub mod multistart_fitter; // TODO: Incomplete, has unimplemented!() functions
 pub mod optical;
 pub mod position;
 pub mod pso_fitter;
@@ -27,7 +27,7 @@ pub use lightcurve::{LightCurve, Photometry};
 pub use lightcurve_fitting::{
     fit_lightcurve, fit_lightcurve_with_config, FitConfig, FitModel, LightCurveFitResult,
 };
-pub use multistart_fitter::{multistart_fit, MultiStartConfig};
+// pub use multistart_fitter::{multistart_fit, MultiStartConfig}; // TODO: Module incomplete
 pub use optical::{flux_to_magnitude, Classification, OpticalAlert, PhotometryPoint, Survey};
 pub use position::SkyPosition;
 pub use skymap::MockSkymap;
