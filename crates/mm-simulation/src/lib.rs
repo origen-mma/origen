@@ -3,6 +3,7 @@ pub mod ejecta_properties;
 pub mod gcn_circular;
 pub mod grb_localization;
 pub mod grb_simulation;
+pub mod joint_far;
 pub mod rotation;
 pub mod runner;
 pub mod satellite;
@@ -22,6 +23,10 @@ pub use grb_simulation::{
     compute_simulation_stats, simulate_grb_batch, simulate_grb_counterpart,
     simulate_multimessenger_batch, simulate_multimessenger_event, GrbProperties,
     GrbSimulationConfig, GrbSimulationStats, GwEventParams, MultiMessengerEvent, SimulatedGrb,
+};
+pub use joint_far::{
+    calculate_joint_far, calculate_pastro, FarComponents, JointFarConfig, JointFarResult,
+    MultiMessengerAssociation as FarAssociation,
 };
 pub use rotation::rotate_skymap;
 pub use runner::{SimulationConfig, SimulationResult, SimulationRunner};
