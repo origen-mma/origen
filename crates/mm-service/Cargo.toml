@@ -94,6 +94,10 @@ path = "src/bin/correlation_exporter.rs"
 name = "stream-optical-alerts"
 path = "src/bin/stream_optical_alerts.rs"
 
+[[bin]]
+name = "stream-o4-simulation"
+path = "src/bin/stream_o4_simulation.rs"
+
 [dependencies]
 mm-core = { path = "../mm-core" }
 mm-gcn = { path = "../mm-gcn" }
@@ -115,3 +119,4 @@ cdshealpix = { workspace = true }
 fitsio = { workspace = true }
 moc = { workspace = true }
 csv = { workspace = true }
+clap = { workspace = true }
