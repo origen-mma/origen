@@ -13,6 +13,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
 rand = { workspace = true }
+rand_distr = { workspace = true }
 cdshealpix = { workspace = true }
 fitsio = { workspace = true }
 reqwest = { workspace = true }
