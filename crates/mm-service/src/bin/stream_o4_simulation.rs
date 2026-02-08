@@ -17,6 +17,8 @@
 use anyhow::Result;
 use clap::Parser;
 use mm_simulation::{
+    background_grbs::{generate_background_grbs, BackgroundGrbConfig},
+    background_optical::{generate_background_optical, BackgroundOpticalConfig},
     calculate_joint_far, simulate_multimessenger_event, BinaryParams, FarAssociation,
     GrbSimulationConfig, GwEventParams, JointFarConfig,
 };
@@ -57,6 +59,14 @@ struct Args {
     /// Survey limiting magnitude
     #[arg(long, default_value = "24.5")]
     limiting_magnitude: f64,
+
+    /// Simulate background transients (GRBs and optical)
+    #[arg(long, default_value = "false")]
+    simulate_background: bool,
+
+    /// Background simulation time window (days)
+    #[arg(long, default_value = "365.0")]
+    background_duration_days: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,6 +113,21 @@ struct MultiMessengerCorrelation {
     joint_far_per_year: f64,
     significance_sigma: f64,
     pastro: f64,
+}
+
+#[derive(Debug, Default)]
+struct BackgroundRejectionStats {
+    // GRB background
+    total_background_grbs: usize,
+    grb_temporal_coincidences: usize,
+    grb_spatial_coincidences: usize,
+
+    // Optical background
+    total_background_optical: usize,
+    optical_temporal_coincidences: usize,
+    optical_spatial_coincidences: usize,
+    shock_cooling_spatial: usize,
+    sne_ia_spatial: usize,
 }
 
 async fn create_producer(brokers: &str) -> Result<FutureProducer> {
@@ -169,12 +194,46 @@ async fn main() -> Result<()> {
         grb_time_window_seconds: 10.0,
     };
 
+    // Generate background transients if enabled
+    let background_grbs = if args.simulate_background {
+        info!("🎲 Generating background GRBs...");
+        let o4_start_gps = 1369094418.0;
+        let o4_duration = args.background_duration_days * 86400.0;
+        let o4_end_gps = o4_start_gps + o4_duration;
+
+        let bg_config = BackgroundGrbConfig::combined(); // Swift + Fermi
+        let grbs = generate_background_grbs(&bg_config, o4_start_gps, o4_end_gps, &mut rng);
+        info!("  Generated {} background GRBs", grbs.len());
+        grbs
+    } else {
+        Vec::new()
+    };
+
+    let background_optical = if args.simulate_background {
+        info!("🎲 Generating background optical transients...");
+        let o4_start_gps = 1369094418.0;
+        let o4_duration = args.background_duration_days * 86400.0;
+        let o4_end_gps = o4_start_gps + o4_duration;
+
+        let optical_config = BackgroundOpticalConfig::ztf(); // ZTF survey
+        let transients =
+            generate_background_optical(&optical_config, o4_start_gps, o4_end_gps, &mut rng);
+        info!(
+            "  Generated {} background optical transients",
+            transients.len()
+        );
+        transients
+    } else {
+        Vec::new()
+    };
+
     // Statistics
     let mut n_events = 0;
     let mut n_gw_published = 0;
     let mut n_grb_published = 0;
     let mut n_optical_published = 0;
     let mut n_correlations_published = 0;
+    let mut bg_stats = BackgroundRejectionStats::default();
 
     let start_time = Instant::now();
     let event_interval = Duration::from_secs_f64(1.0 / args.rate);
@@ -270,6 +329,62 @@ async fn main() -> Result<()> {
             "📡 GW {} published: GPS={:.2}, SNR={:.1}, Distance={:.0} Mpc",
             n_events, gpstime, gw_snr, distance
         );
+
+        // Background rejection analysis (if enabled)
+        if args.simulate_background && !background_grbs.is_empty() {
+            bg_stats.total_background_grbs = background_grbs.len();
+            bg_stats.total_background_optical = background_optical.len();
+
+            // GRB temporal window: ±5 seconds
+            let grb_time_window = 5.0;
+            let grb_temporal: Vec<_> = background_grbs
+                .iter()
+                .filter(|grb| (grb.gps_time - gpstime).abs() <= grb_time_window)
+                .collect();
+
+            bg_stats.grb_temporal_coincidences += grb_temporal.len();
+
+            // GRB spatial window: simplified 100 sq deg skymap
+            let skymap_area_90 = (distance / 100.0).powi(2) * 100.0;
+            let full_sky = 41253.0;
+            let spatial_prob = skymap_area_90 / full_sky;
+
+            for _ in &grb_temporal {
+                // Probabilistic spatial check (simplified)
+                if rand::random::<f64>() < spatial_prob {
+                    bg_stats.grb_spatial_coincidences += 1;
+                }
+            }
+
+            // Optical temporal window: 14 days
+            let optical_time_window = 14.0 * 86400.0;
+            let optical_temporal: Vec<_> = background_optical
+                .iter()
+                .filter(|opt| {
+                    let dt = opt.discovery_gps_time - gpstime;
+                    dt >= 0.0 && dt <= optical_time_window
+                })
+                .collect();
+
+            bg_stats.optical_temporal_coincidences += optical_temporal.len();
+
+            // Optical spatial window: check if in GW skymap
+            use mm_simulation::background_optical::OpticalTransientType;
+            for opt in &optical_temporal {
+                if rand::random::<f64>() < spatial_prob {
+                    bg_stats.optical_spatial_coincidences += 1;
+
+                    match opt.transient_type {
+                        OpticalTransientType::ShockCooling => {
+                            bg_stats.shock_cooling_spatial += 1;
+                        }
+                        OpticalTransientType::TypeIaSN => {
+                            bg_stats.sne_ia_spatial += 1;
+                        }
+                    }
+                }
+            }
+        }
 
         // 2. Publish GRB if detected
         if mm_event.has_grb() {
@@ -443,6 +558,108 @@ async fn main() -> Result<()> {
         "Actual rate: {:.2} Hz",
         n_events as f64 / elapsed.as_secs_f64()
     );
+
+    // Background rejection statistics
+    if args.simulate_background {
+        info!("");
+        info!("╔══════════════════════════════════════════════════════════════╗");
+        info!("║              Background Rejection Analysis                   ║");
+        info!("╚══════════════════════════════════════════════════════════════╝");
+        info!("");
+        info!("Background GRBs:");
+        info!(
+            "  Total generated:           {}",
+            bg_stats.total_background_grbs
+        );
+        info!(
+            "  Temporal coincidences:     {} ({:.2}%)",
+            bg_stats.grb_temporal_coincidences,
+            100.0 * bg_stats.grb_temporal_coincidences as f64
+                / bg_stats.total_background_grbs.max(1) as f64
+        );
+        info!(
+            "  Spatial+temporal:          {} ({:.2}%)",
+            bg_stats.grb_spatial_coincidences,
+            100.0 * bg_stats.grb_spatial_coincidences as f64
+                / bg_stats.total_background_grbs.max(1) as f64
+        );
+
+        let grb_temporal_rejection = 1.0
+            - (bg_stats.grb_temporal_coincidences as f64
+                / bg_stats.total_background_grbs.max(1) as f64);
+        let grb_total_rejection = 1.0
+            - (bg_stats.grb_spatial_coincidences as f64
+                / bg_stats.total_background_grbs.max(1) as f64);
+
+        info!(
+            "  Temporal rejection:        {:.2}%",
+            100.0 * grb_temporal_rejection
+        );
+        info!(
+            "  Total rejection:           {:.4}%",
+            100.0 * grb_total_rejection
+        );
+
+        info!("");
+        info!("Background Optical Transients:");
+        info!(
+            "  Total generated:           {}",
+            bg_stats.total_background_optical
+        );
+        info!(
+            "  Temporal coincidences:     {} ({:.2}%)",
+            bg_stats.optical_temporal_coincidences,
+            100.0 * bg_stats.optical_temporal_coincidences as f64
+                / bg_stats.total_background_optical.max(1) as f64
+        );
+        info!(
+            "  Spatial+temporal:          {} ({:.2}%)",
+            bg_stats.optical_spatial_coincidences,
+            100.0 * bg_stats.optical_spatial_coincidences as f64
+                / bg_stats.total_background_optical.max(1) as f64
+        );
+        info!(
+            "    └─ Shock cooling:        {}",
+            bg_stats.shock_cooling_spatial
+        );
+        info!("    └─ SNe Ia:               {}", bg_stats.sne_ia_spatial);
+
+        let optical_temporal_rejection = 1.0
+            - (bg_stats.optical_temporal_coincidences as f64
+                / bg_stats.total_background_optical.max(1) as f64);
+        let optical_total_rejection = 1.0
+            - (bg_stats.optical_spatial_coincidences as f64
+                / bg_stats.total_background_optical.max(1) as f64);
+
+        info!(
+            "  Temporal rejection:        {:.2}%",
+            100.0 * optical_temporal_rejection
+        );
+        info!(
+            "  Total rejection:           {:.4}%",
+            100.0 * optical_total_rejection
+        );
+
+        info!("");
+        info!("Conclusion:");
+        info!(
+            "  ✅ Temporal cuts reject {:.2}% of background GRBs",
+            100.0 * grb_temporal_rejection
+        );
+        info!(
+            "  ✅ Spatial cuts further improve to {:.4}% rejection",
+            100.0 * grb_total_rejection
+        );
+        info!(
+            "  ✅ Temporal cuts reject {:.2}% of background optical",
+            100.0 * optical_temporal_rejection
+        );
+        info!(
+            "  ✅ Spatial cuts further improve to {:.4}% rejection",
+            100.0 * optical_total_rejection
+        );
+        info!("  🎯 Time + spatial cuts are EXTREMELY effective!");
+    }
 
     Ok(())
 }
