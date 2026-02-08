@@ -1,9 +1,11 @@
 pub mod error;
 pub mod events;
 pub mod explosion_time;
+pub mod fit_quality;
 pub mod io;
 pub mod lightcurve;
 pub mod lightcurve_fitting;
+pub mod multistart_fitter;
 pub mod optical;
 pub mod position;
 pub mod pso_fitter;
@@ -19,11 +21,13 @@ pub mod time;
 pub use error::{CoreError, ParseError};
 pub use events::{Event, EventType, GWEvent, GammaRayEvent, NeutrinoEvent, XRayEvent};
 pub use explosion_time::estimate_explosion_time;
+pub use fit_quality::{FitQuality, FitQualityAssessment};
 pub use io::{load_lightcurve_csv, load_lightcurves_dir};
 pub use lightcurve::{LightCurve, Photometry};
 pub use lightcurve_fitting::{
     fit_lightcurve, fit_lightcurve_with_config, FitConfig, FitModel, LightCurveFitResult,
 };
+pub use multistart_fitter::{multistart_fit, MultiStartConfig};
 pub use optical::{flux_to_magnitude, Classification, OpticalAlert, PhotometryPoint, Survey};
 pub use position::SkyPosition;
 pub use skymap::MockSkymap;
