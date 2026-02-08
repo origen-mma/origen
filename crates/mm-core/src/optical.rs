@@ -47,7 +47,7 @@ impl OpticalAlert {
 
         let mjd_gps_epoch = 44244.0;
         let days_since_gps_epoch = self.mjd - mjd_gps_epoch;
-        
+
         days_since_gps_epoch * 86400.0
     }
 

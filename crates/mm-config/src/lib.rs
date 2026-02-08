@@ -182,8 +182,8 @@ impl Config {
 
     /// Save configuration to TOML file
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), ConfigError> {
-        let toml = toml::to_string_pretty(self)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let toml =
+            toml::to_string_pretty(self).map_err(|e| std::io::Error::other(e.to_string()))?;
         fs::write(path, toml)?;
         Ok(())
     }

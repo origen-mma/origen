@@ -8,8 +8,7 @@
 use anyhow::Result;
 use mm_simulation::{
     background_grbs::{
-        calculate_chance_coincidences, generate_background_grbs, BackgroundGrbConfig,
-        GrbSatellite,
+        calculate_chance_coincidences, generate_background_grbs, BackgroundGrbConfig, GrbSatellite,
     },
     expected_chance_coincidences,
 };
@@ -18,9 +17,7 @@ use tracing::{info, Level};
 
 fn main() -> Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("=== Background GRB Characterization for O4 ===\n");
 
@@ -50,7 +47,10 @@ fn main() -> Result<()> {
 
     info!("Multi-messenger search parameters:");
     info!("  Time window: ±{:.1} seconds", time_window_seconds / 2.0);
-    info!("  Typical BNS skymap: {:.0} sq deg\n", typical_bns_skymap_area);
+    info!(
+        "  Typical BNS skymap: {:.0} sq deg\n",
+        typical_bns_skymap_area
+    );
 
     // Generate background GRBs for each satellite
     let mut rng = thread_rng();
@@ -60,7 +60,10 @@ fn main() -> Result<()> {
     info!("Swift BAT parameters:");
     info!("  Rate: {:.0} SGRBs/year", swift_config.rate_per_year);
     info!("  FOV: {:.1}% of sky", swift_config.fov_fraction * 100.0);
-    info!("  Localization: {:.2}°", swift_config.satellite.localization_error_90());
+    info!(
+        "  Localization: {:.2}°",
+        swift_config.satellite.localization_error_90()
+    );
 
     let swift_grbs = generate_background_grbs(&swift_config, o4_start_gps, o4_end_gps, &mut rng);
     info!("  Generated {} background GRBs\n", swift_grbs.len());
@@ -85,7 +88,10 @@ fn main() -> Result<()> {
     info!("Fermi GBM parameters:");
     info!("  Rate: {:.0} SGRBs/year", fermi_config.rate_per_year);
     info!("  FOV: {:.1}% of sky", fermi_config.fov_fraction * 100.0);
-    info!("  Localization: {:.1}°", fermi_config.satellite.localization_error_90());
+    info!(
+        "  Localization: {:.1}°",
+        fermi_config.satellite.localization_error_90()
+    );
 
     let fermi_grbs = generate_background_grbs(&fermi_config, o4_start_gps, o4_end_gps, &mut rng);
     info!("  Generated {} background GRBs\n", fermi_grbs.len());
@@ -144,7 +150,10 @@ fn main() -> Result<()> {
 
     info!("\nSwift BAT Monte Carlo:");
     info!("  Total GW events: {}", swift_stats.total_gw_events);
-    info!("  Total background GRBs: {}", swift_stats.total_background_grbs);
+    info!(
+        "  Total background GRBs: {}",
+        swift_stats.total_background_grbs
+    );
     info!(
         "  Temporal coincidences: {}",
         swift_stats.temporal_coincidences
@@ -172,7 +181,10 @@ fn main() -> Result<()> {
 
     info!("\nFermi GBM Monte Carlo:");
     info!("  Total GW events: {}", fermi_stats.total_gw_events);
-    info!("  Total background GRBs: {}", fermi_stats.total_background_grbs);
+    info!(
+        "  Total background GRBs: {}",
+        fermi_stats.total_background_grbs
+    );
     info!(
         "  Temporal coincidences: {}",
         fermi_stats.temporal_coincidences
@@ -192,9 +204,18 @@ fn main() -> Result<()> {
 
     println!("\n=== Summary ===\n");
     info!("For O4 with ~{} BNS detections:", expected_bns_events);
-    info!("  • Swift BAT: {:.4} expected false associations", expected_false_swift);
-    info!("  • Fermi GBM: {:.4} expected false associations", expected_false_fermi);
-    info!("  • Combined: {:.4} expected false associations", expected_false_combined);
+    info!(
+        "  • Swift BAT: {:.4} expected false associations",
+        expected_false_swift
+    );
+    info!(
+        "  • Fermi GBM: {:.4} expected false associations",
+        expected_false_fermi
+    );
+    info!(
+        "  • Combined: {:.4} expected false associations",
+        expected_false_combined
+    );
     info!("\nConclusion: Chance GW-GRB coincidences are RARE (<0.1% per BNS event)");
     info!("A detected GW+GRB association is likely REAL, not background!");
 

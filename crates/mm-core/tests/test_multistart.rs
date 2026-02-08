@@ -1,7 +1,9 @@
 /// Test multi-start optimization approach
 ///
 /// Run with: cargo test --test test_multistart -- --nocapture --ignored
-use mm_core::{fit_lightcurve, fit_quality::FitQualityAssessment, svi_models, FitModel, LightCurve, Photometry};
+use mm_core::{
+    fit_lightcurve, fit_quality::FitQualityAssessment, svi_models, FitModel, LightCurve, Photometry,
+};
 use rand::Rng;
 
 /// Simple multi-start wrapper

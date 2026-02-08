@@ -1,4 +1,3 @@
-
 #[test]
 fn test_temporal_correlation() {
     // Test events within time window are correlated

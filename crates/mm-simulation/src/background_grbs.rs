@@ -70,24 +70,24 @@ impl GrbSatellite {
     /// Get typical localization error radius (degrees, 90% CR)
     pub fn localization_error_90(&self) -> f64 {
         match self {
-            GrbSatellite::SwiftBAT => 0.05,  // ~3 arcmin (0.05 deg)
-            GrbSatellite::FermiGBM => 5.0,   // ~5 degrees
+            GrbSatellite::SwiftBAT => 0.05, // ~3 arcmin (0.05 deg)
+            GrbSatellite::FermiGBM => 5.0,  // ~5 degrees
         }
     }
 
     /// Get field of view fraction
     pub fn fov_fraction(&self) -> f64 {
         match self {
-            GrbSatellite::SwiftBAT => 0.17,  // 1/6 sky
-            GrbSatellite::FermiGBM => 0.67,  // 2/3 sky
+            GrbSatellite::SwiftBAT => 0.17, // 1/6 sky
+            GrbSatellite::FermiGBM => 0.67, // 2/3 sky
         }
     }
 
     /// Get fluence threshold (erg/cm²)
     pub fn fluence_threshold(&self) -> f64 {
         match self {
-            GrbSatellite::SwiftBAT => 5e-8,   // ~5×10⁻⁸ erg/cm²
-            GrbSatellite::FermiGBM => 1e-7,   // ~10⁻⁷ erg/cm²
+            GrbSatellite::SwiftBAT => 5e-8, // ~5×10⁻⁸ erg/cm²
+            GrbSatellite::FermiGBM => 1e-7, // ~10⁻⁷ erg/cm²
         }
     }
 }
@@ -102,13 +102,13 @@ impl BackgroundGrbConfig {
     /// Swift BAT configuration
     pub fn swift_bat() -> Self {
         Self {
-            rate_per_year: 100.0,  // ~100 SGRBs/year (Swift BAT alone)
+            rate_per_year: 100.0, // ~100 SGRBs/year (Swift BAT alone)
             fluence_threshold: 5e-8,
             fov_fraction: 0.17,
             satellite: GrbSatellite::SwiftBAT,
-            fluence_log_mean: -7.3,  // log10(5e-8) ≈ -7.3
+            fluence_log_mean: -7.3, // log10(5e-8) ≈ -7.3
             fluence_log_std: 0.5,
-            t90_log_mean: 0.0,       // log10(1.0) = 0 (1 second)
+            t90_log_mean: 0.0, // log10(1.0) = 0 (1 second)
             t90_log_std: 0.3,
         }
     }
@@ -116,11 +116,11 @@ impl BackgroundGrbConfig {
     /// Fermi GBM configuration
     pub fn fermi_gbm() -> Self {
         Self {
-            rate_per_year: 200.0,  // ~200 SGRBs/year (Fermi GBM)
+            rate_per_year: 200.0, // ~200 SGRBs/year (Fermi GBM)
             fluence_threshold: 1e-7,
             fov_fraction: 0.67,
             satellite: GrbSatellite::FermiGBM,
-            fluence_log_mean: -6.7,  // log10(2e-7) ≈ -6.7
+            fluence_log_mean: -6.7, // log10(2e-7) ≈ -6.7
             fluence_log_std: 0.5,
             t90_log_mean: 0.0,
             t90_log_std: 0.3,
@@ -130,10 +130,10 @@ impl BackgroundGrbConfig {
     /// Combined Swift + Fermi (for all-sky coverage)
     pub fn combined() -> Self {
         Self {
-            rate_per_year: 300.0,  // ~300 SGRBs/year (combined)
+            rate_per_year: 300.0, // ~300 SGRBs/year (combined)
             fluence_threshold: 5e-8,
-            fov_fraction: 1.0,  // Assume full sky coverage
-            satellite: GrbSatellite::FermiGBM,  // Use Fermi localization
+            fov_fraction: 1.0,                 // Assume full sky coverage
+            satellite: GrbSatellite::FermiGBM, // Use Fermi localization
             fluence_log_mean: -7.0,
             fluence_log_std: 0.5,
             t90_log_mean: 0.0,
@@ -237,8 +237,8 @@ pub fn generate_background_grbs(
     let mut grbs = Vec::with_capacity(count);
 
     let time_dist = Uniform::new(time_start, time_end);
-    let ra_dist = Uniform::new(0.0, 360.0);  // RA: 0-360 degrees
-    let sin_dec_dist = Uniform::new(-1.0, 1.0);  // Uniform in sin(dec)
+    let ra_dist = Uniform::new(0.0, 360.0); // RA: 0-360 degrees
+    let sin_dec_dist = Uniform::new(-1.0, 1.0); // Uniform in sin(dec)
 
     let fluence_dist = Normal::new(config.fluence_log_mean, config.fluence_log_std).unwrap();
     let t90_dist = Normal::new(config.t90_log_mean, config.t90_log_std).unwrap();
@@ -412,11 +412,11 @@ pub fn calculate_chance_coincidences(
 
     // Calculate expected false associations (analytical)
     let mean_skymap_area = gw_skymap_areas.iter().sum::<f64>() / n_gw as f64;
-    let grb_rate = n_grb as f64 / (365.25 * 86400.0);  // Assuming 1 year
+    let grb_rate = n_grb as f64 / (365.25 * 86400.0); // Assuming 1 year
 
     let expected_false = expected_chance_coincidences(
         n_gw,
-        grb_rate * (365.25 * 86400.0),  // Convert back to per year
+        grb_rate * (365.25 * 86400.0), // Convert back to per year
         time_window,
         mean_skymap_area,
     );
@@ -461,8 +461,10 @@ mod tests {
 
         // Check properties
         for grb in &grbs[..5] {
-            println!("  GRB {}: GPS={:.0}, RA={:.2}, Dec={:.2}, Fluence={:.2e}",
-                     grb.grb_id, grb.gps_time, grb.ra, grb.dec, grb.fluence);
+            println!(
+                "  GRB {}: GPS={:.0}, RA={:.2}, Dec={:.2}, Fluence={:.2e}",
+                grb.grb_id, grb.gps_time, grb.ra, grb.dec, grb.fluence
+            );
 
             assert!(grb.gps_time >= t_start);
             assert!(grb.gps_time <= t_end);
@@ -475,10 +477,10 @@ mod tests {
     #[test]
     fn test_expected_chance_coincidences() {
         let expected = expected_chance_coincidences(
-            50,     // 50 GW events
-            300.0,  // 300 GRBs/year
-            10.0,   // ±5 second window
-            100.0,  // 100 sq deg skymap
+            50,    // 50 GW events
+            300.0, // 300 GRBs/year
+            10.0,  // ±5 second window
+            100.0, // 100 sq deg skymap
         );
 
         println!("Expected chance coincidences: {:.6}", expected);
@@ -493,7 +495,7 @@ mod tests {
         let config = BackgroundGrbConfig::fermi_gbm();
 
         assert_eq!(config.satellite, GrbSatellite::FermiGBM);
-        assert!(config.fov_fraction > 0.5);  // Fermi sees most of sky
+        assert!(config.fov_fraction > 0.5); // Fermi sees most of sky
         assert!(config.rate_per_year > 150.0);
     }
 }

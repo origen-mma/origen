@@ -83,9 +83,9 @@ impl OpticalSurvey {
     /// Get typical position uncertainty (arcsec)
     pub fn position_uncertainty(&self) -> f64 {
         match self {
-            OpticalSurvey::ZTF => 1.0,    // ~1 arcsec
-            OpticalSurvey::LSST => 0.2,   // ~0.2 arcsec
-            OpticalSurvey::DECam => 0.5,  // ~0.5 arcsec
+            OpticalSurvey::ZTF => 1.0,   // ~1 arcsec
+            OpticalSurvey::LSST => 0.2,  // ~0.2 arcsec
+            OpticalSurvey::DECam => 0.5, // ~0.5 arcsec
         }
     }
 }
@@ -101,8 +101,8 @@ impl BackgroundOpticalConfig {
     pub fn ztf() -> Self {
         Self {
             survey: OpticalSurvey::ZTF,
-            rate_per_day: 1000.0,     // ~1000 transients/night to 21 mag
-            survey_coverage: 0.09,     // ~9% of sky per night
+            rate_per_day: 1000.0,  // ~1000 transients/night to 21 mag
+            survey_coverage: 0.09, // ~9% of sky per night
             limiting_magnitude: 21.0,
             shock_cooling_fraction: 0.01, // ~1% are shock cooling
         }
@@ -112,8 +112,8 @@ impl BackgroundOpticalConfig {
     pub fn lsst() -> Self {
         Self {
             survey: OpticalSurvey::LSST,
-            rate_per_day: 10000.0,    // ~10,000 transients/night to 24.5 mag
-            survey_coverage: 0.23,     // ~23% of sky per night
+            rate_per_day: 10000.0, // ~10,000 transients/night to 24.5 mag
+            survey_coverage: 0.23, // ~23% of sky per night
             limiting_magnitude: 24.5,
             shock_cooling_fraction: 0.02, // ~2% are shock cooling (deeper)
         }
@@ -123,8 +123,8 @@ impl BackgroundOpticalConfig {
     pub fn decam() -> Self {
         Self {
             survey: OpticalSurvey::DECam,
-            rate_per_day: 500.0,      // ~500 transients/night to 23 mag
-            survey_coverage: 0.08,     // ~8% of sky per night
+            rate_per_day: 500.0,   // ~500 transients/night to 23 mag
+            survey_coverage: 0.08, // ~8% of sky per night
             limiting_magnitude: 23.0,
             shock_cooling_fraction: 0.01,
         }
@@ -196,7 +196,7 @@ impl BackgroundOpticalTransient {
                 let phase_soft = (1.0 + phase.exp()).ln() + 1e-6;
 
                 // Power-law cooling (n ~ 0.5-1.0 typical)
-                let n = 0.7;  // Representative value
+                let n = 0.7; // Representative value
                 let cooling = phase_soft.powf(-n);
 
                 // Exponential transparency cutoff (τ_tr in days)
@@ -222,7 +222,7 @@ impl BackgroundOpticalTransient {
                 let phase_soft = (1.0 + phase.exp()).ln() + 1e-6;
 
                 // Radioactive decay timescales (days)
-                const TAU_NI: f64 = 8.8;   // Ni-56 decay
+                const TAU_NI: f64 = 8.8; // Ni-56 decay
                 const TAU_CO: f64 = 111.3; // Co-56 decay
 
                 // Fraction of initial heating from Ni vs Co (f ~ 0.5-0.8)
@@ -414,7 +414,11 @@ pub fn generate_background_optical(
     }
 
     // Sort by discovery time
-    transients.sort_by(|a, b| a.discovery_gps_time.partial_cmp(&b.discovery_gps_time).unwrap());
+    transients.sort_by(|a, b| {
+        a.discovery_gps_time
+            .partial_cmp(&b.discovery_gps_time)
+            .unwrap()
+    });
 
     transients
 }
@@ -512,10 +516,8 @@ pub fn calculate_optical_coincidences(
     let mean_skymap_area = gw_skymap_areas.iter().sum::<f64>() / n_gw.max(1) as f64;
     let transient_rate = n_transients as f64 / (365.0 * 86400.0); // Assuming 1 year
 
-    let expected_false = n_gw as f64
-        * transient_rate
-        * time_window_seconds
-        * (mean_skymap_area / 41253.0);
+    let expected_false =
+        n_gw as f64 * transient_rate * time_window_seconds * (mean_skymap_area / 41253.0);
 
     let chance_rate_per_gw = if n_gw > 0 {
         spatial_temporal_coincidences as f64 / n_gw as f64
@@ -551,7 +553,10 @@ mod tests {
 
         let transients = generate_background_optical(&config, t_start, t_end, &mut rng);
 
-        println!("Generated {} background optical transients", transients.len());
+        println!(
+            "Generated {} background optical transients",
+            transients.len()
+        );
 
         // Should generate roughly rate * coverage * duration transients
         // ZTF: 1000/day * 0.09 * 365 = ~32,850 transients

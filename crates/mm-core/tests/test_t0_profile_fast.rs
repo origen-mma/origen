@@ -2,8 +2,8 @@
 ///
 /// Run with: cargo test --test test_t0_profile_fast -- --nocapture
 use mm_core::{
-    fit_lightcurve_profile_t0, svi_models, FitConfig, FitModel,
-    FitQualityAssessment, LightCurve, Photometry,
+    fit_lightcurve_profile_t0, svi_models, FitConfig, FitModel, FitQualityAssessment, LightCurve,
+    Photometry,
 };
 
 fn generate_synthetic_kilonova() -> (LightCurve, f64) {
