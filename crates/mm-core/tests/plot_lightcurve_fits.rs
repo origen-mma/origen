@@ -33,11 +33,11 @@ fn output_dir() -> PathBuf {
 fn generate_all_plots() {
     println!("Generating light curve fit plots...");
 
-    // Plot examples with different models
+    // Plot examples with different models (all are likely SNe, just demonstrating models)
     let examples = vec![
-        ("ZTF25aaaalin.csv", FitModel::Bazin, "Supernova-like"),
-        ("ZTF25aaaawig.csv", FitModel::PowerLaw, "Fast transient"),
-        ("ZTF25aaabnwi.csv", FitModel::MetzgerKN, "Kilonova candidate"),
+        ("ZTF25aaaalin.csv", FitModel::Bazin, "Bazin model example"),
+        ("ZTF25aaaawig.csv", FitModel::PowerLaw, "PowerLaw model example"),
+        ("ZTF25aaabnwi.csv", FitModel::MetzgerKN, "MetzgerKN model example"),
     ];
 
     for (filename, model, description) in examples {
