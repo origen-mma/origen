@@ -14,16 +14,33 @@ pub struct Photometry {
 
     /// Filter/band (e.g., "g", "r", "i" for ZTF)
     pub filter: String,
+
+    /// Is this an upper limit (non-detection) rather than a detection?
+    #[serde(default)]
+    pub is_upper_limit: bool,
 }
 
 impl Photometry {
-    /// Create a new photometry point
+    /// Create a new photometry point (detection)
     pub fn new(mjd: f64, flux: f64, flux_err: f64, filter: String) -> Self {
         Self {
             mjd,
             flux,
             flux_err,
             filter,
+            is_upper_limit: false,
+        }
+    }
+
+    /// Create an upper limit (non-detection)
+    /// flux_err is used as the limiting flux (e.g., 5-sigma limit)
+    pub fn new_upper_limit(mjd: f64, limiting_flux: f64, filter: String) -> Self {
+        Self {
+            mjd,
+            flux: limiting_flux,  // Store limit in flux field
+            flux_err: limiting_flux / 5.0,  // Assume 5-sigma limit
+            filter,
+            is_upper_limit: true,
         }
     }
 

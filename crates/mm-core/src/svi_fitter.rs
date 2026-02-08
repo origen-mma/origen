@@ -8,6 +8,40 @@ use crate::pso_fitter::BandFitData;
 use crate::svi_models::{eval_model_batch, eval_model_grad_batch, SviModel};
 use rand::Rng;
 
+/// Log of the standard normal CDF Φ(x)
+/// Used for upper limit likelihood calculation
+fn log_normal_cdf(x: f64) -> f64 {
+    if x > 8.0 {
+        return 0.0; // Φ(x) ≈ 1
+    }
+    if x < -30.0 {
+        return -0.5 * x * x - 0.5 * (2.0 * std::f64::consts::PI).ln() - (-x).ln();
+    }
+    // Use erfc approximation (Abramowitz & Stegun 7.1.26)
+    let z = -x * std::f64::consts::FRAC_1_SQRT_2; // erfc(z) = 2*Φ(x) when z = -x/sqrt(2)
+    let t = 1.0 / (1.0 + 0.3275911 * z.abs());
+    let poly = t
+        * (0.254829592
+            + t * (-0.284496736
+                + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    let erfc_z = poly * (-z * z).exp();
+    let phi = if z >= 0.0 {
+        0.5 * erfc_z
+    } else {
+        1.0 - 0.5 * erfc_z
+    };
+    (phi.max(1e-300)).ln()
+}
+
+/// Derivative of log Φ(x) with respect to x
+/// Used for gradient calculation with upper limits
+fn dlog_normal_cdf_dx(x: f64) -> f64 {
+    // d/dx log Φ(x) = φ(x) / Φ(x) where φ is the normal PDF
+    let phi = (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt();
+    let log_cdf = log_normal_cdf(x);
+    phi / log_cdf.exp().max(1e-300)
+}
+
 /// Manual Adam optimizer (avoids built-in Adam issues)
 struct ManualAdam {
     m: Vec<f64>,
@@ -185,21 +219,45 @@ pub fn svi_fit(
                 if !pred.is_finite() {
                     continue;
                 }
-                let residual = data.flux[i] - pred;
+
                 let total_var = obs_var[i] + sigma_extra_sq;
-                let inv_total = 1.0 / total_var;
-                let r2 = residual * residual;
-                log_lik += -0.5 * (r2 * inv_total + (2.0 * std::f64::consts::PI * total_var).ln());
+                let sigma_total = total_var.sqrt();
 
-                // Gradient w.r.t. flux model parameters
-                for j in 0..n_params {
-                    if j != se_idx && grads[i][j].is_finite() {
-                        dll_dtheta[j] += residual * inv_total * grads[i][j];
+                if data.is_upper[i] {
+                    // Upper limit: log Φ((f_upper - f_pred) / σ_total)
+                    let z = (data.upper_flux[i] - pred) / sigma_total;
+                    log_lik += log_normal_cdf(z);
+
+                    // Gradient: d/dθ log Φ(z) = -φ(z)/Φ(z) * d_pred/dθ / σ_total
+                    let dlog_phi_dz = dlog_normal_cdf_dx(z);
+                    let dz_dpred = -1.0 / sigma_total;
+
+                    for j in 0..n_params {
+                        if j != se_idx && grads[i][j].is_finite() {
+                            dll_dtheta[j] += dlog_phi_dz * dz_dpred * grads[i][j];
+                        }
                     }
-                }
 
-                // Gradient w.r.t. log_sigma_extra
-                dll_dtheta[se_idx] += (r2 * inv_total * inv_total - inv_total) * sigma_extra_sq;
+                    // Gradient w.r.t. log_sigma_extra (via total_var)
+                    let dz_dsigma = (data.upper_flux[i] - pred) / (total_var * sigma_total);
+                    dll_dtheta[se_idx] += dlog_phi_dz * dz_dsigma * sigma_extra_sq;
+                } else {
+                    // Detection: standard Gaussian likelihood
+                    let residual = data.flux[i] - pred;
+                    let inv_total = 1.0 / total_var;
+                    let r2 = residual * residual;
+                    log_lik += -0.5 * (r2 * inv_total + (2.0 * std::f64::consts::PI * total_var).ln());
+
+                    // Gradient w.r.t. flux model parameters
+                    for j in 0..n_params {
+                        if j != se_idx && grads[i][j].is_finite() {
+                            dll_dtheta[j] += residual * inv_total * grads[i][j];
+                        }
+                    }
+
+                    // Gradient w.r.t. log_sigma_extra
+                    dll_dtheta[se_idx] += (r2 * inv_total * inv_total - inv_total) * sigma_extra_sq;
+                }
             }
 
             // Log-prior: Gaussian priors on parameters

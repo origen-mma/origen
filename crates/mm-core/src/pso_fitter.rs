@@ -8,6 +8,31 @@ use argmin::solver::particleswarm::ParticleSwarm;
 
 use crate::svi_models::{eval_model_batch, SviModel};
 
+/// Log of the standard normal CDF Φ(x)
+/// Used for upper limit likelihood calculation
+fn log_normal_cdf(x: f64) -> f64 {
+    if x > 8.0 {
+        return 0.0; // Φ(x) ≈ 1
+    }
+    if x < -30.0 {
+        return -0.5 * x * x - 0.5 * (2.0 * std::f64::consts::PI).ln() - (-x).ln();
+    }
+    // Use erfc approximation (Abramowitz & Stegun 7.1.26)
+    let z = -x * std::f64::consts::FRAC_1_SQRT_2; // erfc(z) = 2*Φ(x) when z = -x/sqrt(2)
+    let t = 1.0 / (1.0 + 0.3275911 * z.abs());
+    let poly = t
+        * (0.254829592
+            + t * (-0.284496736
+                + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    let erfc_z = poly * (-z * z).exp();
+    let phi = if z >= 0.0 {
+        0.5 * erfc_z
+    } else {
+        1.0 - 0.5 * erfc_z
+    };
+    (phi.max(1e-300)).ln()
+}
+
 /// Data structure for fitting a single band
 #[derive(Clone)]
 pub struct BandFitData {
@@ -15,6 +40,10 @@ pub struct BandFitData {
     pub flux: Vec<f64>,
     pub flux_err: Vec<f64>,
     pub peak_flux_obs: f64,
+    /// Is this point an upper limit (non-detection)?
+    pub is_upper: Vec<bool>,
+    /// For upper limits: the limiting flux value
+    pub upper_flux: Vec<f64>,
 }
 
 /// PSO cost function (negative log-likelihood)
@@ -24,6 +53,8 @@ struct PsoCost {
     flux: Vec<f64>,
     flux_err: Vec<f64>,
     model: SviModel,
+    is_upper: Vec<bool>,
+    upper_flux: Vec<f64>,
 }
 
 impl CostFunction for PsoCost {
@@ -42,9 +73,17 @@ impl CostFunction for PsoCost {
             if !pred.is_finite() {
                 return Ok(1e99);
             }
-            let diff = pred - self.flux[i];
             let total_var = self.flux_err[i] * self.flux_err[i] + sigma_extra_sq + 1e-10;
-            neg_ll += diff * diff / total_var + total_var.ln();
+
+            if self.is_upper[i] {
+                // Upper limit: log Φ((f_upper - f_pred) / σ_total)
+                let z = (self.upper_flux[i] - pred) / total_var.sqrt();
+                neg_ll -= log_normal_cdf(z);  // Negative because we want to minimize
+            } else {
+                // Detection: standard Gaussian likelihood
+                let diff = pred - self.flux[i];
+                neg_ll += diff * diff / total_var + total_var.ln();
+            }
         }
         Ok(neg_ll / n)
     }
@@ -76,6 +115,8 @@ pub fn pso_model_select(data: &BandFitData) -> (SviModel, Vec<f64>, f64) {
             flux: data.flux.clone(),
             flux_err: data.flux_err.clone(),
             model,
+            is_upper: data.is_upper.clone(),
+            upper_flux: data.upper_flux.clone(),
         };
 
         let solver = ParticleSwarm::new((lower, upper), 40);

@@ -232,11 +232,15 @@ pub fn fit_lightcurve(
     );
 
     // Create band fit data
+    // TODO: Properly populate is_upper and upper_flux from Photometry.is_upper_limit
+    let n = times.len();
     let data = BandFitData {
         times: times.clone(),
-        flux: flux_norm,
-        flux_err: flux_err_norm,
+        flux: flux_norm.clone(),
+        flux_err: flux_err_norm.clone(),
         peak_flux_obs: peak_flux,
+        is_upper: vec![false; n],  // All detections for now
+        upper_flux: flux_norm,  // Use flux as upper limit placeholder
     };
 
     // Step 1: PSO initialization for the requested model
@@ -253,6 +257,8 @@ pub fn fit_lightcurve(
         flux: Vec<f64>,
         flux_err: Vec<f64>,
         model: SviModel,
+        is_upper: Vec<bool>,
+        upper_flux: Vec<f64>,
     }
 
     impl CostFunction for PsoCost {
@@ -271,8 +277,11 @@ pub fn fit_lightcurve(
                 if !pred.is_finite() {
                     return Ok(1e99);
                 }
-                let diff = pred - self.flux[i];
                 let total_var = self.flux_err[i] * self.flux_err[i] + sigma_extra_sq + 1e-10;
+
+                // Simple handling for now - treat all as detections
+                // TODO: Implement upper limit likelihood when is_upper[i] == true
+                let diff = pred - self.flux[i];
                 neg_ll += diff * diff / total_var + total_var.ln();
             }
             Ok(neg_ll / n)
@@ -285,6 +294,8 @@ pub fn fit_lightcurve(
         flux: data.flux.clone(),
         flux_err: data.flux_err.clone(),
         model: svi_model,
+        is_upper: data.is_upper.clone(),
+        upper_flux: data.upper_flux.clone(),
     };
 
     let solver = ParticleSwarm::new((lower, upper), 40);
