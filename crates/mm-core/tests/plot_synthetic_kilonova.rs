@@ -38,46 +38,77 @@ fn generate_synthetic_kilonova_plot() {
     println!("  t0 = {:.2} days\n", true_t0);
 
     // Generate synthetic observations
-    let obs_times = vec![
+    // CRITICAL: Include non-detections BEFORE first detection to constrain t0!
+    let obs_times_detections = vec![
         0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
         5.5, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0,
     ];
+
+    // Add pre-detection observations (upper limits)
+    let obs_times_nondetections = vec![-3.0, -2.0, -1.0, -0.5];
+
+    // Combine all observation times
+    let mut all_obs_times = obs_times_nondetections.clone();
+    all_obs_times.extend_from_slice(&obs_times_detections);
 
     // Generate clean model fluxes
     let clean_fluxes = svi_models::eval_model_batch(
         svi_models::SviModel::MetzgerKN,
         &true_params,
-        &obs_times,
+        &all_obs_times,
     );
 
     // Scale to realistic flux levels
     let scale_factor = 200.0;
-    let scaled_fluxes: Vec<f64> = clean_fluxes.iter().map(|f| f * scale_factor).collect();
 
-    // Add realistic noise (SNR ~ 20)
     let mut rng = rand::thread_rng();
-    let mut noisy_fluxes = Vec::new();
-    let mut flux_errors = Vec::new();
+    let mut all_fluxes = Vec::new();
+    let mut all_flux_errors = Vec::new();
 
-    for &flux in &scaled_fluxes {
+    let n_nondet = obs_times_nondetections.len();
+
+    // Non-detections: Upper limits with moderate constraints
+    // These provide weak information that source was faint at early times
+    for i in 0..n_nondet {
+        let limiting_flux = 15.0; // 5-sigma limiting flux (survey sensitivity)
+        let flux_err = 5.0;  // Moderate precision (3-sigma)
+        let true_flux = clean_fluxes[i] * scale_factor;
+
+        // Simulate noise around true (low) flux
+        let noise = rng.gen::<f64>() * flux_err - flux_err * 0.5;
+        let measured_flux = (true_flux + noise).max(0.0).min(limiting_flux);
+
+        println!("  Non-detection at t={:.1} days: flux={:.2} ± {:.2} (5σ limit={:.1}, true={:.2})",
+                 all_obs_times[i], measured_flux, flux_err, limiting_flux, true_flux);
+
+        all_fluxes.push(measured_flux);
+        all_flux_errors.push(flux_err);
+    }
+
+    // Detections: realistic SNR ~ 20
+    for i in n_nondet..all_obs_times.len() {
+        let flux = clean_fluxes[i] * scale_factor;
         let snr = 20.0;
         let err = flux / snr;
         let noise = rng.gen::<f64>() * err * 2.0 - err;
-        noisy_fluxes.push((flux + noise).max(0.1));
-        flux_errors.push(err);
+        all_fluxes.push((flux + noise).max(0.1));
+        all_flux_errors.push(err);
     }
 
-    // Create synthetic light curve
+    // Create synthetic light curve with both non-detections and detections
     let mut lightcurve = LightCurve::new("SYNTHETIC_KN".to_string());
     let mjd_offset = 60000.0;
-    for i in 0..obs_times.len() {
+    for i in 0..all_obs_times.len() {
         lightcurve.add_measurement(Photometry::new(
-            mjd_offset + obs_times[i],
-            noisy_fluxes[i],
-            flux_errors[i],
+            mjd_offset + all_obs_times[i],
+            all_fluxes[i],
+            all_flux_errors[i],
             "r".to_string(),
         ));
     }
+
+    println!("\nGenerated {} non-detections + {} detections",
+             n_nondet, obs_times_detections.len());
 
     // Fit with MetzgerKN model
     println!("Fitting synthetic kilonova...");
@@ -100,10 +131,11 @@ fn generate_synthetic_kilonova_plot() {
     let t0_error_hours = t0_error_days * 24.0;
 
     println!("\n=== EXPLOSION TIME (t0) RECOVERY ===");
-    println!("  True t0:    {:.3} MJD (day 0.0)", true_t0_mjd);
-    println!("  Fitted t0:  {:.3} ± {:.3} MJD", fitted_t0_mjd, fit_result.t0_err);
-    println!("  Error:      {:.3} days ({:.1} hours)", t0_error_days, t0_error_hours);
-    println!("  First obs:  {:.3} MJD (day 0.5)", mjd_offset + obs_times[0]);
+    println!("  True t0:       {:.3} MJD (day 0.0)", true_t0_mjd);
+    println!("  Fitted t0:     {:.3} ± {:.3} MJD", fitted_t0_mjd, fit_result.t0_err);
+    println!("  Error:         {:.3} days ({:.1} hours)", t0_error_days, t0_error_hours);
+    println!("  First non-det: {:.3} MJD (day -3.0)", mjd_offset + all_obs_times[0]);
+    println!("  First detect:  {:.3} MJD (day 0.5)", mjd_offset + obs_times_detections[0]);
     println!("\n  ✅ t0 recovered to {:.1} hour accuracy!", t0_error_hours);
 
     println!("\nPhysical parameter recovery:");
@@ -120,9 +152,9 @@ fn generate_synthetic_kilonova_plot() {
              10f64.powf(fitted_log10_kappa_r),
              (fitted_log10_kappa_r - true_log10_kappa_r).abs());
 
-    // Generate fitted model curve
-    let model_times: Vec<f64> = (0..100)
-        .map(|i| 0.5 + i as f64 * 14.0 / 99.0)
+    // Generate fitted model curve (including pre-detection times)
+    let model_times: Vec<f64> = (0..150)
+        .map(|i| -3.0 + i as f64 * 17.0 / 149.0)
         .collect();
 
     let fitted_params_for_eval = vec![
@@ -156,7 +188,7 @@ fn generate_synthetic_kilonova_plot() {
     root.fill(&WHITE).unwrap();
 
     let y_min = 0.0;
-    let y_max = scaled_fluxes
+    let y_max = all_fluxes
         .iter()
         .cloned()
         .fold(f64::NEG_INFINITY, f64::max)
@@ -165,7 +197,7 @@ fn generate_synthetic_kilonova_plot() {
     let mut chart = ChartBuilder::on(&root)
         .caption(
             format!(
-                "Synthetic Kilonova Validation\nTrue: M_ej={:.3} Msun, v_ej={:.2}c, κ_r={:.1} cm²/g | ELBO: {:.1}",
+                "Synthetic Kilonova Validation (with non-detections)\nTrue: M_ej={:.3} Msun, v_ej={:.2}c, κ_r={:.1} cm²/g | ELBO: {:.1}",
                 10f64.powf(true_log10_mej),
                 10f64.powf(true_log10_vej),
                 10f64.powf(true_log10_kappa_r),
@@ -176,7 +208,7 @@ fn generate_synthetic_kilonova_plot() {
         .margin(15)
         .x_label_area_size(50)
         .y_label_area_size(70)
-        .build_cartesian_2d(0.0_f64..15.0_f64, y_min..y_max)
+        .build_cartesian_2d(-3.5_f64..15.0_f64, y_min..y_max)
         .unwrap();
 
     chart
@@ -189,26 +221,38 @@ fn generate_synthetic_kilonova_plot() {
     // Plot data points with error bars
     chart
         .draw_series(
-            obs_times
+            all_obs_times
                 .iter()
-                .zip(noisy_fluxes.iter())
-                .zip(flux_errors.iter())
+                .zip(all_fluxes.iter())
+                .zip(all_flux_errors.iter())
                 .map(|((&t, &f), &e)| {
-                    ErrorBar::new_vertical(t, f - e, f, f + e, BLUE.filled(), 5)
+                    ErrorBar::new_vertical(t, (f - e).max(0.0), f, f + e, BLUE.filled(), 5)
                 }),
         )
         .unwrap();
 
-    // Plot data points
+    // Plot non-detections (open circles)
     chart
         .draw_series(
-            obs_times
+            all_obs_times[0..n_nondet]
                 .iter()
-                .zip(noisy_fluxes.iter())
+                .zip(all_fluxes[0..n_nondet].iter())
+                .map(|(&t, &f)| Circle::new((t, f), 4, BLUE.stroke_width(2))),
+        )
+        .unwrap()
+        .label("Non-detections (upper limits)")
+        .legend(|(x, y)| Circle::new((x + 10, y), 4, BLUE.stroke_width(2)));
+
+    // Plot detections (filled circles)
+    chart
+        .draw_series(
+            all_obs_times[n_nondet..]
+                .iter()
+                .zip(all_fluxes[n_nondet..].iter())
                 .map(|(&t, &f)| Circle::new((t, f), 4, BLUE.filled())),
         )
         .unwrap()
-        .label("Synthetic data (SNR~20)")
+        .label("Detections (SNR~20)")
         .legend(|(x, y)| Circle::new((x + 10, y), 4, BLUE.filled()));
 
     // Plot true model

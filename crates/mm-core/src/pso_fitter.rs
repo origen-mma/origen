@@ -129,8 +129,12 @@ pub fn pso_bounds(model: SviModel) -> (Vec<f64>, Vec<f64>) {
         }
         SviModel::MetzgerKN => {
             // log10_mej, log10_vej, log10_kappa_r, t0, log_sigma_extra
-            let lower = vec![-4.0, -1.5, 0.0, -100.0, -5.0];
-            let upper = vec![-1.0, -0.5, 2.0, 100.0, 0.0];
+            // CRITICAL: t0 bounds tightened from ±100 to -10/+5 days
+            // Kilonovae rise in ~0.5-2 days, so t0 must be close to first detection
+            // Lower: -10 days allows for missed early rise
+            // Upper: +5 days allows for catching only the tail
+            let lower = vec![-4.0, -1.5, 0.0, -10.0, -5.0];
+            let upper = vec![-1.0, -0.5, 2.0, 5.0, 0.0];
             (lower, upper)
         }
     }
