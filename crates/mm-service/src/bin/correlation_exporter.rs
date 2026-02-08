@@ -10,50 +10,65 @@ use tracing::{info, warn};
 
 #[derive(Debug, Deserialize)]
 struct CorrelationMessage {
-    simulation_id: u32,
-    gw_gpstime: f64,
-    grb_detection_time: f64,
-    time_offset: f64,
-    grb_instrument: String,
-    gw_90cr_area: f64,
-    grb_90cr_area: f64,
-    overlap_area: f64,
-    overlap_fraction_gw: f64,
-    overlap_fraction_grb: f64,
-    timestamp: f64,
+    simulation_id: usize,
+    gw_snr: f64,
+    has_grb: bool,
+    has_optical: bool,
+    optical_magnitude: Option<f64>,
+    joint_far_per_year: f64,
+    significance_sigma: f64,
+    pastro: f64,
 }
 
 #[derive(Debug, Clone, Default)]
 struct Metrics {
     total_correlations: u64,
-    last_overlap_area: f64,
-    last_gw_area: f64,
-    last_grb_area: f64,
-    last_overlap_frac_gw: f64,
-    last_overlap_frac_grb: f64,
-    last_time_offset: f64,
-    avg_overlap_area: f64,
-    avg_gw_area: f64,
-    avg_grb_area: f64,
+    total_with_grb: u64,
+    total_with_optical: u64,
+    total_three_way: u64,
+    last_gw_snr: f64,
+    last_joint_far: f64,
+    last_significance: f64,
+    last_pastro: f64,
+    last_optical_mag: f64,
+    min_far: f64,
+    max_significance: f64,
+    avg_significance: f64,
 }
 
 impl Metrics {
     fn update(&mut self, msg: &CorrelationMessage) {
         let n = self.total_correlations as f64;
 
-        // Running average
-        self.avg_overlap_area = (self.avg_overlap_area * n + msg.overlap_area) / (n + 1.0);
-        self.avg_gw_area = (self.avg_gw_area * n + msg.gw_90cr_area) / (n + 1.0);
-        self.avg_grb_area = (self.avg_grb_area * n + msg.grb_90cr_area) / (n + 1.0);
+        // Count association types
+        self.total_correlations += 1;
+        if msg.has_grb {
+            self.total_with_grb += 1;
+        }
+        if msg.has_optical {
+            self.total_with_optical += 1;
+        }
+        if msg.has_grb && msg.has_optical {
+            self.total_three_way += 1;
+        }
+
+        // Running average for significance
+        self.avg_significance = (self.avg_significance * n + msg.significance_sigma) / (n + 1.0);
+
+        // Track extremes
+        if self.total_correlations == 1 || msg.joint_far_per_year < self.min_far {
+            self.min_far = msg.joint_far_per_year;
+        }
+        if msg.significance_sigma > self.max_significance {
+            self.max_significance = msg.significance_sigma;
+        }
 
         // Last values
-        self.total_correlations += 1;
-        self.last_overlap_area = msg.overlap_area;
-        self.last_gw_area = msg.gw_90cr_area;
-        self.last_grb_area = msg.grb_90cr_area;
-        self.last_overlap_frac_gw = msg.overlap_fraction_gw;
-        self.last_overlap_frac_grb = msg.overlap_fraction_grb;
-        self.last_time_offset = msg.time_offset;
+        self.last_gw_snr = msg.gw_snr;
+        self.last_joint_far = msg.joint_far_per_year;
+        self.last_significance = msg.significance_sigma;
+        self.last_pastro = msg.pastro;
+        self.last_optical_mag = msg.optical_magnitude.unwrap_or(99.0);
     }
 
     fn to_prometheus(&self) -> String {
@@ -62,51 +77,61 @@ impl Metrics {
              # TYPE mm_correlations_total counter\n\
              mm_correlations_total {}\n\
              \n\
-             # HELP mm_last_overlap_area_sq_deg Last correlation overlap area in square degrees\n\
-             # TYPE mm_last_overlap_area_sq_deg gauge\n\
-             mm_last_overlap_area_sq_deg {}\n\
+             # HELP mm_correlations_with_grb Total correlations with GRB detection\n\
+             # TYPE mm_correlations_with_grb counter\n\
+             mm_correlations_with_grb {}\n\
              \n\
-             # HELP mm_last_gw_area_sq_deg Last GW 90% credible region area\n\
-             # TYPE mm_last_gw_area_sq_deg gauge\n\
-             mm_last_gw_area_sq_deg {}\n\
+             # HELP mm_correlations_with_optical Total correlations with optical detection\n\
+             # TYPE mm_correlations_with_optical counter\n\
+             mm_correlations_with_optical {}\n\
              \n\
-             # HELP mm_last_grb_area_sq_deg Last GRB 90% credible region area\n\
-             # TYPE mm_last_grb_area_sq_deg gauge\n\
-             mm_last_grb_area_sq_deg {}\n\
+             # HELP mm_correlations_three_way Total three-way correlations (GW+GRB+Optical)\n\
+             # TYPE mm_correlations_three_way counter\n\
+             mm_correlations_three_way {}\n\
              \n\
-             # HELP mm_last_overlap_fraction_gw Last overlap as fraction of GW area\n\
-             # TYPE mm_last_overlap_fraction_gw gauge\n\
-             mm_last_overlap_fraction_gw {}\n\
+             # HELP mm_last_gw_snr Last gravitational wave SNR\n\
+             # TYPE mm_last_gw_snr gauge\n\
+             mm_last_gw_snr {}\n\
              \n\
-             # HELP mm_last_overlap_fraction_grb Last overlap as fraction of GRB area\n\
-             # TYPE mm_last_overlap_fraction_grb gauge\n\
-             mm_last_overlap_fraction_grb {}\n\
+             # HELP mm_last_joint_far_per_year Last joint false alarm rate per year\n\
+             # TYPE mm_last_joint_far_per_year gauge\n\
+             mm_last_joint_far_per_year {}\n\
              \n\
-             # HELP mm_last_time_offset_seconds Last time offset between GW and GRB\n\
-             # TYPE mm_last_time_offset_seconds gauge\n\
-             mm_last_time_offset_seconds {}\n\
+             # HELP mm_last_significance_sigma Last significance in Gaussian sigma\n\
+             # TYPE mm_last_significance_sigma gauge\n\
+             mm_last_significance_sigma {}\n\
              \n\
-             # HELP mm_avg_overlap_area_sq_deg Average overlap area across all correlations\n\
-             # TYPE mm_avg_overlap_area_sq_deg gauge\n\
-             mm_avg_overlap_area_sq_deg {}\n\
+             # HELP mm_last_pastro Last astrophysical probability (0-1)\n\
+             # TYPE mm_last_pastro gauge\n\
+             mm_last_pastro {}\n\
              \n\
-             # HELP mm_avg_gw_area_sq_deg Average GW area across all correlations\n\
-             # TYPE mm_avg_gw_area_sq_deg gauge\n\
-             mm_avg_gw_area_sq_deg {}\n\
+             # HELP mm_last_optical_magnitude Last optical magnitude (mag)\n\
+             # TYPE mm_last_optical_magnitude gauge\n\
+             mm_last_optical_magnitude {}\n\
              \n\
-             # HELP mm_avg_grb_area_sq_deg Average GRB area across all correlations\n\
-             # TYPE mm_avg_grb_area_sq_deg gauge\n\
-             mm_avg_grb_area_sq_deg {}\n",
+             # HELP mm_min_joint_far Minimum joint FAR observed (most significant)\n\
+             # TYPE mm_min_joint_far gauge\n\
+             mm_min_joint_far {}\n\
+             \n\
+             # HELP mm_max_significance Maximum significance observed (sigma)\n\
+             # TYPE mm_max_significance gauge\n\
+             mm_max_significance {}\n\
+             \n\
+             # HELP mm_avg_significance Average significance across all correlations (sigma)\n\
+             # TYPE mm_avg_significance gauge\n\
+             mm_avg_significance {}\n",
             self.total_correlations,
-            self.last_overlap_area,
-            self.last_gw_area,
-            self.last_grb_area,
-            self.last_overlap_frac_gw,
-            self.last_overlap_frac_grb,
-            self.last_time_offset,
-            self.avg_overlap_area,
-            self.avg_gw_area,
-            self.avg_grb_area,
+            self.total_with_grb,
+            self.total_with_optical,
+            self.total_three_way,
+            self.last_gw_snr,
+            self.last_joint_far,
+            self.last_significance,
+            self.last_pastro,
+            self.last_optical_mag,
+            self.min_far,
+            self.max_significance,
+            self.avg_significance,
         )
     }
 }

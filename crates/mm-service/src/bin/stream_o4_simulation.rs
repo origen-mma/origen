@@ -250,13 +250,8 @@ async fn main() -> Result<()> {
 
         // Simplified GW SNR
         let gw_snr = 8.0 + (1.0 / distance * 100.0);
-        let gw_far_per_year = if gw_snr > 12.0 {
-            0.01
-        } else if gw_snr > 10.0 {
-            0.1
-        } else {
-            1.0
-        };
+        // Use realistic FAR for significant GW detections
+        let gw_far_per_year = 1e-8;
 
         // 1. Publish GW alert
         let gw_alert = GwAlert {
@@ -388,13 +383,29 @@ async fn main() -> Result<()> {
             .await?;
             n_correlations_published += 1;
 
-            if far_result.significance_sigma > 3.0 {
-                info!(
-                    "   ✨ CORRELATION: FAR={:.2e}/yr, σ={:.1}, P_astro={:.1}%",
-                    far_result.far_per_year,
-                    far_result.significance_sigma,
-                    100.0 * pastro
-                );
+            // Always show multi-messenger correlations
+            let emoji = if far_result.significance_sigma > 5.0 {
+                "🎯"
+            } else if far_result.significance_sigma > 3.0 {
+                "✨"
+            } else {
+                "💫"
+            };
+
+            info!(
+                "   {} MMA CORRELATION: GW+{}{}",
+                emoji,
+                if has_grb { "GRB" } else { "" },
+                if has_optical_detectable { "+Optical" } else { "" }
+            );
+            info!(
+                "      FAR={:.2e}/yr, σ={:.2}, P_astro={:.1}%",
+                far_result.far_per_year,
+                far_result.significance_sigma,
+                100.0 * pastro
+            );
+            if has_grb && has_optical_detectable {
+                info!("      THREE-WAY CORRELATION (GW+GRB+Optical)");
             }
         }
 
