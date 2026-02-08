@@ -1,5 +1,6 @@
 pub mod afterglow;
 pub mod background_grbs;
+pub mod background_optical;
 pub mod ejecta_properties;
 pub mod gcn_circular;
 pub mod grb_localization;
@@ -14,6 +15,10 @@ pub use afterglow::{simulate_afterglow, AfterglowConfig, AfterglowProperties, Je
 pub use background_grbs::{
     calculate_chance_coincidences, expected_chance_coincidences, generate_background_grbs,
     BackgroundGrb, BackgroundGrbConfig, ChanceCoincidenceStats, GrbSatellite,
+};
+pub use background_optical::{
+    calculate_optical_coincidences, generate_background_optical, BackgroundOpticalConfig,
+    BackgroundOpticalTransient, OpticalCoincidenceStats, OpticalSurvey, OpticalTransientType,
 };
 pub use ejecta_properties::{
     compute_ejecta_properties, BinaryParams, BinaryType, EjectaProperties,
