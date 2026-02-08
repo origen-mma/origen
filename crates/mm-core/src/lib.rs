@@ -1,7 +1,6 @@
 pub mod error;
 pub mod events;
 pub mod explosion_time;
-pub mod fit_quality;
 pub mod io;
 pub mod lightcurve;
 pub mod lightcurve_fitting;
@@ -20,7 +19,6 @@ pub mod time;
 pub use error::{CoreError, ParseError};
 pub use events::{Event, EventType, GWEvent, GammaRayEvent, NeutrinoEvent, XRayEvent};
 pub use explosion_time::estimate_explosion_time;
-pub use fit_quality::{FitQuality, FitQualityAssessment};
 pub use io::{load_lightcurve_csv, load_lightcurves_dir};
 pub use lightcurve::{LightCurve, Photometry};
 pub use lightcurve_fitting::{

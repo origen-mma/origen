@@ -164,7 +164,7 @@ async fn main() -> Result<()> {
     let far_config = JointFarConfig {
         gw_observing_time: 1.0,
         grb_rate_per_year: 300.0,
-        optical_rate_per_sqdeg_per_year: 500.0,
+        optical_rate_per_sqdeg_per_year: 0.1, // Rare transients like kilonovae/afterglows
         optical_time_window_days: 14.0,
         grb_time_window_seconds: 10.0,
     };
@@ -361,6 +361,15 @@ async fn main() -> Result<()> {
             let far_result = calculate_joint_far(&far_assoc, &far_config);
             let pastro = 1.0 / (1.0 + far_result.far_per_year * far_config.gw_observing_time);
 
+            // Cap infinity/NaN values for JSON serialization
+            let significance_sigma = if far_result.significance_sigma.is_infinite()
+                || far_result.significance_sigma.is_nan()
+            {
+                1000.0 // Use a very large but finite value
+            } else {
+                far_result.significance_sigma
+            };
+
             let correlation = MultiMessengerCorrelation {
                 simulation_id: n_events,
                 gw_snr,
@@ -368,7 +377,7 @@ async fn main() -> Result<()> {
                 has_optical: has_optical_detectable,
                 optical_magnitude,
                 joint_far_per_year: far_result.far_per_year,
-                significance_sigma: far_result.significance_sigma,
+                significance_sigma,
                 pastro,
             };
 
