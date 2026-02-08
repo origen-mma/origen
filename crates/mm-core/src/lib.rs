@@ -6,6 +6,7 @@ pub mod lightcurve;
 pub mod lightcurve_fitting;
 pub mod optical;
 pub mod position;
+pub mod pso_fitter;
 pub mod redis_compat;
 pub mod skymap;
 pub mod skymap_parser;

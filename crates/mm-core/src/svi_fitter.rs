@@ -1,293 +1,270 @@
-//! Stochastic Variational Inference (SVI) for light curve fitting
+//! Stochastic Variational Inference for light curve fitting
 //!
-//! This module implements SVI-based Bayesian inference for transient light curves.
-//! It uses a mean-field Gaussian variational family and optimizes the ELBO using
-//! stochastic gradient ascent with Adam optimizer.
+//! Implements mean-field Gaussian variational inference with the
+//! reparameterization trick and analytical gradients for efficient
+//! Bayesian parameter estimation.
 
-use crate::svi_models::{eval_model_batch, SviModel};
+use crate::pso_fitter::BandFitData;
+use crate::svi_models::{eval_model_batch, eval_model_grad_batch, SviModel};
 use rand::Rng;
-use rand_distr::{Distribution, Normal};
+
+/// Manual Adam optimizer (avoids built-in Adam issues)
+struct ManualAdam {
+    m: Vec<f64>,
+    v: Vec<f64>,
+    lr: f64,
+    beta1: f64,
+    beta2: f64,
+    eps: f64,
+    t: usize,
+}
+
+impl ManualAdam {
+    fn new(n_params: usize, lr: f64) -> Self {
+        Self {
+            m: vec![0.0; n_params],
+            v: vec![0.0; n_params],
+            lr,
+            beta1: 0.9,
+            beta2: 0.999,
+            eps: 1e-8,
+            t: 0,
+        }
+    }
+
+    fn step(&mut self, params: &mut [f64], grads: &[f64]) {
+        self.t += 1;
+        let bc1 = 1.0 - self.beta1.powi(self.t as i32);
+        let bc2 = 1.0 - self.beta2.powi(self.t as i32);
+        for i in 0..params.len() {
+            let g = grads[i];
+            if !g.is_finite() {
+                continue;
+            }
+            self.m[i] = self.beta1 * self.m[i] + (1.0 - self.beta1) * g;
+            self.v[i] = self.beta2 * self.v[i] + (1.0 - self.beta2) * g * g;
+            let m_hat = self.m[i] / bc1;
+            let v_hat = self.v[i] / bc2;
+            params[i] -= self.lr * m_hat / (v_hat.sqrt() + self.eps);
+        }
+    }
+}
 
 /// SVI fit result
-#[derive(Debug, Clone)]
 pub struct SviFitResult {
-    /// Variational means (posterior parameters)
-    pub mu: Vec<f64>,
-    /// Log of variational standard deviations
-    pub log_sigma: Vec<f64>,
-    /// Evidence Lower Bound (ELBO) - higher is better
-    pub elbo: f64,
-    /// Number of iterations completed
-    pub n_iter: usize,
+    pub model: SviModel,
+    pub mu: Vec<f64>,        // Variational means (unconstrained space)
+    pub log_sigma: Vec<f64>, // Log of variational stds
+    pub elbo: f64,           // Final ELBO estimate
 }
 
-impl SviFitResult {
-    /// Get parameter uncertainties (1-sigma)
-    pub fn get_uncertainties(&self) -> Vec<f64> {
-        self.log_sigma.iter().map(|ls| ls.exp()).collect()
-    }
-
-    /// Sample from posterior
-    pub fn sample<R: Rng>(&self, rng: &mut R) -> Vec<f64> {
-        self.mu
-            .iter()
-            .zip(self.log_sigma.iter())
-            .map(|(&mu, &log_sigma)| {
-                let sigma = log_sigma.exp();
-                let normal = Normal::new(mu, sigma).unwrap();
-                normal.sample(rng)
-            })
-            .collect()
-    }
-}
-
-/// Light curve data for fitting
-#[derive(Debug, Clone)]
-pub struct LightCurveData {
-    pub times: Vec<f64>,
-    pub flux: Vec<f64>,
-    pub flux_err: Vec<f64>,
-    pub peak_flux_obs: f64,
-}
-
-impl LightCurveData {
-    /// Create from raw measurements
-    pub fn from_measurements(times: Vec<f64>, flux: Vec<f64>, flux_err: Vec<f64>) -> Self {
-        let peak_flux_obs = flux
-            .iter()
-            .cloned()
-            .fold(f64::NEG_INFINITY, f64::max)
-            .max(1.0);
-
-        Self {
-            times,
-            flux,
-            flux_err,
-            peak_flux_obs,
+/// Gaussian priors for each model's parameters
+fn prior_params(model: SviModel) -> Vec<(f64, f64)> {
+    // Returns (center, width) for each parameter
+    match model {
+        SviModel::Bazin => {
+            // log_a, b, t0, log_tau_rise, log_tau_fall, log_sigma_extra
+            vec![
+                (0.0, 2.0),
+                (0.0, 0.5),
+                (0.0, 50.0),
+                (1.0, 2.0),
+                (3.0, 2.0),
+                (-2.0, 2.0),
+            ]
+        }
+        SviModel::Villar => {
+            // log_a, beta, log_gamma, t0, log_tau_rise, log_tau_fall, log_sigma_extra
+            vec![
+                (0.0, 2.0),
+                (0.0, 0.05),
+                (2.0, 2.0),
+                (0.0, 50.0),
+                (1.0, 2.0),
+                (3.5, 2.0),
+                (-2.0, 2.0),
+            ]
+        }
+        SviModel::PowerLaw => {
+            // log_a, log_alpha, log_beta, t0, log_sigma_extra
+            vec![
+                (0.0, 2.0),
+                (0.0, 1.0),
+                (0.4, 1.0),
+                (0.0, 50.0),
+                (-2.0, 2.0),
+            ]
+        }
+        SviModel::MetzgerKN => {
+            // log10_mej, log10_vej, log10_kappa_r, t0, log_sigma_extra
+            vec![
+                (-2.5, 1.0),
+                (-1.0, 0.5),
+                (1.0, 1.0),
+                (0.0, 50.0),
+                (-2.0, 2.0),
+            ]
         }
     }
-
-    /// Get normalized flux
-    pub fn normalized_flux(&self) -> Vec<f64> {
-        self.flux.iter().map(|f| f / self.peak_flux_obs).collect()
-    }
-
-    /// Get normalized flux errors
-    pub fn normalized_flux_err(&self) -> Vec<f64> {
-        self.flux_err
-            .iter()
-            .map(|e| e / self.peak_flux_obs)
-            .collect()
-    }
 }
 
-/// Compute ELBO (Evidence Lower Bound)
-///
-/// ELBO = E_q[log p(y|θ)] - KL[q(θ) || p(θ)]
-///
-/// For Gaussian prior p(θ) ~ N(μ_prior, σ_prior²) and
-/// Gaussian variational q(θ) ~ N(μ, σ²):
-///
-/// KL[q||p] = log(σ_prior/σ) + (σ² + (μ - μ_prior)²)/(2σ_prior²) - 0.5
-fn compute_elbo(
-    model: SviModel,
-    data: &LightCurveData,
-    mu: &[f64],
-    log_sigma: &[f64],
-    n_samples: usize,
-    bounds: &[(f64, f64)],
-) -> f64 {
-    let n_params = mu.len();
-    let norm_flux = data.normalized_flux();
-    let norm_err = data.normalized_flux_err();
-
-    let mut rng = rand::thread_rng();
-    let mut log_likelihood_sum = 0.0;
-
-    // Monte Carlo estimate of E_q[log p(y|θ)]
-    for _ in 0..n_samples {
-        // Sample from q(θ)
-        let theta: Vec<f64> = mu
-            .iter()
-            .zip(log_sigma.iter())
-            .map(|(&m, &ls)| {
-                let sigma = ls.exp();
-                let normal = Normal::new(m, sigma).unwrap();
-                normal.sample(&mut rng)
-            })
-            .collect();
-
-        // Evaluate model
-        let pred = eval_model_batch(model, &theta, &data.times);
-
-        // Compute log likelihood: log p(y|θ) = -0.5 * sum((y - pred)² / σ²)
-        let mut ll = 0.0;
-        for i in 0..data.times.len() {
-            let residual = norm_flux[i] - pred[i];
-            let variance = norm_err[i] * norm_err[i];
-            ll -= 0.5 * residual * residual / variance;
-        }
-        log_likelihood_sum += ll;
-    }
-    let log_likelihood = log_likelihood_sum / n_samples as f64;
-
-    // Compute KL divergence KL[q(θ) || p(θ)]
-    // Using broad uniform prior → KL ≈ entropy of q
-    let mut kl = 0.0;
-    for i in 0..n_params {
-        let sigma = log_sigma[i].exp();
-
-        // Prior parameters (center of bounds, wide variance)
-        let (min, max) = bounds[i];
-        let mu_prior = (min + max) / 2.0;
-        let sigma_prior = (max - min) / 4.0; // ~95% within bounds
-
-        // KL[N(μ,σ²) || N(μ_p,σ_p²)]
-        let kl_i = (sigma_prior / sigma).ln()
-            + (sigma * sigma + (mu[i] - mu_prior).powi(2)) / (2.0 * sigma_prior * sigma_prior)
-            - 0.5;
-        kl += kl_i;
-    }
-
-    log_likelihood - kl
-}
-
-/// Perform SVI fitting using Adam optimizer
-///
-/// # Arguments
-/// * `model` - Light curve model to fit
-/// * `data` - Observed light curve data
-/// * `n_iter` - Number of optimization iterations
-/// * `n_mc_samples` - Monte Carlo samples for ELBO estimation
-/// * `learning_rate` - Initial Adam learning rate
-/// * `init_params` - Optional initialization (e.g., from PSO)
+/// Run SVI optimization
 pub fn svi_fit(
     model: SviModel,
-    data: &LightCurveData,
-    n_iter: usize,
-    n_mc_samples: usize,
-    learning_rate: f64,
-    init_params: Option<&[f64]>,
+    data: &BandFitData,
+    n_steps: usize,
+    n_samples: usize,
+    lr: f64,
+    pso_init: Option<&[f64]>,
 ) -> SviFitResult {
-    let bounds = model.param_bounds();
     let n_params = model.n_params();
+    let n_variational = 2 * n_params; // mu + log_sigma for each param
 
     // Initialize variational parameters
-    let mut mu = if let Some(init) = init_params {
-        init.to_vec()
+    let mut var_params = vec![0.0; n_variational];
+    if let Some(pso_params) = pso_init {
+        // Use PSO initialization for mu
+        for i in 0..n_params {
+            var_params[i] = pso_params[i]; // mu
+            var_params[n_params + i] = -1.0; // log_sigma (sigma ~ 0.37)
+        }
     } else {
-        // Random initialization within bounds
-        let mut rng = rand::thread_rng();
-        bounds
-            .iter()
-            .map(|(min, max)| rng.gen_range(*min..*max))
-            .collect()
-    };
+        // Fallback initialization
+        for i in 0..n_params {
+            var_params[i] = 0.0; // mu
+            var_params[n_params + i] = -1.0; // log_sigma
+        }
+    }
 
-    let mut log_sigma = vec![-1.0; n_params]; // σ ≈ 0.37
+    let mut adam = ManualAdam::new(n_variational, lr);
 
-    // Adam optimizer state
-    let mut m_mu = vec![0.0; n_params];
-    let mut v_mu = vec![0.0; n_params];
-    let mut m_log_sigma = vec![0.0; n_params];
-    let mut v_log_sigma = vec![0.0; n_params];
+    // Precompute observational variance
+    let obs_var: Vec<f64> = data.flux_err.iter().map(|e| e * e + 1e-10).collect();
 
-    let beta1: f64 = 0.9;
-    let beta2: f64 = 0.999;
-    let epsilon: f64 = 1e-8;
+    // Index of log_sigma_extra in the parameter vector
+    let se_idx = model.sigma_extra_idx();
 
-    let mut best_elbo = f64::NEG_INFINITY;
-    let mut best_mu = mu.clone();
-    let mut best_log_sigma = log_sigma.clone();
+    let mut final_elbo = f64::NEG_INFINITY;
+    let mut rng = rand::thread_rng();
 
-    for iter in 1..=n_iter {
-        // Compute ELBO and gradients (via finite differences)
-        let elbo = compute_elbo(model, data, &mu, &log_sigma, n_mc_samples, &bounds);
+    for _step in 0..n_steps {
+        let mu = &var_params[..n_params];
+        let log_sigma = &var_params[n_params..];
+        let sigma: Vec<f64> = log_sigma.iter().map(|ls| ls.exp()).collect();
 
-        // Simple finite difference gradients
-        let eps = 1e-5;
+        // Accumulators for gradients
         let mut grad_mu = vec![0.0; n_params];
         let mut grad_log_sigma = vec![0.0; n_params];
+        let mut elbo_sum = 0.0;
 
-        for i in 0..n_params {
-            // Gradient w.r.t. mu[i]
-            let mut mu_plus = mu.clone();
-            mu_plus[i] += eps;
-            let elbo_plus = compute_elbo(model, data, &mu_plus, &log_sigma, n_mc_samples, &bounds);
-            grad_mu[i] = (elbo_plus - elbo) / eps;
+        for _ in 0..n_samples {
+            // Draw epsilon ~ N(0, 1) and compute theta via reparameterization
+            let mut eps = vec![0.0; n_params];
+            let mut theta = vec![0.0; n_params];
+            for j in 0..n_params {
+                // Box-Muller transform
+                let u1: f64 = rng.gen::<f64>().max(1e-10);
+                let u2: f64 = rng.gen();
+                eps[j] = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+                theta[j] = mu[j] + sigma[j] * eps[j];
+            }
 
-            // Gradient w.r.t. log_sigma[i]
-            let mut log_sigma_plus = log_sigma.clone();
-            log_sigma_plus[i] += eps;
-            let elbo_plus = compute_elbo(model, data, &mu, &log_sigma_plus, n_mc_samples, &bounds);
-            grad_log_sigma[i] = (elbo_plus - elbo) / eps;
+            // sigma_extra = exp(log_sigma_extra)
+            let sigma_extra = theta[se_idx].exp();
+            let sigma_extra_sq = sigma_extra * sigma_extra;
+
+            // Compute log-likelihood and its gradient w.r.t. theta
+            let preds = eval_model_batch(model, &theta, &data.times);
+            let grads = eval_model_grad_batch(model, &theta, &data.times);
+
+            let mut log_lik = 0.0;
+            let mut dll_dtheta = vec![0.0; n_params];
+
+            for i in 0..data.times.len() {
+                let pred = preds[i];
+                if !pred.is_finite() {
+                    continue;
+                }
+                let residual = data.flux[i] - pred;
+                let total_var = obs_var[i] + sigma_extra_sq;
+                let inv_total = 1.0 / total_var;
+                let r2 = residual * residual;
+                log_lik += -0.5 * (r2 * inv_total + (2.0 * std::f64::consts::PI * total_var).ln());
+
+                // Gradient w.r.t. flux model parameters
+                for j in 0..n_params {
+                    if j != se_idx && grads[i][j].is_finite() {
+                        dll_dtheta[j] += residual * inv_total * grads[i][j];
+                    }
+                }
+
+                // Gradient w.r.t. log_sigma_extra
+                dll_dtheta[se_idx] += (r2 * inv_total * inv_total - inv_total) * sigma_extra_sq;
+            }
+
+            // Log-prior: Gaussian priors on parameters
+            let priors = prior_params(model);
+            let mut log_prior = 0.0;
+            let mut dlp_dtheta = vec![0.0; n_params];
+            for j in 0..n_params {
+                let (center, width) = priors[j];
+                let var = width * width;
+                log_prior += -0.5 * (theta[j] - center).powi(2) / var;
+                dlp_dtheta[j] = -(theta[j] - center) / var;
+            }
+
+            elbo_sum += log_lik + log_prior;
+
+            // Reparameterization trick gradients:
+            // d(ELBO)/d(mu_j) = d(log_lik+log_prior)/d(theta_j)
+            // d(ELBO)/d(log_sigma_j) = d(log_lik+log_prior)/d(theta_j) * sigma_j * eps_j
+            for j in 0..n_params {
+                let df_dtheta = dll_dtheta[j] + dlp_dtheta[j];
+                grad_mu[j] += df_dtheta;
+                grad_log_sigma[j] += df_dtheta * sigma[j] * eps[j];
+            }
         }
 
-        // Adam updates
-        let lr = learning_rate * (1.0 - beta2.powi(iter as i32)).sqrt()
-            / (1.0 - beta1.powi(iter as i32));
+        // Average over samples
+        let ns = n_samples as f64;
+        for j in 0..n_params {
+            grad_mu[j] /= ns;
+            grad_log_sigma[j] /= ns;
+        }
+        elbo_sum /= ns;
 
-        for i in 0..n_params {
-            // Update mu
-            m_mu[i] = beta1 * m_mu[i] + (1.0 - beta1) * grad_mu[i];
-            v_mu[i] = beta2 * v_mu[i] + (1.0 - beta2) * grad_mu[i] * grad_mu[i];
-            let m_hat = m_mu[i] / (1.0 - beta1.powi(iter as i32));
-            let v_hat = v_mu[i] / (1.0 - beta2.powi(iter as i32));
-            mu[i] += lr * m_hat / (v_hat.sqrt() + epsilon);
+        // Add entropy: H[q] = sum(log_sigma_j) + 0.5 * P * ln(2*pi*e)
+        let entropy: f64 = log_sigma.iter().sum::<f64>()
+            + 0.5 * n_params as f64 * (2.0 * std::f64::consts::PI * std::f64::consts::E).ln();
+        final_elbo = elbo_sum + entropy;
 
-            // Clamp to bounds
-            mu[i] = mu[i].clamp(bounds[i].0, bounds[i].1);
-
-            // Update log_sigma
-            m_log_sigma[i] = beta1 * m_log_sigma[i] + (1.0 - beta1) * grad_log_sigma[i];
-            v_log_sigma[i] =
-                beta2 * v_log_sigma[i] + (1.0 - beta2) * grad_log_sigma[i] * grad_log_sigma[i];
-            let m_hat = m_log_sigma[i] / (1.0 - beta1.powi(iter as i32));
-            let v_hat = v_log_sigma[i] / (1.0 - beta2.powi(iter as i32));
-            log_sigma[i] += lr * m_hat / (v_hat.sqrt() + epsilon);
-
-            // Clamp log_sigma to reasonable range
-            log_sigma[i] = log_sigma[i].clamp(-5.0, 2.0); // σ ∈ [0.007, 7.4]
+        // d(entropy)/d(log_sigma_j) = 1
+        for j in 0..n_params {
+            grad_log_sigma[j] += 1.0;
         }
 
-        // Track best
-        if elbo > best_elbo {
-            best_elbo = elbo;
-            best_mu = mu.clone();
-            best_log_sigma = log_sigma.clone();
+        // Build the full gradient of -ELBO (we minimize -ELBO)
+        let mut neg_elbo_grad = Vec::with_capacity(n_variational);
+        for j in 0..n_params {
+            neg_elbo_grad.push(-grad_mu[j]);
+        }
+        for j in 0..n_params {
+            neg_elbo_grad.push(-grad_log_sigma[j]);
+        }
+
+        // Adam step
+        adam.step(&mut var_params, &neg_elbo_grad);
+
+        // Clamp log_sigma to prevent collapse or explosion
+        for i in 0..n_params {
+            var_params[n_params + i] = var_params[n_params + i].clamp(-6.0, 2.0);
         }
     }
 
     SviFitResult {
-        mu: best_mu,
-        log_sigma: best_log_sigma,
-        elbo: best_elbo,
-        n_iter,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_svi_fitting_simple() {
-        // Create synthetic Bazin light curve
-        let params_true = vec![1.0, 1.0, 5.0, 20.0, 2.0];
-        let times: Vec<f64> = (0..20).map(|i| i as f64).collect();
-        let flux_true = eval_model_batch(SviModel::Bazin, &params_true, &times);
-
-        // Add small noise
-        let flux: Vec<f64> = flux_true.iter().map(|f| f + 0.01).collect();
-        let flux_err = vec![0.05; times.len()];
-
-        let data = LightCurveData::from_measurements(times, flux, flux_err);
-
-        // Fit with SVI (small number of iterations for test)
-        let result = svi_fit(SviModel::Bazin, &data, 10, 2, 0.01, Some(&params_true));
-
-        // Should converge near true parameters
-        assert!(result.elbo.is_finite());
-        assert!(result.mu.len() == 5);
+        model,
+        mu: var_params[..n_params].to_vec(),
+        log_sigma: var_params[n_params..].to_vec(),
+        elbo: final_elbo,
     }
 }

@@ -21,6 +21,8 @@ healpix = { workspace = true }
 fitsio = { workspace = true }
 moc = { workspace = true }
 cdshealpix = { workspace = true }
+argmin = { workspace = true }
+argmin-math = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.8"

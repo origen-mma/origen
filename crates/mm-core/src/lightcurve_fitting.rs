@@ -26,7 +26,8 @@
 
 use crate::error::CoreError;
 use crate::lightcurve::LightCurve;
-use crate::svi_fitter::{svi_fit, LightCurveData};
+use crate::pso_fitter::{pso_model_select, BandFitData};
+use crate::svi_fitter::svi_fit;
 use crate::svi_models::SviModel;
 use tracing::{debug, info};
 
@@ -125,7 +126,7 @@ pub fn fit_lightcurve(
         FitModel::MetzgerKN => SviModel::MetzgerKN,
     };
 
-    // Prepare data for SVI fitting
+    // Prepare data for fitting
     // Convert MJD to days relative to first detection
     let first_mjd = lightcurve
         .measurements
@@ -141,8 +142,17 @@ pub fn fit_lightcurve(
         .collect();
 
     let flux: Vec<f64> = lightcurve.measurements.iter().map(|m| m.flux).collect();
-
     let flux_err: Vec<f64> = lightcurve.measurements.iter().map(|m| m.flux_err).collect();
+
+    // Normalize flux by peak for better numerical stability
+    let peak_flux = flux
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max)
+        .max(1.0);
+
+    let flux_norm: Vec<f64> = flux.iter().map(|f| f / peak_flux).collect();
+    let flux_err_norm: Vec<f64> = flux_err.iter().map(|e| e / peak_flux).collect();
 
     debug!(
         "Fitting {} with {} model: {} measurements",
@@ -151,25 +161,41 @@ pub fn fit_lightcurve(
         times.len()
     );
 
-    // Create light curve data
-    let data = LightCurveData::from_measurements(times, flux, flux_err);
+    // Create band fit data
+    let data = BandFitData {
+        times: times.clone(),
+        flux: flux_norm,
+        flux_err: flux_err_norm,
+        peak_flux_obs: peak_flux,
+    };
 
-    // Run SVI fitting
-    // Use moderate iterations for real-time performance
-    let n_iter = 200;
+    // Step 1: PSO model selection
+    info!("Running PSO initialization...");
+    let (pso_model, pso_params, pso_chi2) = pso_model_select(&data);
+
+    debug!(
+        "PSO selected model: {}, chi2: {:.4}",
+        pso_model.name(),
+        pso_chi2
+    );
+
+    // Step 2: SVI refinement with PSO initialization
+    info!("Running SVI refinement...");
+    let n_iter = 1000; // CRITICAL: Use 1000 iterations for proper convergence
     let n_mc_samples = 4;
     let learning_rate = 0.01;
 
-    let svi_result = svi_fit(svi_model, &data, n_iter, n_mc_samples, learning_rate, None);
+    let svi_result = svi_fit(
+        pso_model,
+        &data,
+        n_iter,
+        n_mc_samples,
+        learning_rate,
+        Some(&pso_params),
+    );
 
     // Extract t0 from parameters
-    let t0_idx = match svi_model {
-        SviModel::Bazin => 2,
-        SviModel::Villar => 3,
-        SviModel::PowerLaw => 3,
-        SviModel::MetzgerKN => 3,
-    };
-
+    let t0_idx = svi_result.model.t0_idx();
     let t0_relative = svi_result.mu[t0_idx];
     let t0_mjd = first_mjd + t0_relative;
     let t0_err = svi_result.log_sigma[t0_idx].exp();
@@ -185,12 +211,21 @@ pub fn fit_lightcurve(
         && t0_err < 10.0 // Reasonable uncertainty
         && t0_mjd > 0.0; // Valid MJD
 
-    let parameter_errors = svi_result.get_uncertainties();
+    // Extract parameter uncertainties
+    let parameter_errors: Vec<f64> = svi_result.log_sigma.iter().map(|ls| ls.exp()).collect();
+
+    // Convert FitModel from SviModel
+    let result_model = match svi_result.model {
+        SviModel::Bazin => FitModel::Bazin,
+        SviModel::Villar => FitModel::Villar,
+        SviModel::PowerLaw => FitModel::PowerLaw,
+        SviModel::MetzgerKN => FitModel::MetzgerKN,
+    };
 
     Ok(LightCurveFitResult {
         t0: t0_mjd,
         t0_err,
-        model,
+        model: result_model,
         elbo: svi_result.elbo,
         parameters: svi_result.mu,
         parameter_errors,
