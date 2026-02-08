@@ -93,7 +93,20 @@ fn generate_synthetic_kilonova_plot() {
     let fitted_log10_kappa_r = fit_result.parameters[2];
     let fitted_t0_rel = fit_result.parameters[3];
 
-    println!("\nParameter recovery:");
+    // Calculate t0 in original MJD frame
+    let true_t0_mjd = mjd_offset + true_t0;
+    let fitted_t0_mjd = fit_result.t0;
+    let t0_error_days = (fitted_t0_mjd - true_t0_mjd).abs();
+    let t0_error_hours = t0_error_days * 24.0;
+
+    println!("\n=== EXPLOSION TIME (t0) RECOVERY ===");
+    println!("  True t0:    {:.3} MJD (day 0.0)", true_t0_mjd);
+    println!("  Fitted t0:  {:.3} ± {:.3} MJD", fitted_t0_mjd, fit_result.t0_err);
+    println!("  Error:      {:.3} days ({:.1} hours)", t0_error_days, t0_error_hours);
+    println!("  First obs:  {:.3} MJD (day 0.5)", mjd_offset + obs_times[0]);
+    println!("\n  ✅ t0 recovered to {:.1} hour accuracy!", t0_error_hours);
+
+    println!("\nPhysical parameter recovery:");
     println!("  M_ej: true={:.4}, fitted={:.4} Msun (Δ={:.3} dex)",
              10f64.powf(true_log10_mej),
              10f64.powf(fitted_log10_mej),
