@@ -22,8 +22,7 @@ fn log_normal_cdf(x: f64) -> f64 {
     let t = 1.0 / (1.0 + 0.3275911 * z.abs());
     let poly = t
         * (0.254829592
-            + t * (-0.284496736
-                + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+            + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
     let erfc_z = poly * (-z * z).exp();
     let phi = if z >= 0.0 {
         0.5 * erfc_z
@@ -55,6 +54,8 @@ struct PsoCost {
     model: SviModel,
     is_upper: Vec<bool>,
     upper_flux: Vec<f64>,
+    enable_safeguards: bool,
+    scale_clamp_range: (f64, f64),
 }
 
 impl CostFunction for PsoCost {
@@ -65,7 +66,55 @@ impl CostFunction for PsoCost {
         let se_idx = self.model.sigma_extra_idx();
         let sigma_extra = p[se_idx].exp();
         let sigma_extra_sq = sigma_extra * sigma_extra;
-        let preds = eval_model_batch(self.model, p, &self.times);
+        let mut preds = eval_model_batch(self.model, p, &self.times);
+
+        // CRITICAL FIX: Renormalize MetzgerKN predictions to match observed peak
+        // The Metzger model returns values normalized by the model's internal peak,
+        // but observations are normalized by max(observed flux). If the true peak
+        // occurs before first detection, this creates a systematic bias.
+        if self.model == SviModel::MetzgerKN {
+            // Find max prediction at DETECTION times only (not upper limits)
+            let max_pred = preds
+                .iter()
+                .zip(self.is_upper.iter())
+                .filter(|(_, &is_up)| !is_up)
+                .map(|(p, _)| *p)
+                .fold(f64::NEG_INFINITY, f64::max);
+
+            // Renormalize so max(predictions at detections) = 1.0
+            if max_pred > 1e-10 && max_pred.is_finite() {
+                let scale = 1.0 / max_pred;
+
+                if self.enable_safeguards {
+                    // NUMERICAL SAFEGUARDS: Clamp scale factor to prevent instability
+                    let scale_clamped =
+                        scale.clamp(self.scale_clamp_range.0, self.scale_clamp_range.1);
+
+                    if (scale - scale_clamped).abs() > 0.01 {
+                        // Scale factor was extreme, this might be a bad solution
+                        // Return high cost to guide PSO away from this region
+                        return Ok(1e10);
+                    }
+
+                    for pred in preds.iter_mut() {
+                        *pred *= scale_clamped;
+                        // Safety check after scaling
+                        if !pred.is_finite() {
+                            return Ok(1e10);
+                        }
+                    }
+                } else {
+                    // No safeguards - apply scale factor directly
+                    for pred in preds.iter_mut() {
+                        *pred *= scale;
+                        if !pred.is_finite() {
+                            return Ok(1e99); // Still check for NaN/Inf
+                        }
+                    }
+                }
+            }
+        }
+
         let n = self.times.len().max(1) as f64;
         let mut neg_ll = 0.0;
         for i in 0..self.times.len() {
@@ -78,7 +127,7 @@ impl CostFunction for PsoCost {
             if self.is_upper[i] {
                 // Upper limit: log Φ((f_upper - f_pred) / σ_total)
                 let z = (self.upper_flux[i] - pred) / total_var.sqrt();
-                neg_ll -= log_normal_cdf(z);  // Negative because we want to minimize
+                neg_ll -= log_normal_cdf(z); // Negative because we want to minimize
             } else {
                 // Detection: standard Gaussian likelihood
                 let diff = pred - self.flux[i];
@@ -117,11 +166,13 @@ pub fn pso_model_select(data: &BandFitData) -> (SviModel, Vec<f64>, f64) {
             model,
             is_upper: data.is_upper.clone(),
             upper_flux: data.upper_flux.clone(),
+            enable_safeguards: true, // Default to conservative settings
+            scale_clamp_range: (0.1, 10.0),
         };
 
         let solver = ParticleSwarm::new((lower, upper), 40);
         let res = Executor::new(problem, solver)
-            .configure(|state| state.max_iters(200))  // Increased from 50 for better t0 accuracy
+            .configure(|state| state.max_iters(200)) // Increased from 50 for better t0 accuracy
             .run();
 
         match res {
@@ -212,7 +263,15 @@ pub fn init_variational_means(model: SviModel, data: &BandFitData) -> Vec<f64> {
             let log_tau_rise = 2.0_f64.ln();
             let log_tau_fall = 30.0_f64.ln();
             let log_sigma_extra = -3.0;
-            vec![log_a, beta, log_gamma, t0, log_tau_rise, log_tau_fall, log_sigma_extra]
+            vec![
+                log_a,
+                beta,
+                log_gamma,
+                t0,
+                log_tau_rise,
+                log_tau_fall,
+                log_sigma_extra,
+            ]
         }
         SviModel::PowerLaw => {
             // log_a, log_alpha, log_beta, t0, log_sigma_extra

@@ -36,14 +36,25 @@ fn generate_all_plots() {
     // Plot examples with different models (all are likely SNe, just demonstrating models)
     let examples = vec![
         ("ZTF25aaaalin.csv", FitModel::Bazin, "Bazin model example"),
-        ("ZTF25aaaawig.csv", FitModel::PowerLaw, "PowerLaw model example"),
-        ("ZTF25aaabnwi.csv", FitModel::MetzgerKN, "MetzgerKN model example"),
+        (
+            "ZTF25aaaawig.csv",
+            FitModel::PowerLaw,
+            "PowerLaw model example",
+        ),
+        (
+            "ZTF25aaabnwi.csv",
+            FitModel::MetzgerKN,
+            "MetzgerKN model example",
+        ),
     ];
 
     for (filename, model, description) in examples {
         let lc_path = fixtures_dir().join(filename);
         if let Ok(lightcurve) = load_lightcurve_csv(&lc_path) {
-            println!("\nFitting {} with {:?} model...", lightcurve.object_id, model);
+            println!(
+                "\nFitting {} with {:?} model...",
+                lightcurve.object_id, model
+            );
 
             match fit_lightcurve(&lightcurve, model) {
                 Ok(fit) => {
@@ -60,7 +71,8 @@ fn generate_all_plots() {
                         description.replace(" ", "_")
                     ));
 
-                    if let Err(e) = plot_lightcurve_fit(&lightcurve, &fit, &output_path, description)
+                    if let Err(e) =
+                        plot_lightcurve_fit(&lightcurve, &fit, &output_path, description)
                     {
                         eprintln!("Failed to generate plot: {}", e);
                     } else {
@@ -200,9 +212,7 @@ fn plot_lightcurve_fit(
             .iter()
             .zip(norm_flux.iter())
             .zip(norm_err.iter())
-            .map(|((&t, &f), &e)| {
-                ErrorBar::new_vertical(t, f - e, f, f + e, BLUE.filled(), 5)
-            }),
+            .map(|((&t, &f), &e)| ErrorBar::new_vertical(t, f - e, f, f + e, BLUE.filled(), 5)),
     )?;
 
     // Plot data points
@@ -216,13 +226,13 @@ fn plot_lightcurve_fit(
     // Plot model fit
     chart
         .draw_series(LineSeries::new(
-            model_times.iter().zip(model_flux.iter()).map(|(&t, &f)| (t, f)),
+            model_times
+                .iter()
+                .zip(model_flux.iter())
+                .map(|(&t, &f)| (t, f)),
             &RED,
         ))?
-        .label(format!(
-            "SVI Fit (ELBO: {:.1})",
-            fit.elbo
-        ))
+        .label(format!("SVI Fit (ELBO: {:.1})", fit.elbo))
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
 
     // Mark t0 with vertical line

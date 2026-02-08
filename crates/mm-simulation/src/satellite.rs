@@ -32,7 +32,7 @@ impl SatelliteConfig {
     pub fn fermi() -> Self {
         Self {
             altitude: 565.0,
-            period: 96.0 * 60.0, // 96 minutes in seconds
+            period: 96.0 * 60.0,        // 96 minutes in seconds
             fov_solid_angle: Some(8.0), // ~2/3 of visible sky
             name: "Fermi".to_string(),
         }
@@ -186,8 +186,8 @@ fn angular_separation(pos1: &SkyPosition, pos2: &SkyPosition) -> f64 {
     let delta_dec = dec2 - dec1;
 
     // Haversine formula
-    let a = (delta_dec / 2.0).sin().powi(2)
-        + dec1.cos() * dec2.cos() * (delta_ra / 2.0).sin().powi(2);
+    let a =
+        (delta_dec / 2.0).sin().powi(2) + dec1.cos() * dec2.cos() * (delta_ra / 2.0).sin().powi(2);
 
     2.0 * a.sqrt().asin()
 }
@@ -231,7 +231,10 @@ mod tests {
         let config = SatelliteConfig::fermi();
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
 
-        let position = SkyPosition { ra: 180.0, dec: 0.0 };
+        let position = SkyPosition {
+            ra: 180.0,
+            dec: 0.0,
+        };
 
         // Test 10,000 random orbital phases
         let n_trials = 10_000;
@@ -254,12 +257,24 @@ mod tests {
         let config = SatelliteConfig::swift();
 
         // Pointing at (RA=180°, Dec=0°)
-        let pointing = SkyPosition { ra: 180.0, dec: 0.0 };
+        let pointing = SkyPosition {
+            ra: 180.0,
+            dec: 0.0,
+        };
 
         // Test positions at various separations
-        let pos_same = SkyPosition { ra: 180.0, dec: 0.0 }; // Same position
-        let pos_near = SkyPosition { ra: 180.0, dec: 10.0 }; // 10° away
-        let pos_far = SkyPosition { ra: 180.0, dec: 60.0 }; // 60° away
+        let pos_same = SkyPosition {
+            ra: 180.0,
+            dec: 0.0,
+        }; // Same position
+        let pos_near = SkyPosition {
+            ra: 180.0,
+            dec: 10.0,
+        }; // 10° away
+        let pos_far = SkyPosition {
+            ra: 180.0,
+            dec: 60.0,
+        }; // 60° away
 
         assert!(is_in_fov(&pos_same, &pointing, &config)); // Should be in FOV
         assert!(is_in_fov(&pos_near, &pointing, &config)); // Should be in FOV
@@ -336,7 +351,10 @@ mod tests {
 
         // Test antipodal points
         let pos3 = SkyPosition { ra: 0.0, dec: 0.0 };
-        let pos4 = SkyPosition { ra: 180.0, dec: 0.0 };
+        let pos4 = SkyPosition {
+            ra: 180.0,
+            dec: 0.0,
+        };
 
         let sep2 = angular_separation(&pos3, &pos4);
         let sep2_deg = sep2.to_degrees();

@@ -55,19 +55,19 @@ impl GrbInstrument {
     pub fn typical_error(&self) -> f64 {
         match self {
             GrbInstrument::FermiGBM => 15.0, // ~10° statistical + ~5° systematic
-            GrbInstrument::SwiftBAT => 0.05,  // ~3 arcmin typical
+            GrbInstrument::SwiftBAT => 0.05, // ~3 arcmin typical
             GrbInstrument::EinsteinProbeWXT => 1.0, // ~1° typical
-            GrbInstrument::IPN => 0.017,      // ~1 arcmin with good triangulation
+            GrbInstrument::IPN => 0.017,     // ~1 arcmin with good triangulation
         }
     }
 
     /// Get error range (min, max) in degrees
     pub fn error_range(&self) -> (f64, f64) {
         match self {
-            GrbInstrument::FermiGBM => (10.0, 20.0),      // 10-20° depending on quality
-            GrbInstrument::SwiftBAT => (0.017, 0.067),    // 1-4 arcmin
+            GrbInstrument::FermiGBM => (10.0, 20.0), // 10-20° depending on quality
+            GrbInstrument::SwiftBAT => (0.017, 0.067), // 1-4 arcmin
             GrbInstrument::EinsteinProbeWXT => (0.5, 2.0), // 0.5-2°
-            GrbInstrument::IPN => (0.017, 0.1),           // 1-6 arcmin
+            GrbInstrument::IPN => (0.017, 0.1),      // 1-6 arcmin
         }
     }
 
@@ -209,13 +209,7 @@ impl GrbLocalization {
 
     /// Compute angular separation from true position (degrees)
     pub fn position_error(&self) -> f64 {
-        angular_separation(
-            self.true_ra,
-            self.true_dec,
-            self.obs_ra,
-            self.obs_dec,
-        )
-        .to_degrees()
+        angular_separation(self.true_ra, self.true_dec, self.obs_ra, self.obs_dec).to_degrees()
     }
 }
 
@@ -247,16 +241,15 @@ mod tests {
         let true_ra = 180.0;
         let true_dec = 30.0;
 
-        let localization = add_localization_error(
-            true_ra,
-            true_dec,
-            GrbInstrument::FermiGBM,
-            &mut rng,
-        );
+        let localization =
+            add_localization_error(true_ra, true_dec, GrbInstrument::FermiGBM, &mut rng);
 
         println!("Fermi GBM localization:");
         println!("  True: ({:.2}°, {:.2}°)", true_ra, true_dec);
-        println!("  Obs:  ({:.2}°, {:.2}°)", localization.obs_ra, localization.obs_dec);
+        println!(
+            "  Obs:  ({:.2}°, {:.2}°)",
+            localization.obs_ra, localization.obs_dec
+        );
         println!("  Error radius: {:.2}°", localization.error_radius);
         println!("  Position error: {:.2}°", localization.position_error());
 
@@ -276,22 +269,25 @@ mod tests {
         let true_ra = 45.0;
         let true_dec = -10.0;
 
-        let localization = add_localization_error(
-            true_ra,
-            true_dec,
-            GrbInstrument::SwiftBAT,
-            &mut rng,
-        );
+        let localization =
+            add_localization_error(true_ra, true_dec, GrbInstrument::SwiftBAT, &mut rng);
 
         println!("Swift BAT localization:");
         println!("  True: ({:.4}°, {:.4}°)", true_ra, true_dec);
-        println!("  Obs:  ({:.4}°, {:.4}°)", localization.obs_ra, localization.obs_dec);
-        println!("  Error radius: {:.4}° ({:.2} arcmin)",
-                 localization.error_radius,
-                 localization.error_radius * 60.0);
-        println!("  Position error: {:.4}° ({:.2} arcmin)",
-                 localization.position_error(),
-                 localization.position_error() * 60.0);
+        println!(
+            "  Obs:  ({:.4}°, {:.4}°)",
+            localization.obs_ra, localization.obs_dec
+        );
+        println!(
+            "  Error radius: {:.4}° ({:.2} arcmin)",
+            localization.error_radius,
+            localization.error_radius * 60.0
+        );
+        println!(
+            "  Position error: {:.4}° ({:.2} arcmin)",
+            localization.position_error(),
+            localization.position_error() * 60.0
+        );
 
         // Error radius should be in expected range (1-4 arcmin)
         assert!(localization.error_radius >= 0.017);
@@ -337,24 +333,18 @@ mod tests {
         // Generate 100 Fermi localizations
         let n_trials = 100;
         let localizations: Vec<_> = (0..n_trials)
-            .map(|_| {
-                add_localization_error(
-                    true_ra,
-                    true_dec,
-                    GrbInstrument::FermiGBM,
-                    &mut rng,
-                )
-            })
+            .map(|_| add_localization_error(true_ra, true_dec, GrbInstrument::FermiGBM, &mut rng))
             .collect();
 
         // Compute statistics
-        let mean_error = localizations.iter()
+        let mean_error = localizations
+            .iter()
             .map(|l| l.position_error())
-            .sum::<f64>() / n_trials as f64;
+            .sum::<f64>()
+            / n_trials as f64;
 
-        let mean_radius = localizations.iter()
-            .map(|l| l.error_radius)
-            .sum::<f64>() / n_trials as f64;
+        let mean_radius =
+            localizations.iter().map(|l| l.error_radius).sum::<f64>() / n_trials as f64;
 
         println!("Fermi localization statistics ({} trials):", n_trials);
         println!("  Mean error radius: {:.2}°", mean_radius);

@@ -44,6 +44,91 @@ pub enum FitModel {
     MetzgerKN,
 }
 
+/// Configuration for light curve fitting optimization
+#[derive(Debug, Clone)]
+pub struct FitConfig {
+    /// SVI learning rate (default: 0.005, original: 0.01)
+    pub svi_learning_rate: f64,
+
+    /// SVI iterations (default: 5000)
+    pub svi_iterations: usize,
+
+    /// SVI Monte Carlo samples for gradient estimation (default: 16)
+    pub svi_mc_samples: usize,
+
+    /// PSO iterations (default: 200)
+    pub pso_iterations: u64,
+
+    /// Enable numerical safeguards for MetzgerKN normalization (default: true)
+    pub enable_safeguards: bool,
+
+    /// Scale factor clamping range for safeguards (default: 0.1 to 10.0)
+    pub scale_clamp_range: (f64, f64),
+
+    /// Enable automatic retry on catastrophic failure (default: true)
+    pub enable_retry: bool,
+
+    /// ELBO threshold for catastrophic failure detection (default: -1000.0)
+    pub catastrophic_threshold: f64,
+
+    /// Grid size for profile likelihood: (coarse_points, fine_points)
+    /// Default: (10, 5) for 15 total evaluations
+    pub profile_grid_size: (usize, usize),
+}
+
+impl Default for FitConfig {
+    fn default() -> Self {
+        Self::conservative()
+    }
+}
+
+impl FitConfig {
+    /// Conservative configuration (current settings with safeguards)
+    pub fn conservative() -> Self {
+        Self {
+            svi_learning_rate: 0.005,
+            svi_iterations: 5000,
+            svi_mc_samples: 16,
+            pso_iterations: 200,
+            enable_safeguards: true,
+            scale_clamp_range: (0.1, 10.0),
+            enable_retry: true,
+            catastrophic_threshold: -1000.0,
+            profile_grid_size: (10, 5), // 15 total points (balanced)
+        }
+    }
+
+    /// Original configuration (pre-stability-fix settings, more aggressive)
+    pub fn original() -> Self {
+        Self {
+            svi_learning_rate: 0.01, // Higher learning rate
+            svi_iterations: 5000,
+            svi_mc_samples: 16,
+            pso_iterations: 200,
+            enable_safeguards: false,         // No safeguards
+            scale_clamp_range: (0.01, 100.0), // Wider range
+            enable_retry: false,              // Don't retry from retry
+            catastrophic_threshold: -1000.0,
+            profile_grid_size: (10, 5), // 15 total points (same as conservative)
+        }
+    }
+
+    /// Fast configuration for testing
+    pub fn fast() -> Self {
+        Self {
+            svi_learning_rate: 0.01,
+            svi_iterations: 1000,
+            svi_mc_samples: 8,
+            pso_iterations: 100,
+            enable_safeguards: false,
+            scale_clamp_range: (0.1, 10.0),
+            enable_retry: false,
+            catastrophic_threshold: -1000.0,
+            profile_grid_size: (5, 3), // 8 total points (quick validation)
+        }
+    }
+}
+
 /// Light curve fit result with t0 estimate
 #[derive(Debug, Clone)]
 pub struct LightCurveFitResult {
@@ -86,10 +171,11 @@ impl LightCurveFitResult {
     }
 }
 
-/// Fit a light curve to extract t0
+/// Fit a light curve to extract t0 with automatic retry on failure
 ///
 /// This function performs Stochastic Variational Inference (SVI) to fit
 /// the light curve and extract the explosion/merger time parameter.
+/// It automatically retries with more aggressive settings if catastrophic failure occurs.
 ///
 /// # Arguments
 ///
@@ -109,6 +195,67 @@ impl LightCurveFitResult {
 pub fn fit_lightcurve(
     lightcurve: &LightCurve,
     model: FitModel,
+) -> Result<LightCurveFitResult, CoreError> {
+    let config = FitConfig::default();
+
+    // Try with conservative settings first
+    let result = fit_lightcurve_with_config(lightcurve, model, &config)?;
+
+    // Check if retry needed
+    if config.enable_retry && result.elbo < config.catastrophic_threshold {
+        info!(
+            "Catastrophic failure detected (ELBO = {:.2}), retrying with original settings...",
+            result.elbo
+        );
+
+        // Retry with original (more aggressive) settings
+        let retry_config = FitConfig::original();
+        let retry_result = fit_lightcurve_with_config(lightcurve, model, &retry_config)?;
+
+        // Return better of the two
+        if retry_result.elbo > result.elbo {
+            info!(
+                "Retry improved ELBO from {:.2} to {:.2}",
+                result.elbo, retry_result.elbo
+            );
+            Ok(retry_result)
+        } else {
+            info!(
+                "Retry did not improve (ELBO {:.2} vs {:.2}), keeping original",
+                retry_result.elbo, result.elbo
+            );
+            Ok(result)
+        }
+    } else {
+        Ok(result)
+    }
+}
+
+/// Fit a light curve to extract t0 with custom configuration
+///
+/// This is the low-level fitting function that accepts a custom FitConfig.
+/// For most use cases, use `fit_lightcurve()` which includes automatic retry.
+///
+/// # Arguments
+///
+/// * `lightcurve` - The optical light curve to fit
+/// * `model` - The model to use for fitting
+/// * `config` - Configuration for optimization parameters
+///
+/// # Returns
+///
+/// The fit result including t0 estimate and uncertainties
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Light curve has insufficient data points (< 5)
+/// - Fit fails to converge
+/// - Model evaluation fails
+pub fn fit_lightcurve_with_config(
+    lightcurve: &LightCurve,
+    model: FitModel,
+    config: &FitConfig,
 ) -> Result<LightCurveFitResult, CoreError> {
     // Validate input
     if lightcurve.measurements.len() < 5 {
@@ -171,10 +318,11 @@ pub fn fit_lightcurve(
     let mut time_groups: HashMap<i64, Vec<(f64, f64, bool)>> = HashMap::new();
     for m in &cleaned_measurements {
         let time_key = (m.mjd * 100.0).round() as i64; // Group within 0.01 day
-        time_groups
-            .entry(time_key)
-            .or_insert_with(Vec::new)
-            .push((m.flux, m.flux_err, m.is_upper_limit));
+        time_groups.entry(time_key).or_insert_with(Vec::new).push((
+            m.flux,
+            m.flux_err,
+            m.is_upper_limit,
+        ));
     }
 
     let mut times = Vec::new();
@@ -251,9 +399,9 @@ pub fn fit_lightcurve(
         .zip(is_upper.iter())
         .map(|(&f, &is_up)| {
             if is_up {
-                f  // For upper limits, flux is the limiting value
+                f // For upper limits, flux is the limiting value
             } else {
-                f  // For detections, this field is unused but set to flux
+                f // For detections, this field is unused but set to flux
             }
         })
         .collect();
@@ -269,7 +417,10 @@ pub fn fit_lightcurve(
 
     // Step 1: PSO initialization for the requested model
     // Use PSO to find good starting parameters, but respect user's model choice
-    info!("Running PSO initialization for {} model...", svi_model.name());
+    info!(
+        "Running PSO initialization for {} model...",
+        svi_model.name()
+    );
 
     use crate::pso_fitter::pso_bounds;
     use argmin::core::{CostFunction, Executor, State};
@@ -283,6 +434,8 @@ pub fn fit_lightcurve(
         model: SviModel,
         is_upper: Vec<bool>,
         upper_flux: Vec<f64>,
+        enable_safeguards: bool,
+        scale_clamp_range: (f64, f64),
     }
 
     impl CostFunction for PsoCost {
@@ -320,11 +473,13 @@ pub fn fit_lightcurve(
         model: svi_model,
         is_upper: data.is_upper.clone(),
         upper_flux: data.upper_flux.clone(),
+        enable_safeguards: config.enable_safeguards,
+        scale_clamp_range: config.scale_clamp_range,
     };
 
     let solver = ParticleSwarm::new((lower, upper), 40);
     let pso_result = Executor::new(problem, solver)
-        .configure(|state| state.max_iters(200))  // Increased from 50 for better t0 accuracy
+        .configure(|state| state.max_iters(config.pso_iterations))
         .run();
 
     let pso_params = match pso_result {
@@ -343,18 +498,20 @@ pub fn fit_lightcurve(
     };
 
     // Step 2: SVI refinement with PSO initialization
-    info!("Running SVI refinement...");
-    let n_iter = 5000; // Increased from 1000 for better t0 accuracy (~3 days mean error)
-    let n_mc_samples = 16; // Increased from 4 for better gradient estimates
-    let learning_rate = 0.01;
+    info!(
+        "Running SVI refinement (LR={}, iters={}, safeguards={})...",
+        config.svi_learning_rate, config.svi_iterations, config.enable_safeguards
+    );
 
     let svi_result = svi_fit(
         svi_model,
         &data,
-        n_iter,
-        n_mc_samples,
-        learning_rate,
+        config.svi_iterations,
+        config.svi_mc_samples,
+        config.svi_learning_rate,
         Some(&pso_params),
+        config.enable_safeguards,
+        config.scale_clamp_range,
     );
 
     // Extract t0 from parameters

@@ -1,11 +1,14 @@
+use argmin::core::{CostFunction, Error as ArgminError, Executor, State};
+use argmin::solver::particleswarm::ParticleSwarm;
 /// Test different optimization settings to improve t0 recovery
 ///
 /// Run with: cargo test --test optimize_t0_recovery -- --nocapture --ignored
-
-use mm_core::{svi_fitter::svi_fit, pso_fitter::{BandFitData, pso_bounds}, svi_models};
+use mm_core::{
+    pso_fitter::{pso_bounds, BandFitData},
+    svi_fitter::svi_fit,
+    svi_models,
+};
 use rand::Rng;
-use argmin::core::{CostFunction, Error as ArgminError, Executor, State};
-use argmin::solver::particleswarm::ParticleSwarm;
 
 #[derive(Clone)]
 struct PsoCost {
@@ -44,18 +47,20 @@ fn generate_synthetic_kilonova() -> (Vec<f64>, Vec<f64>, Vec<f64>, f64) {
     let true_log10_vej = -1.0;
     let true_log10_kappa_r = 0.5;
     let true_t0 = 0.0;
-    let true_params = vec![true_log10_mej, true_log10_vej, true_log10_kappa_r, true_t0, -3.0];
-
-    let obs_times = vec![
-        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
-        5.5, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0,
+    let true_params = vec![
+        true_log10_mej,
+        true_log10_vej,
+        true_log10_kappa_r,
+        true_t0,
+        -3.0,
     ];
 
-    let clean_fluxes = svi_models::eval_model_batch(
-        svi_models::SviModel::MetzgerKN,
-        &true_params,
-        &obs_times,
-    );
+    let obs_times = vec![
+        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0,
+    ];
+
+    let clean_fluxes =
+        svi_models::eval_model_batch(svi_models::SviModel::MetzgerKN, &true_params, &obs_times);
 
     let scale_factor = 200.0;
     let mut rng = rand::thread_rng();
@@ -173,7 +178,8 @@ fn test_mc_samples() {
 
     let mc_settings = vec![2, 4, 8, 16, 32];
     for &samples in &mc_settings {
-        let (error, elbo) = test_settings(50, 1000, samples, 0.01, &times, &flux, &flux_err, true_t0);
+        let (error, elbo) =
+            test_settings(50, 1000, samples, 0.01, &times, &flux, &flux_err, true_t0);
         println!(
             "MC samples={:2}: t0_error={:.3} days ({:.1} hrs), ELBO={:.1}",
             samples,
@@ -221,7 +227,9 @@ fn test_best_combo() {
 
     for (name, pso_iter, svi_iter, mc_samp, lr) in configs {
         let (times, flux, flux_err, true_t0) = generate_synthetic_kilonova();
-        let (error, elbo) = test_settings(pso_iter, svi_iter, mc_samp, lr, &times, &flux, &flux_err, true_t0);
+        let (error, elbo) = test_settings(
+            pso_iter, svi_iter, mc_samp, lr, &times, &flux, &flux_err, true_t0,
+        );
         println!(
             "{:30}: t0_error={:.3} days ({:.1} hrs), ELBO={:.1}",
             name,

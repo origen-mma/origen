@@ -9,7 +9,7 @@ use std::f64::consts::PI;
 
 /// Physical constants (CGS)
 const MSUN_CGS: f64 = 1.989e33; // grams
-const C_CGS: f64 = 2.998e10;    // cm/s
+const C_CGS: f64 = 2.998e10; // cm/s
 const SECS_PER_DAY: f64 = 86400.0;
 
 /// Light curve model
@@ -33,10 +33,10 @@ impl SviModel {
 
     pub fn n_params(&self) -> usize {
         match self {
-            SviModel::Bazin => 6,      // log_a, b, t0, log_tau_rise, log_tau_fall, log_sigma_extra
-            SviModel::Villar => 7,     // log_a, beta, log_gamma, t0, log_tau_rise, log_tau_fall, log_sigma_extra
-            SviModel::PowerLaw => 5,   // log_a, log_alpha, log_beta, t0, log_sigma_extra
-            SviModel::MetzgerKN => 5,  // log10_mej, log10_vej, log10_kappa_r, t0, log_sigma_extra
+            SviModel::Bazin => 6, // log_a, b, t0, log_tau_rise, log_tau_fall, log_sigma_extra
+            SviModel::Villar => 7, // log_a, beta, log_gamma, t0, log_tau_rise, log_tau_fall, log_sigma_extra
+            SviModel::PowerLaw => 5, // log_a, log_alpha, log_beta, t0, log_sigma_extra
+            SviModel::MetzgerKN => 5, // log10_mej, log10_vej, log10_kappa_r, t0, log_sigma_extra
         }
     }
 
@@ -57,10 +57,31 @@ impl SviModel {
 
     pub fn param_names(&self) -> Vec<&'static str> {
         match self {
-            SviModel::Bazin => vec!["log_a", "b", "t0", "log_tau_rise", "log_tau_fall", "log_sigma_extra"],
-            SviModel::Villar => vec!["log_a", "beta", "log_gamma", "t0", "log_tau_rise", "log_tau_fall", "log_sigma_extra"],
+            SviModel::Bazin => vec![
+                "log_a",
+                "b",
+                "t0",
+                "log_tau_rise",
+                "log_tau_fall",
+                "log_sigma_extra",
+            ],
+            SviModel::Villar => vec![
+                "log_a",
+                "beta",
+                "log_gamma",
+                "t0",
+                "log_tau_rise",
+                "log_tau_fall",
+                "log_sigma_extra",
+            ],
             SviModel::PowerLaw => vec!["log_a", "log_alpha", "log_beta", "t0", "log_sigma_extra"],
-            SviModel::MetzgerKN => vec!["log10_mej", "log10_vej", "log10_kappa_r", "t0", "log_sigma_extra"],
+            SviModel::MetzgerKN => vec![
+                "log10_mej",
+                "log10_vej",
+                "log10_kappa_r",
+                "t0",
+                "log_sigma_extra",
+            ],
         }
     }
 
@@ -196,7 +217,15 @@ pub fn villar_flux_grad(params: &[f64], t: f64) -> Vec<f64> {
     let d_pr_dlogtf = piece_right * (phase - gamma) / tau_fall;
     let d_log_tau_fall = a * sig_rise * w * d_pr_dlogtf;
 
-    vec![d_log_a, d_beta, d_log_gamma, d_t0, d_log_tau_rise, d_log_tau_fall, 0.0]
+    vec![
+        d_log_a,
+        d_beta,
+        d_log_gamma,
+        d_t0,
+        d_log_tau_rise,
+        d_log_tau_fall,
+        0.0,
+    ]
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +394,10 @@ pub fn metzger_kn_eval_batch(params: &[f64], obs_times: &[f64]) -> Vec<f64> {
             if phase >= grid_t_day[n_grid - 1] {
                 return *grid_norm.last().unwrap();
             }
-            let idx = grid_t_day.partition_point(|&gt| gt < phase).min(n_grid - 1).max(1);
+            let idx = grid_t_day
+                .partition_point(|&gt| gt < phase)
+                .min(n_grid - 1)
+                .max(1);
             let frac = (phase - grid_t_day[idx - 1]) / (grid_t_day[idx] - grid_t_day[idx - 1]);
             grid_norm[idx - 1] + frac * (grid_norm[idx] - grid_norm[idx - 1])
         })

@@ -25,17 +25,17 @@ fn main() {
     println!("{}", "-".repeat(70));
 
     let gw170817_binary = BinaryParams {
-        mass_1_source: 1.46,  // M_sun
-        mass_2_source: 1.27,  // M_sun
-        radius_1: 11.9,       // km
-        radius_2: 11.9,       // km
-        chi_1: 0.0,           // Dimensionless spin
+        mass_1_source: 1.46, // M_sun
+        mass_2_source: 1.27, // M_sun
+        radius_1: 11.9,      // km
+        radius_2: 11.9,      // km
+        chi_1: 0.0,          // Dimensionless spin
         chi_2: 0.0,
-        tov_mass: 2.17,       // Maximum NS mass (EOS-dependent)
-        r_16: 11.9,           // NS radius at 1.6 M_sun
-        ratio_zeta: 0.2,      // Wind/disk ejecta ratio
-        alpha: 0.0,           // Ejecta mass correction (M_sun)
-        ratio_epsilon: 0.1,   // Jet efficiency
+        tov_mass: 2.17,     // Maximum NS mass (EOS-dependent)
+        r_16: 11.9,         // NS radius at 1.6 M_sun
+        ratio_zeta: 0.2,    // Wind/disk ejecta ratio
+        alpha: 0.0,         // Ejecta mass correction (M_sun)
+        ratio_epsilon: 0.1, // Jet efficiency
     };
 
     let gw170817_params = GwEventParams {
@@ -58,11 +58,11 @@ fn main() {
     println!("{}", "-".repeat(70));
 
     let nsbh_binary = BinaryParams {
-        mass_1_source: 5.0,  // BH mass (M_sun)
-        mass_2_source: 1.4,  // NS mass (M_sun)
-        radius_1: 0.0,       // BH has no radius
-        radius_2: 12.0,      // NS radius (km)
-        chi_1: 0.5,          // Spinning BH
+        mass_1_source: 5.0, // BH mass (M_sun)
+        mass_2_source: 1.4, // NS mass (M_sun)
+        radius_1: 0.0,      // BH has no radius
+        radius_2: 12.0,     // NS radius (km)
+        chi_1: 0.5,         // Spinning BH
         chi_2: 0.0,
         tov_mass: 2.17,
         r_16: 12.0,
@@ -129,7 +129,8 @@ fn main() {
     let mean_ejecta = events.iter().map(|e| e.kilonova_mass()).sum::<f64>() / n_events as f64;
 
     println!("Total events simulated: {}", n_events);
-    println!("Events with visible GRB: {} ({:.1}%)",
+    println!(
+        "Events with visible GRB: {} ({:.1}%)",
         n_with_grb,
         n_with_grb as f64 / n_events as f64 * 100.0
     );

@@ -11,8 +11,7 @@
 
 use clap::Parser;
 use mm_simulation::{
-    simulate_multimessenger_event, BinaryParams, GrbSimulationConfig,
-    GwEventParams,
+    simulate_multimessenger_event, BinaryParams, GrbSimulationConfig, GwEventParams,
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashMap;
@@ -85,8 +84,16 @@ impl MagnitudeStats {
             return vec![];
         }
 
-        let min_mag = self.magnitudes.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max_mag = self.magnitudes.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let min_mag = self
+            .magnitudes
+            .iter()
+            .cloned()
+            .fold(f64::INFINITY, f64::min);
+        let max_mag = self
+            .magnitudes
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
 
         let n_bins = ((max_mag - min_mag) / bin_width).ceil() as usize + 1;
         let mut bins = vec![0usize; n_bins];
@@ -132,7 +139,10 @@ fn main() -> anyhow::Result<()> {
 
     // Read injections.dat file
     let injections_file = args.bgp_path.join("injections.dat");
-    println!("Reading O4 gravitational wave events from: {:?}", injections_file);
+    println!(
+        "Reading O4 gravitational wave events from: {:?}",
+        injections_file
+    );
 
     let file = File::open(&injections_file)
         .map_err(|e| anyhow::anyhow!("Failed to open injections.dat: {}", e))?;
@@ -140,7 +150,7 @@ fn main() -> anyhow::Result<()> {
 
     // Statistics collectors
     let mut afterglow_all = MagnitudeStats::default();
-    let mut afterglow_onaxis = MagnitudeStats::default();  // Only for on-axis GRBs
+    let mut afterglow_onaxis = MagnitudeStats::default(); // Only for on-axis GRBs
 
     // Distance bins for stratification
     let mut distance_bins: HashMap<String, (MagnitudeStats, MagnitudeStats)> = HashMap::new();
@@ -178,7 +188,10 @@ fn main() -> anyhow::Result<()> {
         let parts: Vec<&str> = line.split('\t').collect();
 
         if parts.len() < 9 {
-            eprintln!("Warning: Line {} has insufficient columns, skipping", line_num + 1);
+            eprintln!(
+                "Warning: Line {} has insufficient columns, skipping",
+                line_num + 1
+            );
             continue;
         }
 
@@ -220,7 +233,7 @@ fn main() -> anyhow::Result<()> {
         let binary_params = BinaryParams {
             mass_1_source: mass1,
             mass_2_source: mass2,
-            radius_1: 12.0,  // Typical NS radius
+            radius_1: 12.0, // Typical NS radius
             radius_2: 12.0,
             chi_1: spin1z,
             chi_2: spin2z,
@@ -238,12 +251,8 @@ fn main() -> anyhow::Result<()> {
         };
 
         // Simulate multi-messenger event
-        let mm_event = simulate_multimessenger_event(
-            &binary_params,
-            &gw_params,
-            &grb_config,
-            &mut rng,
-        );
+        let mm_event =
+            simulate_multimessenger_event(&binary_params, &gw_params, &grb_config, &mut rng);
 
         n_events += 1;
 
@@ -286,14 +295,34 @@ fn main() -> anyhow::Result<()> {
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     println!("Total events processed: {}", n_events);
-    println!("  BNS:  {} ({:.1}%)", n_bns, 100.0 * n_bns as f64 / n_events as f64);
-    println!("  NSBH: {} ({:.1}%)", n_nsbh, 100.0 * n_nsbh as f64 / n_events as f64);
+    println!(
+        "  BNS:  {} ({:.1}%)",
+        n_bns,
+        100.0 * n_bns as f64 / n_events as f64
+    );
+    println!(
+        "  NSBH: {} ({:.1}%)",
+        n_nsbh,
+        100.0 * n_nsbh as f64 / n_events as f64
+    );
     println!("  Mean distance: {:.0} Mpc", mean_distance);
     println!();
     println!("Detection rates:");
-    println!("  GRBs (on-axis):        {} ({:.1}%)", n_grb, 100.0 * n_grb as f64 / n_events as f64);
-    println!("  Afterglows (ZTF 21 mag): {} ({:.1}%)", n_afterglow, 100.0 * n_afterglow as f64 / n_events as f64);
-    println!("  Kilonovae:             {} ({:.1}%)", n_kilonova, 100.0 * n_kilonova as f64 / n_events as f64);
+    println!(
+        "  GRBs (on-axis):        {} ({:.1}%)",
+        n_grb,
+        100.0 * n_grb as f64 / n_events as f64
+    );
+    println!(
+        "  Afterglows (ZTF 21 mag): {} ({:.1}%)",
+        n_afterglow,
+        100.0 * n_afterglow as f64 / n_events as f64
+    );
+    println!(
+        "  Kilonovae:             {} ({:.1}%)",
+        n_kilonova,
+        100.0 * n_kilonova as f64 / n_events as f64
+    );
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║              Afterglow Magnitude Distribution                ║");
@@ -326,7 +355,7 @@ fn main() -> anyhow::Result<()> {
     println!("║              Afterglow Magnitude Histogram                   ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    let histogram = afterglow_all.compute_histogram(1.0);  // 1 mag bins
+    let histogram = afterglow_all.compute_histogram(1.0); // 1 mag bins
     println!("Magnitude distribution (1 mag bins):\n");
     println!("  Mag Range    | Count  | Fraction | Bar");
     println!("  -------------|--------|----------|{}", "-".repeat(50));
@@ -335,8 +364,14 @@ fn main() -> anyhow::Result<()> {
         let fraction = count as f64 / stats_all.count as f64;
         let bar_length = (fraction * 50.0) as usize;
         let bar = "█".repeat(bar_length);
-        println!("  {:.1} - {:.1} | {:6} | {:6.1}% | {}",
-                 mag, mag + 1.0, count, 100.0 * fraction, bar);
+        println!(
+            "  {:.1} - {:.1} | {:6} | {:6.1}% | {}",
+            mag,
+            mag + 1.0,
+            count,
+            100.0 * fraction,
+            bar
+        );
     }
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
@@ -346,43 +381,68 @@ fn main() -> anyhow::Result<()> {
     println!("Afterglow detection rates with different survey depths:\n");
     println!("  Survey | Limit | Detected (All) | Detected (On-Axis GRBs) |");
     println!("  -------|-------|----------------|-------------------------|");
-    println!("  ZTF    | 21.0  | {:6} ({:4.1}%) | {:6} ({:4.1}%)          |",
-             stats_all.ztf_detectable,
-             100.0 * stats_all.ztf_detectable as f64 / stats_all.count as f64,
-             stats_onaxis.ztf_detectable,
-             100.0 * stats_onaxis.ztf_detectable as f64 / stats_onaxis.count.max(1) as f64);
-    println!("  DECam  | 23.5  | {:6} ({:4.1}%) | {:6} ({:4.1}%)          |",
-             stats_all.decam_detectable,
-             100.0 * stats_all.decam_detectable as f64 / stats_all.count as f64,
-             stats_onaxis.decam_detectable,
-             100.0 * stats_onaxis.decam_detectable as f64 / stats_onaxis.count.max(1) as f64);
-    println!("  LSST   | 24.5  | {:6} ({:4.1}%) | {:6} ({:4.1}%)          |",
-             stats_all.lsst_detectable,
-             100.0 * stats_all.lsst_detectable as f64 / stats_all.count as f64,
-             stats_onaxis.lsst_detectable,
-             100.0 * stats_onaxis.lsst_detectable as f64 / stats_onaxis.count.max(1) as f64);
+    println!(
+        "  ZTF    | 21.0  | {:6} ({:4.1}%) | {:6} ({:4.1}%)          |",
+        stats_all.ztf_detectable,
+        100.0 * stats_all.ztf_detectable as f64 / stats_all.count as f64,
+        stats_onaxis.ztf_detectable,
+        100.0 * stats_onaxis.ztf_detectable as f64 / stats_onaxis.count.max(1) as f64
+    );
+    println!(
+        "  DECam  | 23.5  | {:6} ({:4.1}%) | {:6} ({:4.1}%)          |",
+        stats_all.decam_detectable,
+        100.0 * stats_all.decam_detectable as f64 / stats_all.count as f64,
+        stats_onaxis.decam_detectable,
+        100.0 * stats_onaxis.decam_detectable as f64 / stats_onaxis.count.max(1) as f64
+    );
+    println!(
+        "  LSST   | 24.5  | {:6} ({:4.1}%) | {:6} ({:4.1}%)          |",
+        stats_all.lsst_detectable,
+        100.0 * stats_all.lsst_detectable as f64 / stats_all.count as f64,
+        stats_onaxis.lsst_detectable,
+        100.0 * stats_onaxis.lsst_detectable as f64 / stats_onaxis.count.max(1) as f64
+    );
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                     Key Insights                             ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     if stats_onaxis.count > 0 {
-        println!("• Mean on-axis afterglow magnitude: {:.1} mag", stats_onaxis.mean);
-        println!("• Median on-axis afterglow magnitude: {:.1} mag", stats_onaxis.median);
-        println!("• 80% of on-axis afterglows fall between {:.1} and {:.1} mag",
-                 stats_onaxis.p10, stats_onaxis.p90);
+        println!(
+            "• Mean on-axis afterglow magnitude: {:.1} mag",
+            stats_onaxis.mean
+        );
+        println!(
+            "• Median on-axis afterglow magnitude: {:.1} mag",
+            stats_onaxis.median
+        );
+        println!(
+            "• 80% of on-axis afterglows fall between {:.1} and {:.1} mag",
+            stats_onaxis.p10, stats_onaxis.p90
+        );
         println!();
-        println!("• ZTF (21 mag) detects {:.0}% of on-axis afterglows",
-                 100.0 * stats_onaxis.ztf_detectable as f64 / stats_onaxis.count as f64);
-        println!("• DECam (23.5 mag) detects {:.0}% of on-axis afterglows",
-                 100.0 * stats_onaxis.decam_detectable as f64 / stats_onaxis.count as f64);
-        println!("• LSST (24.5 mag) detects {:.0}% of on-axis afterglows",
-                 100.0 * stats_onaxis.lsst_detectable as f64 / stats_onaxis.count as f64);
+        println!(
+            "• ZTF (21 mag) detects {:.0}% of on-axis afterglows",
+            100.0 * stats_onaxis.ztf_detectable as f64 / stats_onaxis.count as f64
+        );
+        println!(
+            "• DECam (23.5 mag) detects {:.0}% of on-axis afterglows",
+            100.0 * stats_onaxis.decam_detectable as f64 / stats_onaxis.count as f64
+        );
+        println!(
+            "• LSST (24.5 mag) detects {:.0}% of on-axis afterglows",
+            100.0 * stats_onaxis.lsst_detectable as f64 / stats_onaxis.count as f64
+        );
     }
     println!();
-    println!("💡 O4 events are typically at {:.0} Mpc (mean), pushing even on-axis", mean_distance);
-    println!("   afterglows to {:.1}-{:.1} mag, requiring deep surveys like LSST.",
-             stats_onaxis.p10, stats_onaxis.p90);
+    println!(
+        "💡 O4 events are typically at {:.0} Mpc (mean), pushing even on-axis",
+        mean_distance
+    );
+    println!(
+        "   afterglows to {:.1}-{:.1} mag, requiring deep surveys like LSST.",
+        stats_onaxis.p10, stats_onaxis.p90
+    );
 
     Ok(())
 }
@@ -396,13 +456,19 @@ fn print_statistics(stats: &Statistics) {
     println!("  90th %ile:  {:.2} mag", stats.p90);
     println!();
     println!("  Detectable with:");
-    println!("    ZTF (21.0 mag):   {} ({:.1}%)",
-             stats.ztf_detectable,
-             100.0 * stats.ztf_detectable as f64 / stats.count as f64);
-    println!("    DECam (23.5 mag): {} ({:.1}%)",
-             stats.decam_detectable,
-             100.0 * stats.decam_detectable as f64 / stats.count as f64);
-    println!("    LSST (24.5 mag):  {} ({:.1}%)",
-             stats.lsst_detectable,
-             100.0 * stats.lsst_detectable as f64 / stats.count as f64);
+    println!(
+        "    ZTF (21.0 mag):   {} ({:.1}%)",
+        stats.ztf_detectable,
+        100.0 * stats.ztf_detectable as f64 / stats.count as f64
+    );
+    println!(
+        "    DECam (23.5 mag): {} ({:.1}%)",
+        stats.decam_detectable,
+        100.0 * stats.decam_detectable as f64 / stats.count as f64
+    );
+    println!(
+        "    LSST (24.5 mag):  {} ({:.1}%)",
+        stats.lsst_detectable,
+        100.0 * stats.lsst_detectable as f64 / stats.count as f64
+    );
 }

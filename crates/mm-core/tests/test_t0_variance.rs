@@ -1,11 +1,14 @@
+use argmin::core::{CostFunction, Error as ArgminError, Executor, State};
+use argmin::solver::particleswarm::ParticleSwarm;
 /// Test variance in t0 recovery across multiple runs
 ///
 /// Run with: cargo test --test test_t0_variance -- --nocapture --ignored
-
-use mm_core::{svi_fitter::svi_fit, pso_fitter::{BandFitData, pso_bounds}, svi_models};
+use mm_core::{
+    pso_fitter::{pso_bounds, BandFitData},
+    svi_fitter::svi_fit,
+    svi_models,
+};
 use rand::Rng;
-use argmin::core::{CostFunction, Error as ArgminError, Executor, State};
-use argmin::solver::particleswarm::ParticleSwarm;
 
 #[derive(Clone)]
 struct PsoCost {
@@ -44,18 +47,20 @@ fn generate_synthetic_kilonova() -> (Vec<f64>, Vec<f64>, Vec<f64>, f64) {
     let true_log10_vej = -1.0;
     let true_log10_kappa_r = 0.5;
     let true_t0 = 0.0;
-    let true_params = vec![true_log10_mej, true_log10_vej, true_log10_kappa_r, true_t0, -3.0];
-
-    let obs_times = vec![
-        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
-        5.5, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0,
+    let true_params = vec![
+        true_log10_mej,
+        true_log10_vej,
+        true_log10_kappa_r,
+        true_t0,
+        -3.0,
     ];
 
-    let clean_fluxes = svi_models::eval_model_batch(
-        svi_models::SviModel::MetzgerKN,
-        &true_params,
-        &obs_times,
-    );
+    let obs_times = vec![
+        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0,
+    ];
+
+    let clean_fluxes =
+        svi_models::eval_model_batch(svi_models::SviModel::MetzgerKN, &true_params, &obs_times);
 
     let scale_factor = 200.0;
     let mut rng = rand::thread_rng();
@@ -133,7 +138,12 @@ fn test_baseline_variance() {
     for trial in 1..=10 {
         let (times, flux, flux_err, true_t0) = generate_synthetic_kilonova();
         let error = test_single_run(50, 1000, 4, 0.01, &times, &flux, &flux_err, true_t0);
-        println!("Trial {:2}: t0_error = {:.3} days ({:.1} hrs)", trial, error, error * 24.0);
+        println!(
+            "Trial {:2}: t0_error = {:.3} days ({:.1} hrs)",
+            trial,
+            error,
+            error * 24.0
+        );
         errors.push(error);
     }
 
@@ -141,8 +151,13 @@ fn test_baseline_variance() {
     let variance = errors.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / errors.len() as f64;
     let std = variance.sqrt();
 
-    println!("\nMean error: {:.3} ± {:.3} days ({:.1} ± {:.1} hrs)",
-             mean, std, mean * 24.0, std * 24.0);
+    println!(
+        "\nMean error: {:.3} ± {:.3} days ({:.1} ± {:.1} hrs)",
+        mean,
+        std,
+        mean * 24.0,
+        std * 24.0
+    );
 }
 
 #[test]
@@ -154,7 +169,12 @@ fn test_improved_variance() {
     for trial in 1..=10 {
         let (times, flux, flux_err, true_t0) = generate_synthetic_kilonova();
         let error = test_single_run(200, 5000, 16, 0.01, &times, &flux, &flux_err, true_t0);
-        println!("Trial {:2}: t0_error = {:.3} days ({:.1} hrs)", trial, error, error * 24.0);
+        println!(
+            "Trial {:2}: t0_error = {:.3} days ({:.1} hrs)",
+            trial,
+            error,
+            error * 24.0
+        );
         errors.push(error);
     }
 
@@ -162,6 +182,11 @@ fn test_improved_variance() {
     let variance = errors.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / errors.len() as f64;
     let std = variance.sqrt();
 
-    println!("\nMean error: {:.3} ± {:.3} days ({:.1} ± {:.1} hrs)",
-             mean, std, mean * 24.0, std * 24.0);
+    println!(
+        "\nMean error: {:.3} ± {:.3} days ({:.1} ± {:.1} hrs)",
+        mean,
+        std,
+        mean * 24.0,
+        std * 24.0
+    );
 }

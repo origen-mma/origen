@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 /// Physical constants
 const GEOM_MSUN_KM: f64 = 1.47662504; // Geometric solar mass in km (G M_sun / c^2)
-const MSUN_TO_ERGS: f64 = 1.787e54;    // Solar mass to ergs (M_sun c^2)
+const MSUN_TO_ERGS: f64 = 1.787e54; // Solar mass to ergs (M_sun c^2)
 
 /// Binary type classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -265,12 +265,7 @@ fn compute_nsbh_ejecta(params: &BinaryParams) -> EjectaProperties {
 
 /// Dynamical ejecta mass for BNS (Krüger & Foucart 2020)
 /// See https://arxiv.org/pdf/2002.07728.pdf
-fn dynamic_mass_fitting_krfo(
-    mass_1: f64,
-    mass_2: f64,
-    comp_1: f64,
-    comp_2: f64,
-) -> f64 {
+fn dynamic_mass_fitting_krfo(mass_1: f64, mass_2: f64, comp_1: f64, comp_2: f64) -> f64 {
     const A: f64 = -9.3335;
     const B: f64 = 114.17;
     const C: f64 = -337.56;
@@ -286,31 +281,20 @@ fn dynamic_mass_fitting_krfo(
 
 /// Dynamical ejecta velocity for BNS (Radice et al. 2018)
 /// See https://arxiv.org/pdf/1809.11161 Eq. (22)
-fn dynamic_vel_fitting_radice2018(
-    mass_1: f64,
-    mass_2: f64,
-    comp_1: f64,
-    comp_2: f64,
-) -> f64 {
+fn dynamic_vel_fitting_radice2018(mass_1: f64, mass_2: f64, comp_1: f64, comp_2: f64) -> f64 {
     const A: f64 = -0.287;
     const B: f64 = 0.494;
     const C: f64 = -3.000;
 
-    let vej = A * mass_1 / mass_2 * (1.0 + C * comp_1)
-        + A * mass_2 / mass_1 * (1.0 + C * comp_2)
-        + B;
+    let vej =
+        A * mass_1 / mass_2 * (1.0 + C * comp_1) + A * mass_2 / mass_1 * (1.0 + C * comp_2) + B;
 
     vej.max(0.0).min(0.8) // Cap at 0.8c for physical realism
 }
 
 /// Remnant disk mass for BNS (Kruger et al. 2020)
 /// See https://arxiv.org/pdf/2205.08513 Eq. (22)
-fn log10_disk_mass_fitting_bns(
-    total_mass: f64,
-    mass_ratio: f64,
-    mtov: f64,
-    r_16: f64,
-) -> f64 {
+fn log10_disk_mass_fitting_bns(total_mass: f64, mass_ratio: f64, mtov: f64, r_16: f64) -> f64 {
     const A0: f64 = -1.725;
     const DELTA_A: f64 = -2.337;
     const B0: f64 = -0.564;
@@ -339,8 +323,9 @@ fn log10_disk_mass_fitting_bns(
 
 /// Convert BH spin to ISCO radius
 fn chi_bh_to_risco(chi_bh: f64) -> f64 {
-    let z1 = 1.0 + (1.0 - chi_bh.powi(2)).powf(1.0 / 3.0)
-        * ((1.0 + chi_bh).powf(1.0 / 3.0) + (1.0 - chi_bh).powf(1.0 / 3.0));
+    let z1 = 1.0
+        + (1.0 - chi_bh.powi(2)).powf(1.0 / 3.0)
+            * ((1.0 + chi_bh).powf(1.0 / 3.0) + (1.0 - chi_bh).powf(1.0 / 3.0));
     let z2 = (3.0 * chi_bh.powi(2) + z1.powi(2)).sqrt();
 
     3.0 + z2 - chi_bh.signum() * ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt()
@@ -412,7 +397,7 @@ mod tests {
         let params = BinaryParams {
             mass_1_source: 1.46,
             mass_2_source: 1.27,
-            radius_1: 12.0,  // km
+            radius_1: 12.0, // km
             radius_2: 11.5,
             chi_1: 0.0,
             chi_2: 0.0,
@@ -450,9 +435,9 @@ mod tests {
         let params = BinaryParams {
             mass_1_source: 5.0,
             mass_2_source: 1.4,
-            radius_1: 0.0,   // BH
-            radius_2: 12.0,  // NS
-            chi_1: 0.5,      // Moderate BH spin
+            radius_1: 0.0,  // BH
+            radius_2: 12.0, // NS
+            chi_1: 0.5,     // Moderate BH spin
             chi_2: 0.0,
             tov_mass: 2.1,
             r_16: 12.0,

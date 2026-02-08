@@ -50,11 +50,11 @@ pub struct JointFarConfig {
 impl Default for JointFarConfig {
     fn default() -> Self {
         Self {
-            gw_observing_time: 1.0,                    // 1 year
-            grb_rate_per_year: 300.0,                  // ~300 SGRBs/year all sky
-            optical_rate_per_sqdeg_per_year: 100.0,   // ~100 transients/sq deg/year (ZTF-like)
-            optical_time_window_days: 14.0,           // 2 week search window
-            grb_time_window_seconds: 10.0,            // ±5 seconds around GW trigger
+            gw_observing_time: 1.0,                 // 1 year
+            grb_rate_per_year: 300.0,               // ~300 SGRBs/year all sky
+            optical_rate_per_sqdeg_per_year: 100.0, // ~100 transients/sq deg/year (ZTF-like)
+            optical_time_window_days: 14.0,         // 2 week search window
+            grb_time_window_seconds: 10.0,          // ±5 seconds around GW trigger
         }
     }
 }
@@ -65,17 +65,17 @@ pub struct MultiMessengerAssociation {
     /// GW event properties
     pub gw_snr: f64,
     pub gw_far_per_year: f64,
-    pub skymap_area_90: f64,  // sq deg
+    pub skymap_area_90: f64, // sq deg
 
     /// GRB properties (if detected)
     pub has_grb: bool,
-    pub grb_fluence: Option<f64>,          // erg/cm^2
-    pub grb_time_offset: Option<f64>,      // seconds from GW trigger
+    pub grb_fluence: Option<f64>,     // erg/cm^2
+    pub grb_time_offset: Option<f64>, // seconds from GW trigger
 
     /// Optical properties (if detected)
     pub has_optical: bool,
     pub optical_magnitude: Option<f64>,
-    pub optical_time_offset: Option<f64>,  // days from GW trigger
+    pub optical_time_offset: Option<f64>, // days from GW trigger
 }
 
 /// Joint FAR calculation result
@@ -238,7 +238,7 @@ fn gaussian_sigma_from_pvalue(p: f64) -> f64 {
 
     // For moderate p-values, use Newton-Raphson iteration
     // to solve: p = (1 - erf(σ/√2)) / 2
-    let mut sigma = sqrt_z;  // Initial guess
+    let mut sigma = sqrt_z; // Initial guess
 
     for _ in 0..10 {
         let x = sigma / std::f64::consts::SQRT_2;
@@ -261,12 +261,12 @@ fn gaussian_sigma_from_pvalue(p: f64) -> f64 {
 /// Error function approximation
 fn erf(x: f64) -> f64 {
     // Abramowitz and Stegun approximation (error < 1.5e-7)
-    let a1 =  0.254829592;
+    let a1 = 0.254829592;
     let a2 = -0.284496736;
-    let a3 =  1.421413741;
+    let a3 = 1.421413741;
     let a4 = -1.453152027;
-    let a5 =  1.061405429;
-    let p  =  0.3275911;
+    let a5 = 1.061405429;
+    let p = 0.3275911;
 
     let sign = if x < 0.0 { -1.0 } else { 1.0 };
     let x = x.abs();
@@ -295,13 +295,13 @@ mod tests {
         // GW170817-like event: nearby BNS with kilonova
         let assoc = MultiMessengerAssociation {
             gw_snr: 32.4,
-            gw_far_per_year: 1.0 / 1e5,  // Very significant GW detection
-            skymap_area_90: 28.0,          // Small localization area (sq deg)
+            gw_far_per_year: 1.0 / 1e5, // Very significant GW detection
+            skymap_area_90: 28.0,       // Small localization area (sq deg)
             has_grb: true,
-            grb_fluence: Some(1e-7),       // Weak GRB (far off-axis)
-            grb_time_offset: Some(1.7),    // 1.7 seconds after GW
+            grb_fluence: Some(1e-7),    // Weak GRB (far off-axis)
+            grb_time_offset: Some(1.7), // 1.7 seconds after GW
             has_optical: true,
-            optical_magnitude: Some(17.0), // Bright kilonova
+            optical_magnitude: Some(17.0),  // Bright kilonova
             optical_time_offset: Some(0.5), // Detected 12 hours after
         };
 
@@ -315,8 +315,14 @@ mod tests {
         println!("  N trials: {:.2e}", result.n_trials);
 
         // Should be highly significant
-        assert!(result.significance_sigma > 5.0, "GW170817-like event should be >5σ");
-        assert!(result.far_per_year < 1.0, "FAR should be much less than 1/year");
+        assert!(
+            result.significance_sigma > 5.0,
+            "GW170817-like event should be >5σ"
+        );
+        assert!(
+            result.far_per_year < 1.0,
+            "FAR should be much less than 1/year"
+        );
     }
 
     #[test]
@@ -324,13 +330,13 @@ mod tests {
         // Typical O4 event: distant BNS with on-axis GRB
         let assoc = MultiMessengerAssociation {
             gw_snr: 12.0,
-            gw_far_per_year: 1.0,          // ~1 per year false alarm rate
-            skymap_area_90: 500.0,         // Large localization (typical O4)
+            gw_far_per_year: 1.0,  // ~1 per year false alarm rate
+            skymap_area_90: 500.0, // Large localization (typical O4)
             has_grb: true,
-            grb_fluence: Some(1e-6),       // Moderate GRB
-            grb_time_offset: Some(0.5),    // 0.5 seconds after GW
+            grb_fluence: Some(1e-6),    // Moderate GRB
+            grb_time_offset: Some(0.5), // 0.5 seconds after GW
             has_optical: true,
-            optical_magnitude: Some(22.0), // Faint afterglow
+            optical_magnitude: Some(22.0),  // Faint afterglow
             optical_time_offset: Some(1.0), // 1 day after
         };
 
@@ -341,10 +347,16 @@ mod tests {
         println!("  Joint FAR: {:.2e} per year", result.far_per_year);
         println!("  Significance: {:.1} sigma", result.significance_sigma);
         println!("  Spatial prob: {:.4}", result.components.spatial_prob);
-        println!("  EM background rate: {:.2e}", result.components.em_background_rate);
+        println!(
+            "  EM background rate: {:.2e}",
+            result.components.em_background_rate
+        );
 
         // Should still be significant, but less than GW170817
-        assert!(result.significance_sigma > 3.0, "Typical O4 event should be >3σ");
+        assert!(
+            result.significance_sigma > 3.0,
+            "Typical O4 event should be >3σ"
+        );
     }
 
     #[test]
@@ -377,29 +389,46 @@ mod tests {
     fn test_pastro_calculation() {
         // High significance event
         let pastro_high = calculate_pastro(1e-5, 1.0);
-        assert!(pastro_high > 0.99, "High significance should have Pastro > 99%");
+        assert!(
+            pastro_high > 0.99,
+            "High significance should have Pastro > 99%"
+        );
 
         // Marginal event
         let pastro_marginal = calculate_pastro(1.0, 1.0);
-        assert!(pastro_marginal > 0.4 && pastro_marginal < 0.6, "Marginal event should have Pastro ~ 50%");
+        assert!(
+            pastro_marginal > 0.4 && pastro_marginal < 0.6,
+            "Marginal event should have Pastro ~ 50%"
+        );
 
         // Low significance event
         let pastro_low = calculate_pastro(10.0, 1.0);
-        assert!(pastro_low < 0.1, "Low significance should have Pastro < 10%");
+        assert!(
+            pastro_low < 0.1,
+            "Low significance should have Pastro < 10%"
+        );
     }
 
     #[test]
     fn test_sigma_conversion() {
         // Test known conversions
-        let sigma_3 = gaussian_sigma_from_pvalue(0.0013499);  // 3σ
-        let sigma_5 = gaussian_sigma_from_pvalue(2.867e-7);  // 5σ
+        let sigma_3 = gaussian_sigma_from_pvalue(0.0013499); // 3σ
+        let sigma_5 = gaussian_sigma_from_pvalue(2.867e-7); // 5σ
 
         println!("\nSigma conversions:");
         println!("  p = 0.0013499 → {:.2} sigma (expected 3.0)", sigma_3);
         println!("  p = 2.867e-7 → {:.2} sigma (expected 5.0)", sigma_5);
 
         // Allow for numerical precision in conversion
-        assert!((sigma_3 - 3.0).abs() < 0.15, "Should convert to ~3σ, got {:.2}", sigma_3);
-        assert!((sigma_5 - 5.0).abs() < 0.2, "Should convert to ~5σ, got {:.2}", sigma_5);
+        assert!(
+            (sigma_3 - 3.0).abs() < 0.15,
+            "Should convert to ~3σ, got {:.2}",
+            sigma_3
+        );
+        assert!(
+            (sigma_5 - 5.0).abs() < 0.2,
+            "Should convert to ~5σ, got {:.2}",
+            sigma_5
+        );
     }
 }

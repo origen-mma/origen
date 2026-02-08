@@ -49,7 +49,7 @@ impl GcnCircular {
         let fluence_str = format!("{:.2e}", fluence_cgs);
 
         let body = format!(
-r#"At {:02}:{:02}:{:02.2} UT on {}, the Fermi Gamma-ray Burst Monitor
+            r#"At {:02}:{:02}:{:02.2} UT on {}, the Fermi Gamma-ray Burst Monitor
 (GBM) triggered and located GRB {} (trigger {:.0}).
 
 The on-ground calculated location, using the Fermi GBM trigger data, is RA = {:.2},
@@ -84,7 +84,11 @@ published in the GBM GRB Catalog."#,
             localization.obs_dec,
             localization.error_radius,
             format!("{:.0}", 60.0 + (trigger_time % 60.0)), // Mock angle from boresight
-            if grb.t90_obs.unwrap_or(0.0) < 2.0 { "a single pulse" } else { "multiple overlapping pulses" },
+            if grb.t90_obs.unwrap_or(0.0) < 2.0 {
+                "a single pulse"
+            } else {
+                "multiple overlapping pulses"
+            },
             grb.t90_obs.unwrap_or(0.0),
             grb.t90_obs.unwrap_or(0.0) / 4.0,
             grb.t90_obs.unwrap_or(0.0) * 3.0 / 4.0,
@@ -123,7 +127,7 @@ published in the GBM GRB Catalog."#,
         let error_arcmin = localization.error_radius * 60.0;
 
         let body = format!(
-r#"At {:02}:{:02}:{:02} UT on {}, the Swift Burst Alert Telescope (BAT)
+            r#"At {:02}:{:02}:{:02} UT on {}, the Swift Burst Alert Telescope (BAT)
 triggered and located GRB {} (trigger={:.0}). Swift slewed immediately to the burst.
 The BAT on-board calculated location is RA, Dec {:.4}, {:+.4} which is
    RA(J2000) = {:02}h {:02}m {:.2}s
@@ -170,7 +174,7 @@ followup of this burst."#,
             trigger_time_utc.hour(),
             trigger_time_utc.minute(),
             trigger_time_utc.second() + 80,
-            80.0, // XRT slew time
+            80.0,                 // XRT slew time
             localization.true_ra, // XRT gets more accurate position
             localization.true_dec,
             (localization.true_ra / 15.0) as u32,
@@ -179,7 +183,7 @@ followup of this burst."#,
             localization.true_dec as i32,
             (localization.true_dec.abs().fract() * 60.0) as u32,
             ((localization.true_dec.abs().fract() * 60.0).fract() * 60.0),
-            error_arcmin / 10.0, // XRT has better localization
+            error_arcmin / 10.0,                  // XRT has better localization
             localization.position_error() * 60.0, // Distance from BAT position
         );
 
@@ -218,7 +222,7 @@ followup of this burst."#,
         let time_offset_abs = time_offset.abs();
 
         let body = format!(
-r#"The LIGO Scientific Collaboration, the Virgo Collaboration, and the KAGRA Collaboration
+            r#"The LIGO Scientific Collaboration, the Virgo Collaboration, and the KAGRA Collaboration
 report:
 
 We have conducted a search for gravitational-wave counterparts to GRB {} in LIGO and
@@ -287,7 +291,7 @@ fn gps_to_utc(gps_time: f64) -> DateTime<Utc> {
 mod tests {
     use super::*;
     use crate::grb_localization::{add_localization_error, GrbInstrument};
-    use crate::grb_simulation::{GrbSimulationConfig, GwEventParams, simulate_grb_counterpart};
+    use crate::grb_simulation::{simulate_grb_counterpart, GrbSimulationConfig, GwEventParams};
     use rand::SeedableRng;
 
     #[test]
@@ -309,21 +313,11 @@ mod tests {
         }
 
         // Add localization error
-        let localization = add_localization_error(
-            180.0,
-            30.0,
-            GrbInstrument::FermiGBM,
-            &mut rng,
-        );
+        let localization = add_localization_error(180.0, 30.0, GrbInstrument::FermiGBM, &mut rng);
 
         // Generate circular
-        let circular = GcnCircular::fermi_gbm_detection(
-            "240101A",
-            1262304000.0,
-            &localization,
-            &grb,
-            35000,
-        );
+        let circular =
+            GcnCircular::fermi_gbm_detection("240101A", 1262304000.0, &localization, &grb, 35000);
 
         let text = circular.to_text();
 
@@ -354,20 +348,10 @@ mod tests {
             return;
         }
 
-        let localization = add_localization_error(
-            45.0,
-            -20.0,
-            GrbInstrument::SwiftBAT,
-            &mut rng,
-        );
+        let localization = add_localization_error(45.0, -20.0, GrbInstrument::SwiftBAT, &mut rng);
 
-        let circular = GcnCircular::swift_bat_detection(
-            "240615B",
-            1277856000.0,
-            &localization,
-            &grb,
-            35001,
-        );
+        let circular =
+            GcnCircular::swift_bat_detection("240615B", 1277856000.0, &localization, &grb, 35001);
 
         let text = circular.to_text();
 
@@ -381,13 +365,7 @@ mod tests {
 
     #[test]
     fn test_coincidence_circular() {
-        let circular = GcnCircular::gw_grb_coincidence(
-            "170817A",
-            "S170817a",
-            1.74,
-            true,
-            24228,
-        );
+        let circular = GcnCircular::gw_grb_coincidence("170817A", "S170817a", 1.74, true, 24228);
 
         let text = circular.to_text();
 

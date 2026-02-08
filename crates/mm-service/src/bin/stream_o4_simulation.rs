@@ -14,7 +14,6 @@
 ///!     --rate 1.0 \
 ///!     --max-events 100
 ///! ```
-
 use anyhow::Result;
 use clap::Parser;
 use mm_simulation::{
@@ -236,12 +235,8 @@ async fn main() -> Result<()> {
         };
 
         // Simulate multi-messenger event
-        let mm_event = simulate_multimessenger_event(
-            &binary_params,
-            &gw_params,
-            &grb_config,
-            &mut rng,
-        );
+        let mm_event =
+            simulate_multimessenger_event(&binary_params, &gw_params, &grb_config, &mut rng);
 
         n_events += 1;
 
@@ -331,7 +326,10 @@ async fn main() -> Result<()> {
                     .await?;
                     n_optical_published += 1;
 
-                    info!("   🔭 Optical detected! mag={:.1}, type={}", mag, optical_alert.source_type);
+                    info!(
+                        "   🔭 Optical detected! mag={:.1}, type={}",
+                        mag, optical_alert.source_type
+                    );
                 }
             }
         }
@@ -339,8 +337,8 @@ async fn main() -> Result<()> {
         // 4. Calculate and publish joint FAR if multi-messenger
         if mm_event.has_grb() || (has_optical && optical_magnitude.is_some()) {
             let has_grb = mm_event.has_grb();
-            let has_optical_detectable = has_optical
-                && optical_magnitude.map_or(false, |m| m < args.limiting_magnitude);
+            let has_optical_detectable =
+                has_optical && optical_magnitude.map_or(false, |m| m < args.limiting_magnitude);
 
             let skymap_area_90 = (distance / 100.0).powi(2) * 100.0; // Simplified
 
@@ -396,7 +394,11 @@ async fn main() -> Result<()> {
                 "   {} MMA CORRELATION: GW+{}{}",
                 emoji,
                 if has_grb { "GRB" } else { "" },
-                if has_optical_detectable { "+Optical" } else { "" }
+                if has_optical_detectable {
+                    "+Optical"
+                } else {
+                    ""
+                }
             );
             info!(
                 "      FAR={:.2e}/yr, σ={:.2}, P_astro={:.1}%",

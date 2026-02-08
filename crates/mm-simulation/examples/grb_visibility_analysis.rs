@@ -55,7 +55,10 @@ fn analyze_jet_beaming(rng: &mut impl rand::Rng) {
     let config = GrbSimulationConfig::default();
     let n_events = 10000;
 
-    println!("Simulating {} BNS mergers with isotropic inclinations...", n_events);
+    println!(
+        "Simulating {} BNS mergers with isotropic inclinations...",
+        n_events
+    );
     println!("Mean jet opening angle: {:.1}°", config.jet_angle_mean);
 
     let mut n_visible = 0;
@@ -91,7 +94,10 @@ fn analyze_jet_beaming(rng: &mut impl rand::Rng) {
     // Expected visibility for θ_jet ~ 10°
     let solid_angle_jet = 2.0 * PI * (1.0 - (10f64.to_radians()).cos());
     let expected_fraction = solid_angle_jet / (4.0 * PI);
-    println!("\nTheoretical expectation (θ_jet = 10°): {:.2}%", expected_fraction * 100.0);
+    println!(
+        "\nTheoretical expectation (θ_jet = 10°): {:.2}%",
+        expected_fraction * 100.0
+    );
 }
 
 /// Analyze satellite detection constraints
@@ -134,10 +140,18 @@ fn analyze_satellite_detection(rng: &mut impl rand::Rng) {
         println!("  {} Detection:", name);
         println!("    Altitude: {:.0} km", config.altitude);
         if let Some(fov) = config.fov_solid_angle {
-            println!("    FOV: {:.1} sr ({:.1}% of sky)", fov, fov / (4.0 * PI) * 100.0);
+            println!(
+                "    FOV: {:.1} sr ({:.1}% of sky)",
+                fov,
+                fov / (4.0 * PI) * 100.0
+            );
         }
-        println!("    Detection rate: {:.1}% ({}/{})",
-            detection_rate * 100.0, n_detected, n_grbs);
+        println!(
+            "    Detection rate: {:.1}% ({}/{})",
+            detection_rate * 100.0,
+            n_detected,
+            n_grbs
+        );
         println!();
     }
 }
@@ -149,7 +163,10 @@ fn analyze_complete_detection_chain(rng: &mut impl rand::Rng) {
     let fermi_config = SatelliteConfig::fermi();
     let swift_config = SatelliteConfig::swift();
 
-    println!("Simulating complete detection chain for {} BNS mergers...\n", n_bns);
+    println!(
+        "Simulating complete detection chain for {} BNS mergers...\n",
+        n_bns
+    );
 
     let mut n_visible_grbs = 0;
     let mut n_fermi_detected = 0;
@@ -196,16 +213,19 @@ fn analyze_complete_detection_chain(rng: &mut impl rand::Rng) {
 
     println!("Results:");
     println!("  BNS mergers simulated: {}", n_bns);
-    println!("  Visible GRBs (jet beaming): {} ({:.2}%)",
+    println!(
+        "  Visible GRBs (jet beaming): {} ({:.2}%)",
         n_visible_grbs,
         n_visible_grbs as f64 / n_bns as f64 * 100.0
     );
-    println!("  Fermi detections: {} ({:.2}% of all, {:.1}% of visible)",
+    println!(
+        "  Fermi detections: {} ({:.2}% of all, {:.1}% of visible)",
         n_fermi_detected,
         n_fermi_detected as f64 / n_bns as f64 * 100.0,
         n_fermi_detected as f64 / n_visible_grbs as f64 * 100.0
     );
-    println!("  Swift detections: {} ({:.2}% of all, {:.1}% of visible)",
+    println!(
+        "  Swift detections: {} ({:.2}% of all, {:.1}% of visible)",
         n_swift_detected,
         n_swift_detected as f64 / n_bns as f64 * 100.0,
         n_swift_detected as f64 / n_visible_grbs as f64 * 100.0
@@ -213,7 +233,10 @@ fn analyze_complete_detection_chain(rng: &mut impl rand::Rng) {
 
     println!("\nKey Insight:");
     println!("  For every 1000 BNS mergers:");
-    println!("    → ~{} produce on-axis GRBs (jet beaming)", n_visible_grbs / 10);
+    println!(
+        "    → ~{} produce on-axis GRBs (jet beaming)",
+        n_visible_grbs / 10
+    );
     println!("    → ~{} detected by Fermi", n_fermi_detected / 10);
     println!("    → ~{} detected by Swift", n_swift_detected / 10);
 }
@@ -224,8 +247,10 @@ fn analyze_localization_accuracy(rng: &mut impl rand::Rng) {
     let true_ra = 180.0;
     let true_dec = 30.0;
 
-    println!("Testing localization accuracy for {} GRBs at (RA={:.1}°, Dec={:.1}°)\n",
-        n_localizations, true_ra, true_dec);
+    println!(
+        "Testing localization accuracy for {} GRBs at (RA={:.1}°, Dec={:.1}°)\n",
+        n_localizations, true_ra, true_dec
+    );
 
     let instruments = vec![
         ("Fermi GBM", GrbInstrument::FermiGBM),
@@ -239,12 +264,7 @@ fn analyze_localization_accuracy(rng: &mut impl rand::Rng) {
         let mut error_radii = Vec::new();
 
         for _ in 0..n_localizations {
-            let localization = add_localization_error(
-                true_ra,
-                true_dec,
-                instrument,
-                rng,
-            );
+            let localization = add_localization_error(true_ra, true_dec, instrument, rng);
 
             position_errors.push(localization.position_error());
             error_radii.push(localization.error_radius);
@@ -252,18 +272,27 @@ fn analyze_localization_accuracy(rng: &mut impl rand::Rng) {
 
         let mean_position_error = position_errors.iter().sum::<f64>() / n_localizations as f64;
         let mean_error_radius = error_radii.iter().sum::<f64>() / n_localizations as f64;
-        let min_error = position_errors.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max_error = position_errors.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let min_error = position_errors
+            .iter()
+            .cloned()
+            .fold(f64::INFINITY, f64::min);
+        let max_error = position_errors
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
 
         // Calculate 90% error region area
-        let ellipse_90 = add_localization_error(true_ra, true_dec, instrument, rng)
-            .to_error_ellipse(0.90);
+        let ellipse_90 =
+            add_localization_error(true_ra, true_dec, instrument, rng).to_error_ellipse(0.90);
         let area_90 = ellipse_90.area();
 
         println!("  {}:", name);
         println!("    Mean 1σ error radius: {:.3}°", mean_error_radius);
         println!("    Mean position error: {:.3}°", mean_position_error);
-        println!("    Position error range: {:.3}° - {:.3}°", min_error, max_error);
+        println!(
+            "    Position error range: {:.3}° - {:.3}°",
+            min_error, max_error
+        );
         println!("    90% error region: {:.1} sq deg", area_90);
 
         // Convert to arcminutes for small angles

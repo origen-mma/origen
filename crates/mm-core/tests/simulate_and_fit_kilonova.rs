@@ -2,7 +2,6 @@
 ///
 /// This demonstrates that the MetzgerKN model can correctly recover
 /// kilonova parameters from realistic noisy data.
-
 use mm_core::{fit_lightcurve, svi_models, FitModel, LightCurve, Photometry};
 use rand::Rng;
 
@@ -15,27 +14,41 @@ fn test_simulate_and_fit_kilonova() {
     let true_log10_vej = -1.0; // 0.1c
     let true_log10_kappa_r = 0.5; // kappa ~ 3 cm²/g
     let true_t0 = 0.0; // days (relative)
-    let true_params = vec![true_log10_mej, true_log10_vej, true_log10_kappa_r, true_t0, -3.0];
+    let true_params = vec![
+        true_log10_mej,
+        true_log10_vej,
+        true_log10_kappa_r,
+        true_t0,
+        -3.0,
+    ];
 
     println!("True parameters:");
-    println!("  log10(M_ej) = {:.2} (M_ej = {:.4} Msun)", true_log10_mej, 10f64.powf(true_log10_mej));
-    println!("  log10(v_ej) = {:.2} (v_ej = {:.2}c)", true_log10_vej, 10f64.powf(true_log10_vej));
-    println!("  log10(κ_r) = {:.2} (κ_r = {:.1} cm²/g)", true_log10_kappa_r, 10f64.powf(true_log10_kappa_r));
+    println!(
+        "  log10(M_ej) = {:.2} (M_ej = {:.4} Msun)",
+        true_log10_mej,
+        10f64.powf(true_log10_mej)
+    );
+    println!(
+        "  log10(v_ej) = {:.2} (v_ej = {:.2}c)",
+        true_log10_vej,
+        10f64.powf(true_log10_vej)
+    );
+    println!(
+        "  log10(κ_r) = {:.2} (κ_r = {:.1} cm²/g)",
+        true_log10_kappa_r,
+        10f64.powf(true_log10_kappa_r)
+    );
     println!("  t0 = {:.2} days\n", true_t0);
 
     // Generate synthetic observations
     // Typical kilonova cadence: sparse early, denser near peak
     let obs_times = vec![
-        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
-        5.5, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0,
+        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0,
     ];
 
     // Generate clean model fluxes
-    let clean_fluxes = svi_models::eval_model_batch(
-        svi_models::SviModel::MetzgerKN,
-        &true_params,
-        &obs_times,
-    );
+    let clean_fluxes =
+        svi_models::eval_model_batch(svi_models::SviModel::MetzgerKN, &true_params, &obs_times);
 
     // Find peak flux for normalization
     let peak_flux = clean_fluxes
@@ -61,7 +74,13 @@ fn test_simulate_and_fit_kilonova() {
     }
 
     println!("Generated {} synthetic observations", obs_times.len());
-    println!("  Peak flux: {:.1} counts", scaled_fluxes.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
+    println!(
+        "  Peak flux: {:.1} counts",
+        scaled_fluxes
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max)
+    );
     println!("  SNR: ~20\n");
 
     // Create synthetic light curve
@@ -94,12 +113,18 @@ fn test_simulate_and_fit_kilonova() {
     let fitted_t0_rel = fit_result.parameters[3]; // Relative to first obs
 
     println!("\nParameter recovery:");
-    println!("  log10(M_ej): true={:.2}, fitted={:.2} ± {:.2}",
-             true_log10_mej, fitted_log10_mej, fit_result.parameter_errors[0]);
-    println!("  log10(v_ej): true={:.2}, fitted={:.2} ± {:.2}",
-             true_log10_vej, fitted_log10_vej, fit_result.parameter_errors[1]);
-    println!("  log10(κ_r): true={:.2}, fitted={:.2} ± {:.2}",
-             true_log10_kappa_r, fitted_log10_kappa_r, fit_result.parameter_errors[2]);
+    println!(
+        "  log10(M_ej): true={:.2}, fitted={:.2} ± {:.2}",
+        true_log10_mej, fitted_log10_mej, fit_result.parameter_errors[0]
+    );
+    println!(
+        "  log10(v_ej): true={:.2}, fitted={:.2} ± {:.2}",
+        true_log10_vej, fitted_log10_vej, fit_result.parameter_errors[1]
+    );
+    println!(
+        "  log10(κ_r): true={:.2}, fitted={:.2} ± {:.2}",
+        true_log10_kappa_r, fitted_log10_kappa_r, fit_result.parameter_errors[2]
+    );
 
     // Check that we recovered parameters within ~3 sigma
     // (relaxed since PSO + SVI can have some variance)
@@ -113,12 +138,28 @@ fn test_simulate_and_fit_kilonova() {
     println!("  Δlog10(κ_r) = {:.3}", kappa_diff);
 
     // Relaxed thresholds since we're using PSO which can vary run-to-run
-    assert!(mej_diff < 1.0, "M_ej recovery failed: diff = {:.3}", mej_diff);
-    assert!(vej_diff < 0.5, "v_ej recovery failed: diff = {:.3}", vej_diff);
-    assert!(kappa_diff < 1.0, "κ_r recovery failed: diff = {:.3}", kappa_diff);
+    assert!(
+        mej_diff < 1.0,
+        "M_ej recovery failed: diff = {:.3}",
+        mej_diff
+    );
+    assert!(
+        vej_diff < 0.5,
+        "v_ej recovery failed: diff = {:.3}",
+        vej_diff
+    );
+    assert!(
+        kappa_diff < 1.0,
+        "κ_r recovery failed: diff = {:.3}",
+        kappa_diff
+    );
 
     // Check fit quality
-    assert!(fit_result.elbo > -500.0, "ELBO too low: {:.2}", fit_result.elbo);
+    assert!(
+        fit_result.elbo > -500.0,
+        "ELBO too low: {:.2}",
+        fit_result.elbo
+    );
 
     println!("\n✅ Kilonova parameter recovery successful!");
 }
@@ -134,7 +175,14 @@ fn test_simulate_supernova_with_bazin() {
     let true_t0 = 5.0; // days
     let true_log_tau_rise = (2.0_f64).ln(); // 2 days
     let true_log_tau_fall = (20.0_f64).ln(); // 20 days
-    let true_params = vec![true_log_a, true_b, true_t0, true_log_tau_rise, true_log_tau_fall, -3.0];
+    let true_params = vec![
+        true_log_a,
+        true_b,
+        true_t0,
+        true_log_tau_rise,
+        true_log_tau_fall,
+        -3.0,
+    ];
 
     println!("True parameters:");
     println!("  a = {:.2}", true_log_a.exp());
@@ -144,16 +192,11 @@ fn test_simulate_supernova_with_bazin() {
     println!("  τ_fall = {:.2} days\n", true_log_tau_fall.exp());
 
     // Generate observations from -5 to +40 days
-    let obs_times: Vec<f64> = (0..30)
-        .map(|i| -5.0 + i as f64 * 1.5)
-        .collect();
+    let obs_times: Vec<f64> = (0..30).map(|i| -5.0 + i as f64 * 1.5).collect();
 
     // Generate clean fluxes
-    let clean_fluxes = svi_models::eval_model_batch(
-        svi_models::SviModel::Bazin,
-        &true_params,
-        &obs_times,
-    );
+    let clean_fluxes =
+        svi_models::eval_model_batch(svi_models::SviModel::Bazin, &true_params, &obs_times);
 
     // Scale and add noise
     let scale_factor = 100.0;
@@ -189,7 +232,11 @@ fn test_simulate_supernova_with_bazin() {
     let fit_result = fit_lightcurve(&lightcurve, FitModel::Bazin).unwrap();
 
     println!("\nFit results:");
-    println!("  t0: {:.3} ± {:.3} days", fit_result.t0 - mjd_offset, fit_result.t0_err);
+    println!(
+        "  t0: {:.3} ± {:.3} days",
+        fit_result.t0 - mjd_offset,
+        fit_result.t0_err
+    );
     println!("  ELBO: {:.2}", fit_result.elbo);
 
     // Check t0 recovery (first obs is at -5, so true t0 is at 5 relative to that)
@@ -198,13 +245,23 @@ fn test_simulate_supernova_with_bazin() {
     let t0_error = (fitted_t0_rel - true_t0_rel).abs();
 
     println!("\nParameter recovery:");
-    println!("  t0: true={:.2}, fitted={:.2} ± {:.2} days",
-             true_t0_rel, fitted_t0_rel, fit_result.parameter_errors[2]);
+    println!(
+        "  t0: true={:.2}, fitted={:.2} ± {:.2} days",
+        true_t0_rel, fitted_t0_rel, fit_result.parameter_errors[2]
+    );
     println!("  Δt0 = {:.3} days", t0_error);
 
     // Check that t0 is recovered within ~3 days
-    assert!(t0_error < 3.0, "t0 recovery failed: error = {:.3} days", t0_error);
-    assert!(fit_result.elbo > -500.0, "ELBO too low: {:.2}", fit_result.elbo);
+    assert!(
+        t0_error < 3.0,
+        "t0 recovery failed: error = {:.3} days",
+        t0_error
+    );
+    assert!(
+        fit_result.elbo > -500.0,
+        "ELBO too low: {:.2}",
+        fit_result.elbo
+    );
 
     println!("\n✅ Supernova parameter recovery successful!");
 }

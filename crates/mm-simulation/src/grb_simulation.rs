@@ -309,25 +309,13 @@ pub fn compute_simulation_stats(grbs: &[SimulatedGrb]) -> GrbSimulationStats {
     let mean_jet_angle = grbs.iter().map(|g| g.theta_jet_deg).sum::<f64>() / total_events as f64;
 
     let mean_fluence = if n_visible > 0 {
-        Some(
-            visible_grbs
-                .iter()
-                .filter_map(|g| g.fluence)
-                .sum::<f64>()
-                / n_visible as f64,
-        )
+        Some(visible_grbs.iter().filter_map(|g| g.fluence).sum::<f64>() / n_visible as f64)
     } else {
         None
     };
 
     let mean_t90_obs = if n_visible > 0 {
-        Some(
-            visible_grbs
-                .iter()
-                .filter_map(|g| g.t90_obs)
-                .sum::<f64>()
-                / n_visible as f64,
-        )
+        Some(visible_grbs.iter().filter_map(|g| g.t90_obs).sum::<f64>() / n_visible as f64)
     } else {
         None
     };
@@ -634,7 +622,10 @@ mod tests {
         println!("\nGRB Simulation Statistics:");
         println!("  Total events: {}", stats.total_events);
         println!("  Visible GRBs: {}", stats.visible_grbs);
-        println!("  Visibility fraction: {:.1}%", stats.visibility_fraction * 100.0);
+        println!(
+            "  Visibility fraction: {:.1}%",
+            stats.visibility_fraction * 100.0
+        );
         println!("  Mean jet angle: {:.1}°", stats.mean_jet_angle);
 
         if let Some(mean_fluence) = stats.mean_fluence {
@@ -727,10 +718,7 @@ mod tests {
         println!("Disk mass: {:.4} M_sun", event.ejecta.mdisk);
 
         // Check ejecta properties
-        assert_eq!(
-            event.binary_type,
-            crate::ejecta_properties::BinaryType::BNS
-        );
+        assert_eq!(event.binary_type, crate::ejecta_properties::BinaryType::BNS);
         assert!(event.has_kilonova());
         assert!(event.kilonova_mass() > 0.0);
         assert!(event.ejecta.mdisk > 0.0);
@@ -767,16 +755,16 @@ mod tests {
                 tov_mass: 2.17,
                 r_16: 11.9,
                 ratio_zeta: 0.2,
-                alpha: 0.0,  // No additive correction
+                alpha: 0.0, // No additive correction
                 ratio_epsilon: 0.1,
             })
             .collect();
 
         let gw_params: Vec<_> = (0..n_events)
             .map(|_| GwEventParams {
-                inclination: rng.gen::<f64>() * PI, // Random inclination
+                inclination: rng.gen::<f64>() * PI,        // Random inclination
                 distance: 50.0 + rng.gen::<f64>() * 150.0, // 50-200 Mpc
-                z: 0.01 + rng.gen::<f64>() * 0.04, // z = 0.01-0.05
+                z: 0.01 + rng.gen::<f64>() * 0.04,         // z = 0.01-0.05
             })
             .collect();
 
@@ -821,11 +809,11 @@ mod tests {
 
         // NSBH system: 5 M_sun BH + 1.4 M_sun NS
         let binary_params = crate::ejecta_properties::BinaryParams {
-            mass_1_source: 5.0,  // BH
-            mass_2_source: 1.4,  // NS
-            radius_1: 0.0,       // BH has no radius
-            radius_2: 12.0,      // NS radius
-            chi_1: 0.5,          // Spinning BH
+            mass_1_source: 5.0, // BH
+            mass_2_source: 1.4, // NS
+            radius_1: 0.0,      // BH has no radius
+            radius_2: 12.0,     // NS radius
+            chi_1: 0.5,         // Spinning BH
             chi_2: 0.0,
             tov_mass: 2.17,
             r_16: 12.0,

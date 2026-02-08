@@ -9,8 +9,8 @@
 //! ```
 
 use mm_simulation::{
-    simulate_multimessenger_event, AfterglowConfig, BinaryParams,
-    GrbSimulationConfig, GwEventParams,
+    simulate_multimessenger_event, AfterglowConfig, BinaryParams, GrbSimulationConfig,
+    GwEventParams,
 };
 use rand::{thread_rng, Rng};
 use std::f64::consts::PI;
@@ -24,13 +24,12 @@ fn main() {
     let n_events = 1000;
 
     // Survey configurations
-    let surveys = vec![
-        ("ZTF", 21.0),
-        ("DECam", 23.5),
-        ("LSST", 24.5),
-    ];
+    let surveys = vec![("ZTF", 21.0), ("DECam", 23.5), ("LSST", 24.5)];
 
-    println!("Simulating {} BNS mergers with random viewing angles...\n", n_events);
+    println!(
+        "Simulating {} BNS mergers with random viewing angles...\n",
+        n_events
+    );
 
     for (survey_name, limiting_mag) in surveys {
         let config = AfterglowConfig {
@@ -101,14 +100,28 @@ fn main() {
         };
 
         println!("📡 {} (limiting mag = {:.1}):", survey_name, limiting_mag);
-        println!("   Events with on-axis GRB: {} / {} ({:.1}%)", n_with_grb, n_events, n_with_grb as f64 / n_events as f64 * 100.0);
-        println!("   Detectable afterglows: {} / {} GRBs ({:.1}%)", n_detectable, n_with_grb, detection_rate);
+        println!(
+            "   Events with on-axis GRB: {} / {} ({:.1}%)",
+            n_with_grb,
+            n_events,
+            n_with_grb as f64 / n_events as f64 * 100.0
+        );
+        println!(
+            "   Detectable afterglows: {} / {} GRBs ({:.1}%)",
+            n_detectable, n_with_grb, detection_rate
+        );
 
         if !mags_detected.is_empty() {
             let mean_mag = mags_detected.iter().sum::<f64>() / mags_detected.len() as f64;
             let brightest = mags_detected.iter().cloned().fold(f64::INFINITY, f64::min);
-            let faintest = mags_detected.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            println!("   Detected mags: mean={:.2}, range={:.2}-{:.2}", mean_mag, brightest, faintest);
+            let faintest = mags_detected
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
+            println!(
+                "   Detected mags: mean={:.2}, range={:.2}-{:.2}",
+                mean_mag, brightest, faintest
+            );
         }
 
         if !mags_missed.is_empty() {

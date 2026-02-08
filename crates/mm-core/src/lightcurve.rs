@@ -37,8 +37,8 @@ impl Photometry {
     pub fn new_upper_limit(mjd: f64, limiting_flux: f64, filter: String) -> Self {
         Self {
             mjd,
-            flux: limiting_flux,  // Store limit in flux field
-            flux_err: limiting_flux / 5.0,  // Assume 5-sigma limit
+            flux: limiting_flux,           // Store limit in flux field
+            flux_err: limiting_flux / 5.0, // Assume 5-sigma limit
             filter,
             is_upper_limit: true,
         }

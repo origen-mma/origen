@@ -51,7 +51,10 @@ fn main() -> anyhow::Result<()> {
 
     // Read injections.dat file
     let injections_file = args.bgp_path.join("injections.dat");
-    println!("Reading O4 gravitational wave events from: {:?}", injections_file);
+    println!(
+        "Reading O4 gravitational wave events from: {:?}",
+        injections_file
+    );
 
     let file = File::open(&injections_file)
         .map_err(|e| anyhow::anyhow!("Failed to open injections.dat: {}", e))?;
@@ -59,18 +62,18 @@ fn main() -> anyhow::Result<()> {
 
     // FAR configuration
     let far_config = JointFarConfig {
-        gw_observing_time: 1.0,                    // 1 year O4 run
-        grb_rate_per_year: 300.0,                  // ~300 SGRBs/year all sky
-        optical_rate_per_sqdeg_per_year: 500.0,   // ZTF-like transient rate
-        optical_time_window_days: 14.0,           // 2 week search window
-        grb_time_window_seconds: 10.0,            // ±5 seconds
+        gw_observing_time: 1.0,                 // 1 year O4 run
+        grb_rate_per_year: 300.0,               // ~300 SGRBs/year all sky
+        optical_rate_per_sqdeg_per_year: 500.0, // ZTF-like transient rate
+        optical_time_window_days: 14.0,         // 2 week search window
+        grb_time_window_seconds: 10.0,          // ±5 seconds
     };
 
     // Event counters and statistics
     let mut n_events = 0;
-    let mut n_mm_associations = 0;  // GW + GRB + optical
-    let mut n_gw_grb = 0;            // GW + GRB only
-    let mut n_gw_optical = 0;        // GW + optical only
+    let mut n_mm_associations = 0; // GW + GRB + optical
+    let mut n_gw_grb = 0; // GW + GRB only
+    let mut n_gw_optical = 0; // GW + optical only
 
     let mut far_values = Vec::new();
     let mut significance_values = Vec::new();
@@ -96,7 +99,10 @@ fn main() -> anyhow::Result<()> {
         let parts: Vec<&str> = line.split('\t').collect();
 
         if parts.len() < 9 {
-            eprintln!("Warning: Line {} has insufficient columns, skipping", line_num + 1);
+            eprintln!(
+                "Warning: Line {} has insufficient columns, skipping",
+                line_num + 1
+            );
             continue;
         }
 
@@ -134,31 +140,27 @@ fn main() -> anyhow::Result<()> {
         };
 
         // Simulate multi-messenger event
-        let mm_event = simulate_multimessenger_event(
-            &binary_params,
-            &gw_params,
-            &grb_config,
-            &mut rng,
-        );
+        let mm_event =
+            simulate_multimessenger_event(&binary_params, &gw_params, &grb_config, &mut rng);
 
         n_events += 1;
 
         // Calculate GW SNR (simplified - would use real LIGO SNR formula)
-        let gw_snr = 8.0 + (1.0 / distance * 100.0);  // Rough approximation
+        let gw_snr = 8.0 + (1.0 / distance * 100.0); // Rough approximation
 
         // Calculate GW FAR based on SNR (simplified)
         // Real calculation would use LIGO pipeline FAR estimates
         let gw_far_per_year = if gw_snr > 12.0 {
-            0.01  // High SNR
+            0.01 // High SNR
         } else if gw_snr > 10.0 {
-            0.1   // Medium SNR
+            0.1 // Medium SNR
         } else {
-            1.0   // Low SNR
+            1.0 // Low SNR
         };
 
         // Skymap area (simplified - would use real skymap from LIGO)
         // Area scales roughly as distance^2 for fixed SNR
-        let skymap_area_90 = (distance / 100.0).powi(2) * 100.0;  // sq deg
+        let skymap_area_90 = (distance / 100.0).powi(2) * 100.0; // sq deg
 
         // Only calculate FAR if there's an EM counterpart
         if mm_event.has_grb() || mm_event.has_afterglow() || mm_event.has_kilonova() {
@@ -206,7 +208,10 @@ fn main() -> anyhow::Result<()> {
                 }
                 println!("  Joint FAR: {:.2e} per year", far_result.far_per_year);
                 println!("  Significance: {:.1} sigma", far_result.significance_sigma);
-                println!("  P_astro: {:.1}%", 100.0 * calculate_pastro(far_result.far_per_year, 1.0));
+                println!(
+                    "  P_astro: {:.1}%",
+                    100.0 * calculate_pastro(far_result.far_per_year, 1.0)
+                );
                 println!();
             }
         }
@@ -221,12 +226,21 @@ fn main() -> anyhow::Result<()> {
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     println!("Total events processed: {}", n_events);
-    println!("  GW + GRB + Optical: {} ({:.1}%)", n_mm_associations,
-             100.0 * n_mm_associations as f64 / n_events as f64);
-    println!("  GW + GRB only:      {} ({:.1}%)", n_gw_grb,
-             100.0 * n_gw_grb as f64 / n_events as f64);
-    println!("  GW + Optical only:  {} ({:.1}%)", n_gw_optical,
-             100.0 * n_gw_optical as f64 / n_events as f64);
+    println!(
+        "  GW + GRB + Optical: {} ({:.1}%)",
+        n_mm_associations,
+        100.0 * n_mm_associations as f64 / n_events as f64
+    );
+    println!(
+        "  GW + GRB only:      {} ({:.1}%)",
+        n_gw_grb,
+        100.0 * n_gw_grb as f64 / n_events as f64
+    );
+    println!(
+        "  GW + Optical only:  {} ({:.1}%)",
+        n_gw_optical,
+        100.0 * n_gw_optical as f64 / n_events as f64
+    );
 
     if !far_values.is_empty() {
         println!("\n╔══════════════════════════════════════════════════════════════╗");
@@ -269,21 +283,34 @@ fn main() -> anyhow::Result<()> {
         let n_5sigma = significance_values.iter().filter(|&&s| s > 5.0).count();
 
         println!("\nSignificance thresholds:");
-        println!("  > 3σ: {} ({:.1}%)", n_3sigma,
-                 100.0 * n_3sigma as f64 / significance_values.len() as f64);
-        println!("  > 5σ: {} ({:.1}%)", n_5sigma,
-                 100.0 * n_5sigma as f64 / significance_values.len() as f64);
+        println!(
+            "  > 3σ: {} ({:.1}%)",
+            n_3sigma,
+            100.0 * n_3sigma as f64 / significance_values.len() as f64
+        );
+        println!(
+            "  > 5σ: {} ({:.1}%)",
+            n_5sigma,
+            100.0 * n_5sigma as f64 / significance_values.len() as f64
+        );
 
         println!("\n╔══════════════════════════════════════════════════════════════╗");
         println!("║                    Key Insights                              ║");
         println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-        println!("• {} multi-messenger associations detected", far_values.len());
+        println!(
+            "• {} multi-messenger associations detected",
+            far_values.len()
+        );
         println!("• Median significance: {:.1}σ", median_sigma);
-        println!("• {:.0}% of associations are >3σ significant",
-                 100.0 * n_3sigma as f64 / significance_values.len() as f64);
-        println!("• {:.0}% of associations are >5σ (discovery level)",
-                 100.0 * n_5sigma as f64 / significance_values.len() as f64);
+        println!(
+            "• {:.0}% of associations are >3σ significant",
+            100.0 * n_3sigma as f64 / significance_values.len() as f64
+        );
+        println!(
+            "• {:.0}% of associations are >5σ (discovery level)",
+            100.0 * n_5sigma as f64 / significance_values.len() as f64
+        );
         println!();
         println!("💡 Joint FAR accounts for:");
         println!("   - GW detection significance (network SNR, FAR)");
