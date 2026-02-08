@@ -1,4 +1,5 @@
 pub mod afterglow;
+pub mod background_grbs;
 pub mod ejecta_properties;
 pub mod gcn_circular;
 pub mod grb_localization;
@@ -10,6 +11,10 @@ pub mod satellite;
 pub mod voevent;
 
 pub use afterglow::{simulate_afterglow, AfterglowConfig, AfterglowProperties, JetStructure};
+pub use background_grbs::{
+    calculate_chance_coincidences, expected_chance_coincidences, generate_background_grbs,
+    BackgroundGrb, BackgroundGrbConfig, ChanceCoincidenceStats, GrbSatellite,
+};
 pub use ejecta_properties::{
     compute_ejecta_properties, BinaryParams, BinaryType, EjectaProperties,
 };
