@@ -164,6 +164,85 @@ pub fn calculate_skymap_offset(position: &SkyPosition, skymap: &ParsedSkymap) ->
     }
 }
 
+/// Calculate combined spatiotemporal FAR using RAVEN methodology
+///
+/// This implements the RAVEN formula from doi.org/10.3847/1538-4357/aabfd2:
+///
+/// ```text
+/// temporal_far = time_window × ext_rate × gw_far
+/// spatiotemporal_far = temporal_far / spatial_overlap
+/// ```
+///
+/// Where:
+/// - `time_window`: Coincidence window in seconds (e.g., 10s for GRB, 86400s for optical)
+/// - `ext_rate`: External event rate in Hz (e.g., 325 GRB/yr = 1.03e-5 /s)
+/// - `gw_far`: Gravitational wave false alarm rate in Hz
+/// - `spatial_overlap`: Skymap overlap integral (probability)
+///
+/// # Arguments
+/// * `time_window` - Coincidence window in seconds
+/// * `ext_rate` - External event rate in Hz (events per second)
+/// * `gw_far` - GW false alarm rate in Hz
+/// * `spatial_overlap` - Spatial probability from skymap integration
+///
+/// # Returns
+/// Combined spatiotemporal FAR in Hz (events per second)
+///
+/// # Example
+/// ```rust
+/// // GRB search: 10s window, 325 GRB/yr, typical BNS FAR, median spatial overlap
+/// let time_window = 10.0; // seconds
+/// let grb_rate = 325.0 / (365.25 * 24.0 * 3600.0); // 325/yr → Hz
+/// let gw_far = 1e-7; // typical BNS FAR
+/// let spatial_overlap = 3.4e-6; // median from calibration (1/290,000)
+///
+/// let combined_far = calculate_raven_spatiotemporal_far(
+///     time_window, grb_rate, gw_far, spatial_overlap
+/// );
+/// // Expected: ~0.3 per year for prompt GRB with good localization
+/// ```
+pub fn calculate_raven_spatiotemporal_far(
+    time_window: f64,
+    ext_rate: f64,
+    gw_far: f64,
+    spatial_overlap: f64,
+) -> f64 {
+    // Temporal FAR (RAVEN untargeted search formula)
+    let temporal_far = time_window * ext_rate * gw_far;
+
+    // Spatiotemporal FAR (divide by spatial overlap)
+    if spatial_overlap > 0.0 {
+        temporal_far / spatial_overlap
+    } else {
+        // If spatial overlap is zero, return infinite FAR (no coincidence)
+        f64::INFINITY
+    }
+}
+
+/// Standard background rates for RAVEN-style calculations
+/// Source: doi.org/10.3847/1538-4357/aabfd2 and LIGO-T2400116
+pub mod background_rates {
+    /// Combined GRB rate from Fermi-GBM + Swift-BAT + SVOM ECLAIRs
+    /// = 325 per year = 1.03e-5 per second
+    pub const GRB_RATE_HZ: f64 = 325.0 / (365.25 * 24.0 * 3600.0);
+
+    /// Sub-threshold GRB rate
+    /// = 65 per year = 2.06e-6 per second
+    pub const SUBGRB_RATE_HZ: f64 = 65.0 / (365.25 * 24.0 * 3600.0);
+
+    /// Combined GRB + SubGRB rate
+    /// = 390 per year = 1.24e-5 per second
+    pub const TOTAL_GRB_RATE_HZ: f64 = GRB_RATE_HZ + SUBGRB_RATE_HZ;
+
+    /// IceCube high-energy neutrino rate
+    /// = 13.91 per year = 4.41e-7 per second
+    pub const NEUTRINO_RATE_HZ: f64 = 13.91 / (365.25 * 24.0 * 3600.0);
+
+    /// Supernova rate relative to kilonova rate
+    /// Assumption: ~10,000× more common based on volumetric rates
+    pub const SN_TO_KN_RATE_RATIO: f64 = 10_000.0;
+}
+
 /// Result of skymap offset calculation
 #[derive(Debug, Clone)]
 pub struct SkymapOffset {
@@ -794,6 +873,88 @@ mod tests {
                 background_probs.len(),
                 100.0 * n_bg_zero as f64 / background_probs.len() as f64
             );
+
+            // ========== RAVEN-STYLE ANALYTICAL FAR CALCULATION ==========
+            println!("\n========== RAVEN ANALYTICAL FAR ==========");
+
+            // Use RAVEN background rates and parameters
+            let time_window = 10.0; // GRB search: -5s to +5s = 10s window
+            let grb_rate = background_rates::GRB_RATE_HZ; // 325/yr
+            let gw_far = 1e-7; // Typical BNS FAR in Hz
+
+            println!("  Parameters:");
+            println!("    Time window: {:.1} s", time_window);
+            println!(
+                "    GRB rate: {:.3e} Hz ({:.1} /yr)",
+                grb_rate,
+                grb_rate * 365.25 * 24.0 * 3600.0
+            );
+            println!("    GW FAR: {:.2e} Hz", gw_far);
+
+            // Calculate analytical FAR using median spatial overlap
+            let temporal_far = time_window * grb_rate * gw_far;
+            let spatiotemporal_far_median =
+                calculate_raven_spatiotemporal_far(time_window, grb_rate, gw_far, signal_median);
+
+            println!("\n  RAVEN Formula Results:");
+            println!(
+                "    Temporal FAR: {:.3e} Hz ({:.4} /yr)",
+                temporal_far,
+                temporal_far * 365.25 * 24.0 * 3600.0
+            );
+            println!(
+                "    Spatiotemporal FAR (median signal): {:.3e} Hz ({:.4} /yr)",
+                spatiotemporal_far_median,
+                spatiotemporal_far_median * 365.25 * 24.0 * 3600.0
+            );
+            println!(
+                "    Spatial correction factor: {:.0}× (= 1/P_spatial)",
+                1.0 / signal_median
+            );
+
+            // Note: RAVEN gives FAR for individual coincidences, not discrimination between distributions
+            let empirical_discrimination = signal_median / bg_median;
+            println!("\n  Note on Methodology:");
+            println!("    RAVEN FAR measures: How often would this coincidence occur by chance?");
+            println!("    Empirical discrimination measures: How much more likely is signal vs background?");
+            println!("    These are different metrics - RAVEN is event-by-event, empirical is distribution-based.");
+            println!("\n  Empirical discrimination (signal/background medians): {:.0}×", empirical_discrimination);
+
+            // Distribution of RAVEN FAR values across all signal trials
+            let mut raven_fars: Vec<f64> = signal_probs
+                .iter()
+                .map(|&p| calculate_raven_spatiotemporal_far(time_window, grb_rate, gw_far, p))
+                .filter(|&f| f.is_finite())
+                .collect();
+            raven_fars.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            if !raven_fars.is_empty() {
+                let raven_median = raven_fars[raven_fars.len() / 2];
+                let raven_95th =
+                    raven_fars[(raven_fars.len() as f64 * 0.95).min(raven_fars.len() as f64 - 1.0) as usize];
+
+                println!("\n  Signal FAR Distribution:");
+                println!(
+                    "    Median FAR: {:.3e} Hz ({:.4} /yr)",
+                    raven_median,
+                    raven_median * 365.25 * 24.0 * 3600.0
+                );
+                println!(
+                    "    95th percentile FAR: {:.3e} Hz ({:.2} /yr)",
+                    raven_95th,
+                    raven_95th * 365.25 * 24.0 * 3600.0
+                );
+
+                // Count how many signals have FAR < 1/yr (typical alert threshold)
+                let far_threshold = 1.0 / (365.25 * 24.0 * 3600.0); // 1/yr in Hz
+                let n_significant = raven_fars.iter().filter(|&&f| f < far_threshold).count();
+                println!(
+                    "    Signals with FAR < 1/yr: {} / {} ({:.1}%)",
+                    n_significant,
+                    raven_fars.len(),
+                    100.0 * n_significant as f64 / raven_fars.len() as f64
+                );
+            }
 
             // Store results for comparison
             all_results.push((
