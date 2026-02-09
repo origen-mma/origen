@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Messenger Sky Map Test</title>
+    <script src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js"></script>
+    <style>
+        #aladin-container { width: 100%; height: 700px; }
+        #status { padding: 20px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div id="status">Loading...</div>
+    <div id="aladin-container"></div>
+    <script>
+        // Test API connection first
+        fetch('http://localhost:8080/api/events')
+            .then(r => {
+                document.getElementById('status').innerHTML = `API Status: ${r.status} ${r.statusText}`;
+                return r.json();
+            })
+            .then(events => {
+                document.getElementById('status').innerHTML += `<br>Loaded ${events.length} events<br>Events: ${events.map(e => e.event_id).join(', ')}`;
+
+                // Initialize Aladin
+                let aladin = A.aladin('#aladin-container', {
+                    survey: 'P/DSS2/color',
+                    fov: 180,
+                    projection: 'AIT',
+                    showCooGrid: true
+                });
+
+                // Create catalogs
+                const multiCat = A.catalog({name: 'Multi-Messenger', color: '#ff6b6b', sourceSize: 25});
+                const gwCat = A.catalog({name: 'GW Only', color: '#00d4ff', sourceSize: 20});
+                aladin.addCatalog(multiCat);
+                aladin.addCatalog(gwCat);
+
+                // Add markers
+                events.forEach(e => {
+                    const hasEM = (e.grb_detections?.length > 0) || (e.optical_detections?.length > 0);
+                    let popup = `<b>${e.event_id}</b><br>SNR: ${e.snr.toFixed(1)}<br>FAR: ${e.far.toExponential(2)}`;
+
+                    if (e.grb_detections?.length > 0) {
+                        popup += '<br><br><b>GRB Detections:</b>';
+                        e.grb_detections.forEach(g => popup += `<br>• ${g.instrument}`);
+                    }
+
+                    if (e.optical_detections?.length > 0) {
+                        popup += '<br><br><b>Optical Detections:</b>';
+                        e.optical_detections.forEach(o =>
+                            popup += `<br>• ${o.survey}: ${o.transient_type}<br>  mag ${o.magnitude.toFixed(1)}`
+                        );
+                    }
+
+                    const marker = A.marker(e.ra, e.dec, {popupTitle: e.event_id, popupDesc: popup});
+                    (hasEM ? multiCat : gwCat).addSources([marker]);
+                });
+
+                console.log('Loaded ' + events.length + ' events successfully');
+            })
+            .catch(err => {
+                console.error('API Error:', err);
+                document.getElementById('status').innerHTML =
+                    '<p style="color:red;">Error: ' + err.message + '</p>';
+                document.getElementById('aladin-container').innerHTML =
+                    '<p style="color:red;padding:20px;">Error: Cannot connect to API at http://localhost:8080</p>';
+            });
+    </script>
+</body>
+</html>

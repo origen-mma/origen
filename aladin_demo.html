@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Messenger Skymap Viewer - Aladin Demo</title>
+    <script src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        h1 {
+            color: #4fc3f7;
+            border-bottom: 2px solid #4fc3f7;
+            padding-bottom: 10px;
+        }
+
+        #controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+
+        #event-selector {
+            padding: 8px;
+            font-size: 14px;
+            margin: 0 10px;
+            background: #3a3a3a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            font-size: 14px;
+            background: #4fc3f7;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+
+        button:hover {
+            background: #29b6f6;
+        }
+
+        #aladin-lite-div {
+            width: 100%;
+            height: 600px;
+            margin: 20px 0;
+            border: 2px solid #4fc3f7;
+            border-radius: 8px;
+        }
+
+        #event-info {
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .info-card {
+            background: #3a3a3a;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #4fc3f7;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #4fc3f7;
+        }
+
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .status-success {
+            background: #2e7d32;
+            color: #a5d6a7;
+        }
+
+        .status-error {
+            background: #c62828;
+            color: #ef9a9a;
+        }
+
+        .status-info {
+            background: #1565c0;
+            color: #90caf9;
+        }
+
+        .detections {
+            margin-top: 15px;
+        }
+
+        .detection-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            margin: 4px;
+            background: #4fc3f7;
+            color: #000;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌌 Multi-Messenger Event Skymap Viewer</h1>
+
+    <div id="status" class="status-info">Connecting to API at http://localhost:8080...</div>
+
+    <div id="controls">
+        <label for="event-selector">Select Event:</label>
+        <select id="event-selector">
+            <option value="">Loading events...</option>
+        </select>
+        <button onclick="loadSelectedEvent()">Load Skymap</button>
+        <button onclick="refreshEvents()">Refresh Events</button>
+        <button onclick="toggleFullscreen()">Toggle Fullscreen</button>
+    </div>
+
+    <div id="aladin-lite-div"></div>
+
+    <div id="event-info" style="display: none;">
+        <h2>Event Details</h2>
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="info-label">Event ID</div>
+                <div class="info-value" id="info-event-id">—</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">GPS Time</div>
+                <div class="info-value" id="info-gpstime">—</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">Position (RA, Dec)</div>
+                <div class="info-value" id="info-position">—</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">SNR</div>
+                <div class="info-value" id="info-snr">—</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">FAR (Hz)</div>
+                <div class="info-value" id="info-far">—</div>
+            </div>
+        </div>
+        <div class="detections" id="detections"></div>
+    </div>
+
+    <script>
+        let aladin;
+        let allEvents = [];
+
+        // Initialize Aladin Lite
+        function initAladin() {
+            aladin = A.aladin('#aladin-lite-div', {
+                survey: 'P/DSS2/color',
+                fov: 180,
+                projection: 'AIT',
+                showCooGrid: true,
+                showReticle: false
+            });
+        }
+
+        // Fetch events from API
+        async function fetchEvents() {
+            try {
+                const response = await fetch('http://localhost:8080/api/events');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                allEvents = await response.json();
+                updateEventSelector();
+                setStatus(`✓ Loaded ${allEvents.length} events`, 'success');
+                return true;
+            } catch (error) {
+                console.error('Failed to fetch events:', error);
+                setStatus(`✗ Failed to connect to API: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Update event selector dropdown
+        function updateEventSelector() {
+            const selector = document.getElementById('event-selector');
+            selector.innerHTML = '';
+
+            if (allEvents.length === 0) {
+                selector.innerHTML = '<option value="">No events available</option>';
+                return;
+            }
+
+            allEvents.forEach(event => {
+                const option = document.createElement('option');
+                option.value = event.event_id;
+                option.textContent = `${event.event_id} | GPS: ${event.gpstime.toFixed(2)} | SNR: ${event.snr.toFixed(1)}`;
+                selector.appendChild(option);
+            });
+
+            // Auto-select first event
+            if (allEvents.length > 0) {
+                selector.selectedIndex = 0;
+            }
+        }
+
+        // Load selected event's skymap
+        async function loadSelectedEvent() {
+            const selector = document.getElementById('event-selector');
+            const eventId = selector.value;
+
+            if (!eventId) {
+                setStatus('Please select an event', 'error');
+                return;
+            }
+
+            const event = allEvents.find(e => e.event_id === eventId);
+            if (!event) {
+                setStatus(`Event ${eventId} not found`, 'error');
+                return;
+            }
+
+            setStatus(`Loading skymap for ${eventId}...`, 'info');
+
+            // Display event information
+            displayEventInfo(event);
+
+            // Point Aladin to event position
+            aladin.gotoRaDec(event.ra, event.dec);
+            aladin.setFoV(60);  // 60 degree field of view
+
+            // Add marker at event position
+            let catalog = A.catalog({name: 'GW Event', color: '#4fc3f7', sourceSize: 18});
+            aladin.removeLayers();
+            aladin.addCatalog(catalog);
+            catalog.addSources([
+                A.marker(event.ra, event.dec, {
+                    popupTitle: event.event_id,
+                    popupDesc: `<strong>SNR:</strong> ${event.snr.toFixed(2)}<br>` +
+                               `<strong>FAR:</strong> ${event.far.toExponential(2)} Hz<br>` +
+                               `<strong>GPS:</strong> ${event.gpstime.toFixed(2)}`
+                })
+            ]);
+
+            // Try to load skymap if available
+            if (event.skymap_url) {
+                try {
+                    const skymapUrl = `http://localhost:8080${event.skymap_url}`;
+                    // Note: displayFITS requires the skymap to be in FITS format
+                    // This is a placeholder - actual FITS loading would need proper implementation
+                    setStatus(`✓ Loaded event ${eventId} (skymap visualization coming soon)`, 'success');
+                } catch (error) {
+                    console.error('Failed to load skymap:', error);
+                    setStatus(`✓ Loaded event ${eventId} (skymap data not yet available)`, 'info');
+                }
+            } else {
+                setStatus(`✓ Loaded event ${eventId} (no skymap available)`, 'success');
+            }
+        }
+
+        // Display event information
+        function displayEventInfo(event) {
+            document.getElementById('event-info').style.display = 'block';
+            document.getElementById('info-event-id').textContent = event.event_id;
+            document.getElementById('info-gpstime').textContent = event.gpstime.toFixed(4);
+            document.getElementById('info-position').textContent =
+                `${event.ra.toFixed(3)}°, ${event.dec.toFixed(3)}°`;
+            document.getElementById('info-snr').textContent = event.snr.toFixed(2);
+            document.getElementById('info-far').textContent = event.far.toExponential(2);
+
+            // Show detections
+            const detectionsDiv = document.getElementById('detections');
+            detectionsDiv.innerHTML = '<h3>Associated Detections</h3>';
+
+            if (event.grb_detections && event.grb_detections.length > 0) {
+                event.grb_detections.forEach(grb => {
+                    const badge = document.createElement('span');
+                    badge.className = 'detection-badge';
+                    badge.textContent = `🔥 GRB: ${grb.instrument}`;
+                    badge.style.background = '#ff6b6b';
+                    detectionsDiv.appendChild(badge);
+                });
+            }
+
+            if (event.optical_detections && event.optical_detections.length > 0) {
+                event.optical_detections.forEach(opt => {
+                    const badge = document.createElement('span');
+                    badge.className = 'detection-badge';
+                    badge.textContent = `💫 ${opt.survey}: mag ${opt.magnitude.toFixed(1)}`;
+                    badge.style.background = '#51cf66';
+                    detectionsDiv.appendChild(badge);
+                });
+            }
+
+            if ((!event.grb_detections || event.grb_detections.length === 0) &&
+                (!event.optical_detections || event.optical_detections.length === 0)) {
+                detectionsDiv.innerHTML += '<p style="color: #888;">No associated detections yet</p>';
+            }
+        }
+
+        // Set status message
+        function setStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status-${type}`;
+        }
+
+        // Refresh events
+        async function refreshEvents() {
+            setStatus('Refreshing events...', 'info');
+            await fetchEvents();
+        }
+
+        // Toggle fullscreen
+        function toggleFullscreen() {
+            const aladinDiv = document.getElementById('aladin-lite-div');
+            if (aladinDiv.style.height === '600px') {
+                aladinDiv.style.height = '90vh';
+            } else {
+                aladinDiv.style.height = '600px';
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', async () => {
+            initAladin();
+            const success = await fetchEvents();
+            if (success && allEvents.length > 0) {
+                // Auto-load first event
+                setTimeout(() => loadSelectedEvent(), 500);
+            }
+        });
+    </script>
+
+    <div style="margin-top: 40px; padding: 20px; background: #2a2a2a; border-radius: 8px;">
+        <h3>📚 Usage Instructions</h3>
+        <ol>
+            <li>Make sure the API server is running: <code>cargo run --bin mm_api_server --release -- --bind 0.0.0.0:8080</code></li>
+            <li>Start the simulation: <code>cargo run --bin stream_o4_simulation --release</code></li>
+            <li>Open this HTML file in your browser</li>
+            <li>Select an event from the dropdown and click "Load Skymap"</li>
+            <li>Use mouse to pan/zoom the sky view</li>
+        </ol>
+    </div>
+</body>
+</html>

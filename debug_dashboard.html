@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Multi-Messenger Skymap Viewer</title>
+    <script src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js"></script>
+    <style>
+        body {
+            margin: 20px;
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        #status {
+            padding: 15px;
+            background: #2a2a2a;
+            border-left: 4px solid #667eea;
+            margin: 10px 0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        #aladin-container {
+            width: 100%;
+            height: 700px;
+            margin: 10px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        .info { color: #4da6ff; }
+    </style>
+</head>
+<body>
+    <h1>🐛 Debug Multi-Messenger Skymap Viewer</h1>
+    <div id="status">Starting debug test...</div>
+    <div id="aladin-container"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : '📊';
+            statusDiv.innerHTML += `\n[${timestamp}] ${prefix} ${message}`;
+            console.log(`[${type}] ${message}`);
+        }
+
+        async function runTests() {
+            try {
+                // Test 1: Check if Aladin loaded
+                log('Testing Aladin library...');
+                if (typeof A === 'undefined') {
+                    log('ERROR: Aladin library (A) is not defined!', 'error');
+                    return;
+                }
+                log('Aladin library loaded successfully', 'success');
+
+                // Test 2: Fetch events
+                log('Fetching events from http://localhost:8080/api/events...');
+                const response = await fetch('http://localhost:8080/api/events');
+
+                if (!response.ok) {
+                    log(`HTTP Error: ${response.status} ${response.statusText}`, 'error');
+                    return;
+                }
+                log(`HTTP ${response.status} OK`, 'success');
+
+                const events = await response.json();
+                log(`Loaded ${events.length} events`, 'success');
+                log(`Events: ${events.map(e => e.event_id).join(', ')}`);
+
+                // Test 3: Initialize Aladin
+                log('Initializing Aladin...');
+                let aladin;
+                try {
+                    aladin = A.aladin('#aladin-container', {
+                        survey: 'P/DSS2/color',
+                        fov: 180,
+                        projection: 'AIT',
+                        showCooGrid: true,
+                        showFrame: true,
+                        showReticle: false
+                    });
+                    log('Aladin initialized successfully', 'success');
+                } catch (e) {
+                    log(`Aladin initialization error: ${e.message}`, 'error');
+                    return;
+                }
+
+                // Test 4: Load first event's contours
+                if (events.length > 0) {
+                    const event = events[0];
+                    log(`\nLoading contours for ${event.event_id}...`);
+
+                    // Center on event
+                    aladin.gotoRaDec(event.ra, event.dec);
+                    log(`Centered on RA=${event.ra.toFixed(2)}, Dec=${event.dec.toFixed(2)}`);
+
+                    // Add marker
+                    const cat = A.catalog({name: event.event_id, color: '#ff6b6b', sourceSize: 20});
+                    aladin.addCatalog(cat);
+                    const marker = A.marker(event.ra, event.dec, {
+                        popupTitle: event.event_id,
+                        popupDesc: `SNR: ${event.snr.toFixed(1)}`
+                    });
+                    cat.addSources([marker]);
+                    log('Added event marker', 'success');
+
+                    // Fetch contours
+                    const contoursUrl = `http://localhost:8080/api/skymaps/${event.event_id}/contours`;
+                    log(`Fetching contours from ${contoursUrl}...`);
+
+                    const contoursResponse = await fetch(contoursUrl);
+                    if (!contoursResponse.ok) {
+                        log(`Contours HTTP Error: ${contoursResponse.status}`, 'error');
+                        return;
+                    }
+
+                    const contours = await contoursResponse.json();
+                    log(`Loaded ${contours.length} contour levels`, 'success');
+
+                    // Display contour details
+                    contours.forEach(c => {
+                        log(`  ${(c.level * 100).toFixed(0)}% CR: ${c.area_deg2.toFixed(1)} sq deg, ${c.pixels.length} pixels`);
+                    });
+
+                    // Auto-zoom to 90% contour
+                    const cr90 = contours.find(c => c.level === 0.9);
+                    if (cr90) {
+                        const radiusDeg = Math.sqrt(cr90.area_deg2 / Math.PI);
+                        const fov = Math.max(radiusDeg * 2.5, 10);
+                        aladin.setFoV(fov);
+                        log(`Set FOV to ${fov.toFixed(1)} degrees`, 'success');
+                    }
+
+                    // Add contours as catalogs (90% first, then 50%)
+                    const sortedContours = [...contours].reverse();
+                    sortedContours.forEach((contour, idx) => {
+                        const is50 = contour.level === 0.5;
+                        const color = is50 ? '#ff8800' : '#4da6ff';
+                        const size = is50 ? 10 : 6;
+                        const label = `${(contour.level * 100).toFixed(0)}% CR`;
+
+                        const contourCat = A.catalog({
+                            name: label,
+                            color: color,
+                            sourceSize: size,
+                            shape: 'circle'
+                        });
+
+                        const sources = contour.pixels.map(p => A.source(p.ra, p.dec));
+                        contourCat.addSources(sources);
+                        aladin.addCatalog(contourCat);
+                    });
+
+                    log(`\n✅ All tests passed! Contours displayed for ${event.event_id}`, 'success');
+                }
+
+            } catch (err) {
+                log(`EXCEPTION: ${err.message}`, 'error');
+                log(`Stack: ${err.stack}`, 'error');
+            }
+        }
+
+        // Wait for Aladin to load, then run tests
+        window.addEventListener('DOMContentLoaded', () => {
+            log('DOM loaded, waiting for Aladin...');
+
+            // Check if A is already defined, otherwise wait a bit
+            if (typeof A !== 'undefined') {
+                runTests();
+            } else {
+                setTimeout(() => {
+                    if (typeof A !== 'undefined') {
+                        runTests();
+                    } else {
+                        log('ERROR: Aladin failed to load after timeout', 'error');
+                    }
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>

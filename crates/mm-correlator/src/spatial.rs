@@ -891,69 +891,113 @@ mod tests {
             );
             println!("    GW FAR: {:.2e} Hz", gw_far);
 
-            // Calculate analytical FAR using median spatial overlap
+            // Calculate RAVEN FAR for BOTH signal and background populations
             let temporal_far = time_window * grb_rate * gw_far;
-            let spatiotemporal_far_median =
-                calculate_raven_spatiotemporal_far(time_window, grb_rate, gw_far, signal_median);
 
-            println!("\n  RAVEN Formula Results:");
-            println!(
-                "    Temporal FAR: {:.3e} Hz ({:.4} /yr)",
-                temporal_far,
-                temporal_far * 365.25 * 24.0 * 3600.0
-            );
-            println!(
-                "    Spatiotemporal FAR (median signal): {:.3e} Hz ({:.4} /yr)",
-                spatiotemporal_far_median,
-                spatiotemporal_far_median * 365.25 * 24.0 * 3600.0
-            );
-            println!(
-                "    Spatial correction factor: {:.0}× (= 1/P_spatial)",
-                1.0 / signal_median
-            );
-
-            // Note: RAVEN gives FAR for individual coincidences, not discrimination between distributions
-            let empirical_discrimination = signal_median / bg_median;
-            println!("\n  Note on Methodology:");
-            println!("    RAVEN FAR measures: How often would this coincidence occur by chance?");
-            println!("    Empirical discrimination measures: How much more likely is signal vs background?");
-            println!("    These are different metrics - RAVEN is event-by-event, empirical is distribution-based.");
-            println!("\n  Empirical discrimination (signal/background medians): {:.0}×", empirical_discrimination);
-
-            // Distribution of RAVEN FAR values across all signal trials
-            let mut raven_fars: Vec<f64> = signal_probs
+            // Signal FAR distribution
+            let mut signal_fars: Vec<f64> = signal_probs
                 .iter()
+                .filter(|&&p| p > 0.0)
                 .map(|&p| calculate_raven_spatiotemporal_far(time_window, grb_rate, gw_far, p))
                 .filter(|&f| f.is_finite())
                 .collect();
-            raven_fars.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            signal_fars.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            if !raven_fars.is_empty() {
-                let raven_median = raven_fars[raven_fars.len() / 2];
-                let raven_95th =
-                    raven_fars[(raven_fars.len() as f64 * 0.95).min(raven_fars.len() as f64 - 1.0) as usize];
+            // Background FAR distribution
+            let mut background_fars: Vec<f64> = background_probs
+                .iter()
+                .filter(|&&p| p > 0.0)
+                .map(|&p| calculate_raven_spatiotemporal_far(time_window, grb_rate, gw_far, p))
+                .filter(|&f| f.is_finite())
+                .collect();
+            background_fars.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            println!("\n  Temporal FAR (without spatial): {:.3e} Hz ({:.4} /yr)",
+                temporal_far,
+                temporal_far * 365.25 * 24.0 * 3600.0
+            );
+
+            if !signal_fars.is_empty() && !background_fars.is_empty() {
+                let signal_far_median = signal_fars[signal_fars.len() / 2];
+                let bg_far_median = background_fars[background_fars.len() / 2];
 
                 println!("\n  Signal FAR Distribution:");
                 println!(
-                    "    Median FAR: {:.3e} Hz ({:.4} /yr)",
-                    raven_median,
-                    raven_median * 365.25 * 24.0 * 3600.0
+                    "    Median: {:.3e} Hz ({:.4} /yr)",
+                    signal_far_median,
+                    signal_far_median * 365.25 * 24.0 * 3600.0
                 );
                 println!(
-                    "    95th percentile FAR: {:.3e} Hz ({:.2} /yr)",
-                    raven_95th,
-                    raven_95th * 365.25 * 24.0 * 3600.0
+                    "    95th percentile: {:.3e} Hz ({:.2} /yr)",
+                    signal_fars[(signal_fars.len() as f64 * 0.95).min(signal_fars.len() as f64 - 1.0) as usize],
+                    signal_fars[(signal_fars.len() as f64 * 0.95).min(signal_fars.len() as f64 - 1.0) as usize]
+                        * 365.25 * 24.0 * 3600.0
                 );
 
-                // Count how many signals have FAR < 1/yr (typical alert threshold)
-                let far_threshold = 1.0 / (365.25 * 24.0 * 3600.0); // 1/yr in Hz
-                let n_significant = raven_fars.iter().filter(|&&f| f < far_threshold).count();
+                println!("\n  Background FAR Distribution:");
                 println!(
-                    "    Signals with FAR < 1/yr: {} / {} ({:.1}%)",
-                    n_significant,
-                    raven_fars.len(),
-                    100.0 * n_significant as f64 / raven_fars.len() as f64
+                    "    Median: {:.3e} Hz ({:.2e} /yr)",
+                    bg_far_median,
+                    bg_far_median * 365.25 * 24.0 * 3600.0
                 );
+                println!(
+                    "    5th percentile (best): {:.3e} Hz ({:.2e} /yr)",
+                    background_fars[(background_fars.len() as f64 * 0.05).max(0.0) as usize],
+                    background_fars[(background_fars.len() as f64 * 0.05).max(0.0) as usize]
+                        * 365.25 * 24.0 * 3600.0
+                );
+
+                // KEY INSIGHT: RAVEN discrimination = FAR_background / FAR_signal
+                let raven_discrimination = bg_far_median / signal_far_median;
+                let empirical_discrimination = signal_median / bg_median;
+
+                println!("\n  ✅ RECONCILIATION (Empirical ↔ RAVEN):");
+                println!(
+                    "    RAVEN FAR discrimination (bg/signal): {:.0}×",
+                    raven_discrimination
+                );
+                println!(
+                    "    Empirical P discrimination (signal/bg): {:.0}×",
+                    empirical_discrimination
+                );
+                println!(
+                    "    Ratio (should be ~1): {:.2}",
+                    raven_discrimination / empirical_discrimination
+                );
+                println!("\n    Mathematical equivalence:");
+                println!("      FAR_bg/FAR_signal = (Δt×R×FAR_GW/P_bg) / (Δt×R×FAR_GW/P_sig)");
+                println!("                        = P_signal / P_background");
+                println!("                        = empirical discrimination!");
+                println!("      ✅ Both methods are measuring the same thing on different scales.");
+
+                // Count significant coincidences
+                let far_threshold = 1.0 / (365.25 * 24.0 * 3600.0); // 1/yr in Hz
+                let n_signal_significant = signal_fars.iter().filter(|&&f| f < far_threshold).count();
+                let n_bg_significant = background_fars.iter().filter(|&&f| f < far_threshold).count();
+
+                println!("\n  Significant Coincidences (FAR < 1/yr threshold):");
+                println!(
+                    "    Signal: {} / {} ({:.1}%)",
+                    n_signal_significant,
+                    signal_fars.len(),
+                    100.0 * n_signal_significant as f64 / signal_fars.len() as f64
+                );
+                println!(
+                    "    Background: {} / {} ({:.3}%)",
+                    n_bg_significant,
+                    background_fars.len(),
+                    100.0 * n_bg_significant as f64 / background_fars.len() as f64
+                );
+
+                if n_bg_significant > 0 {
+                    println!(
+                        "    ⚠️  False positive rate: {:.4}% ({} random coincidences below threshold)",
+                        100.0 * n_bg_significant as f64 / background_fars.len() as f64,
+                        n_bg_significant
+                    );
+                } else {
+                    println!("    ✅ No false positives (0 random coincidences below threshold)");
+                }
             }
 
             // Store results for comparison

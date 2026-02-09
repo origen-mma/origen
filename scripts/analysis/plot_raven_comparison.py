@@ -105,31 +105,45 @@ for idx, (instrument, error_deg, label) in enumerate(instruments):
             transform=ax.transAxes, va='top', fontsize=9,
             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
-    # ===== Plot 2: RAVEN Analytical FAR Distribution =====
+    # ===== Plot 2: RAVEN Analytical FAR Distribution (Signal vs Background) =====
     ax = axes[idx, 1]
 
-    # Histogram of RAVEN FAR values
-    bins_far = np.logspace(-3, 4, 50)  # /yr
-    ax.hist(raven_far_signal_per_yr, bins=bins_far, alpha=0.7, color='C2', density=True)
+    # Calculate RAVEN FAR for background too
+    raven_far_background = np.array([calculate_raven_far(p) for p in background_probs])
+    raven_far_background = raven_far_background[np.isfinite(raven_far_background)]
+    raven_far_background_per_yr = raven_far_background * (365.25 * 24 * 3600)
+
+    # Histogram of RAVEN FAR values for both signal and background
+    bins_far = np.logspace(np.log10(min(raven_far_signal_per_yr.min(), raven_far_background_per_yr.min())),
+                           np.log10(max(raven_far_signal_per_yr.max(), raven_far_background_per_yr.max())), 50)
+    ax.hist(raven_far_signal_per_yr, bins=bins_far, alpha=0.6, color='C0', density=True, label='Signal')
+    ax.hist(raven_far_background_per_yr, bins=bins_far, alpha=0.6, color='C1', density=True, label='Background')
 
     ax.set_xscale('log')
     ax.set_xlabel('RAVEN Spatiotemporal FAR (/yr)')
     ax.set_ylabel('Probability Density')
-    ax.set_title(f'{label}\nRAVEN Analytical FAR')
+    ax.set_title(f'{label}\nRAVEN Analytical FAR (Signal vs Background)')
     ax.grid(True, alpha=0.3)
 
     # Add threshold line at 1/yr
     ax.axvline(1.0, color='red', linestyle='--', linewidth=2, alpha=0.7, label='1/yr threshold')
     ax.legend()
 
-    # Add statistics
-    far_median = np.median(raven_far_signal_per_yr)
-    far_95th = np.percentile(raven_far_signal_per_yr, 95)
-    n_below_threshold = np.sum(raven_far_signal_per_yr < 1.0)
-    frac_below = 100 * n_below_threshold / len(raven_far_signal_per_yr)
+    # Add statistics showing discrimination
+    signal_far_median = np.median(raven_far_signal_per_yr)
+    bg_far_median = np.median(raven_far_background_per_yr)
+    raven_discrimination = bg_far_median / signal_far_median
 
-    stats_text = f'Median: {far_median:.2e} /yr\n95th %: {far_95th:.2e} /yr\nFAR < 1/yr: {frac_below:.1f}%'
-    ax.text(0.95, 0.95, stats_text, transform=ax.transAxes, va='top', ha='right',
+    n_signal_below = np.sum(raven_far_signal_per_yr < 1.0)
+    n_bg_below = np.sum(raven_far_background_per_yr < 1.0)
+    frac_signal_below = 100 * n_signal_below / len(raven_far_signal_per_yr)
+    frac_bg_below = 100 * n_bg_below / len(raven_far_background_per_yr)
+
+    stats_text = (f'Signal FAR: {signal_far_median:.2e} /yr\n'
+                  f'Background FAR: {bg_far_median:.2e} /yr\n'
+                  f'RAVEN discrim: {raven_discrimination:.0f}×\n'
+                  f'(= empirical {discrimination:.0f}×)')
+    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, va='top',
             fontsize=9, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
 # Add overall title
