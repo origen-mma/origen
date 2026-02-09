@@ -23,11 +23,11 @@ pub use error::{CoreError, ParseError};
 pub use events::{Event, EventType, GWEvent, GammaRayEvent, NeutrinoEvent, XRayEvent};
 pub use explosion_time::estimate_explosion_time;
 pub use fit_quality::{FitQuality, FitQualityAssessment};
-pub use io::{load_lightcurve_csv, load_lightcurves_dir};
-pub use lightcurve::{LightCurve, Photometry};
 pub use gp_features::{
     background_rejection_score, extract_features, LightCurveFeatures, LightCurveFilterConfig,
 };
+pub use io::{load_lightcurve_csv, load_lightcurves_dir};
+pub use lightcurve::{LightCurve, Photometry};
 pub use lightcurve_fitting::{
     fit_lightcurve, fit_lightcurve_with_config, FitConfig, FitModel, LightCurveFitResult,
 };

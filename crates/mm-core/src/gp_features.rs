@@ -44,8 +44,8 @@ impl Default for LightCurveFilterConfig {
     fn default() -> Self {
         Self {
             enable: true,
-            min_rise_rate: 1.0,     // > 1.0 mag/day = fast riser (KN-like)
-            min_decay_rate: 0.3,    // < 0.3 mag/day = slow fader (SN-like)
+            min_rise_rate: 1.0,  // > 1.0 mag/day = fast riser (KN-like)
+            min_decay_rate: 0.3, // < 0.3 mag/day = slow fader (SN-like)
             min_detections: 3,
             max_penalty_factor: 10.0,
         }
@@ -138,9 +138,7 @@ pub fn extract_features_with_config(
             .push((m.mjd, m.flux, m.flux_err));
     }
 
-    let (best_band, band_data) = by_band
-        .into_iter()
-        .max_by_key(|(_, pts)| pts.len())?;
+    let (best_band, band_data) = by_band.into_iter().max_by_key(|(_, pts)| pts.len())?;
 
     if band_data.len() < min_detections {
         debug!(
@@ -304,10 +302,7 @@ fn fit_gp_and_predict(
 
                 // Reject candidates with extreme extrapolated peaks
                 if let Ok(pred_grid) = trained.predict(&pred_2d) {
-                    let pred_grid_min = pred_grid
-                        .iter()
-                        .cloned()
-                        .fold(f64::INFINITY, f64::min);
+                    let pred_grid_min = pred_grid.iter().cloned().fold(f64::INFINITY, f64::min);
                     let obs_min = mags.iter().cloned().fold(f64::INFINITY, f64::min);
                     if pred_grid_min.is_finite() && (pred_grid_min - obs_min).abs() > 6.0 {
                         continue;
@@ -566,10 +561,7 @@ pub fn background_rejection_score(
     }
 
     // Clamp to configured bounds
-    (score as f64).clamp(
-        1.0 / config.max_penalty_factor,
-        config.max_penalty_factor,
-    )
+    (score as f64).clamp(1.0 / config.max_penalty_factor, config.max_penalty_factor)
 }
 
 #[cfg(test)]
@@ -584,14 +576,14 @@ mod tests {
 
         // KN-like: rises ~2 mag in 0.5 days, decays ~3 mag in 3 days
         let times_and_flux = [
-            (0.0, 50.0),    // faint detection
-            (0.2, 200.0),   // rapidly brightening
-            (0.5, 1000.0),  // near peak
-            (0.7, 800.0),   // starting to fade
-            (1.0, 400.0),   // fading
-            (1.5, 150.0),   // fading fast
-            (2.0, 60.0),    // faint
-            (3.0, 20.0),    // very faint
+            (0.0, 50.0),   // faint detection
+            (0.2, 200.0),  // rapidly brightening
+            (0.5, 1000.0), // near peak
+            (0.7, 800.0),  // starting to fade
+            (1.0, 400.0),  // fading
+            (1.5, 150.0),  // fading fast
+            (2.0, 60.0),   // faint
+            (3.0, 20.0),   // very faint
         ];
 
         for (dt, flux) in &times_and_flux {
@@ -617,11 +609,11 @@ mod tests {
             (6.0, 350.0),
             (9.0, 500.0),
             (12.0, 650.0),
-            (15.0, 700.0),  // near peak
+            (15.0, 700.0), // near peak
             (18.0, 680.0),
             (21.0, 650.0),
             (25.0, 600.0),
-            (30.0, 520.0),  // slow decay
+            (30.0, 520.0), // slow decay
         ];
 
         for (dt, flux) in &times_and_flux {
@@ -731,7 +723,10 @@ mod tests {
         lc.add_measurement(Photometry::new(60003.0, 200.0, 10.0, "r".to_string()));
 
         let features = extract_features(&lc);
-        assert!(features.is_some(), "Should extract features from 5 detections");
+        assert!(
+            features.is_some(),
+            "Should extract features from 5 detections"
+        );
     }
 
     #[test]
@@ -740,7 +735,11 @@ mod tests {
         let x = vec![0.0, 1.0, 2.0, 3.0, 4.0];
         let y = vec![1.0, 3.0, 5.0, 7.0, 9.0];
         let slope = linear_regression_slope(&x, &y);
-        assert!((slope - 2.0).abs() < 1e-10, "Slope should be 2.0, got {}", slope);
+        assert!(
+            (slope - 2.0).abs() < 1e-10,
+            "Slope should be 2.0, got {}",
+            slope
+        );
     }
 
     #[test]
@@ -749,8 +748,8 @@ mod tests {
 
         // Even extreme values should be clamped
         let fast_features = LightCurveFeatures {
-            rise_rate: -5.0,  // Very fast rise
-            decay_rate: 3.0,  // Very fast decay
+            rise_rate: -5.0, // Very fast rise
+            decay_rate: 3.0, // Very fast decay
             peak_mag: 18.0,
             fwhm: 1.0,
             dfdt_now: -2.0,

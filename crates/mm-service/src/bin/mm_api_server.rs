@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use mm_api::{ApiState, run_server};
+use mm_api::{run_server, ApiState};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tracing::{info, Level};
@@ -30,9 +30,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     let args = Args::parse();
 

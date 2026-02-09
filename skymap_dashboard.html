@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Messenger Skymap Viewer</title>
+    <script src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        #header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        #status {
+            padding: 15px 20px;
+            background: #2a2a2a;
+            border-left: 4px solid #667eea;
+            margin: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        #controls {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            margin: 10px;
+            border-radius: 4px;
+        }
+        #event-list {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .event-btn {
+            padding: 8px 16px;
+            background: #3a3a3a;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+        .event-btn:hover {
+            background: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+        }
+        .event-btn.active {
+            background: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.6);
+        }
+        .event-btn.multi-messenger {
+            border-color: #ff6b6b;
+        }
+        .event-btn.multi-messenger.active {
+            background: #ff6b6b;
+            box-shadow: 0 0 15px rgba(255, 107, 107, 0.6);
+        }
+        #aladin-container {
+            width: calc(100% - 20px);
+            height: 700px;
+            margin: 10px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        #info-panel {
+            padding: 15px 20px;
+            background: #2a2a2a;
+            margin: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        #info-panel.visible {
+            display: block;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .info-item {
+            background: #3a3a3a;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+        .info-label {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        .info-value {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>🌌 Multi-Messenger Skymap Viewer</h1>
+    </div>
+
+    <div id="status">Loading events...</div>
+
+    <div id="controls">
+        <strong>Select Event:</strong>
+        <div id="event-list"></div>
+    </div>
+
+    <div id="info-panel">
+        <strong>Event Details</strong>
+        <div class="info-grid" id="event-details"></div>
+    </div>
+
+    <div id="legend" style="display: none; padding: 15px 20px; background: #2a2a2a; margin: 10px; border-radius: 4px;">
+        <strong>Legend</strong>
+        <div style="margin-top: 10px;">
+            <div style="margin: 5px 0;"><span style="color: #ff6b6b;">●</span> GW Event</div>
+            <div style="margin: 5px 0;"><span style="color: #ffff00;">▲</span> GRB Detection</div>
+            <div style="margin: 5px 0;"><span style="color: #00ff00;">■</span> Optical Transient</div>
+            <div style="margin: 5px 0;"><span style="color: #ff8800;">●</span> 50% Credible Region</div>
+            <div style="margin: 5px 0;"><span style="color: #4da6ff;">●</span> 90% Credible Region</div>
+        </div>
+    </div>
+
+    <div id="aladin-container"></div>
+
+    <script>
+        let aladin;
+        let events = [];
+        let currentCatalogs = [];
+
+        // Initialize Aladin Lite
+        function initAladin() {
+            aladin = A.aladin('#aladin-container', {
+                survey: 'P/DSS2/color',
+                fov: 180,
+                projection: 'AIT',
+                showCooGrid: true,
+                showFrame: true,
+                showCooGridControl: true,
+                showFullscreenControl: true,
+                showReticle: false
+            });
+        }
+
+        // Calculate angular separation between two sky positions (degrees)
+        function calculateOffset(ra1, dec1, ra2, dec2) {
+            const toRad = Math.PI / 180.0;
+            const ra1Rad = ra1 * toRad;
+            const dec1Rad = dec1 * toRad;
+            const ra2Rad = ra2 * toRad;
+            const dec2Rad = dec2 * toRad;
+
+            const cosSep = Math.sin(dec1Rad) * Math.sin(dec2Rad) +
+                          Math.cos(dec1Rad) * Math.cos(dec2Rad) * Math.cos(ra1Rad - ra2Rad);
+
+            return Math.acos(Math.max(-1, Math.min(1, cosSep))) / toRad;
+        }
+
+        // Main initialization - wait for page load
+        window.addEventListener('load', () => {
+            console.log('Page loaded, waiting for Aladin...');
+            document.getElementById('status').innerHTML = 'Page loaded, checking Aladin...';
+
+            // Check if Aladin is available
+            if (typeof A === 'undefined') {
+                console.log('Aladin not loaded yet, waiting 1 second...');
+                document.getElementById('status').innerHTML = 'Waiting for Aladin library...';
+                setTimeout(() => {
+                    if (typeof A === 'undefined') {
+                        document.getElementById('status').innerHTML = '❌ Error: Aladin library failed to load';
+                        console.error('Aladin library (A) is undefined');
+                    } else {
+                        console.log('Aladin loaded successfully');
+                        loadEvents();
+                    }
+                }, 1000);
+            } else {
+                console.log('Aladin already loaded');
+                loadEvents();
+            }
+        });
+
+        // Load events from API
+        function loadEvents() {
+            console.log('Starting to fetch events...');
+            fetch('http://localhost:8080/api/events')
+            .then(r => {
+                console.log('Fetch response received:', r.status);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
+            .then(loadedEvents => {
+                console.log('Events loaded:', loadedEvents.length);
+                events = loadedEvents;
+                document.getElementById('status').innerHTML =
+                    `✅ Loaded ${events.length} events from API`;
+
+                // Initialize Aladin
+                console.log('Initializing Aladin...');
+                initAladin();
+                console.log('Aladin initialized');
+
+                // Create event buttons
+                const eventList = document.getElementById('event-list');
+                events.forEach((event, idx) => {
+                    const btn = document.createElement('button');
+                    const hasEM = (event.grb_detections?.length > 0) || (event.optical_detections?.length > 0);
+                    btn.className = 'event-btn' + (hasEM ? ' multi-messenger' : '');
+                    btn.textContent = `${event.event_id} (SNR: ${event.snr.toFixed(1)})`;
+                    btn.onclick = () => loadSkymap(event, btn);
+                    eventList.appendChild(btn);
+                });
+            })
+            .catch(err => {
+                console.error('Error loading events:', err);
+                document.getElementById('status').innerHTML =
+                    `❌ Error: ${err.message}`;
+                document.getElementById('aladin-container').innerHTML =
+                    '<p style="color:#ff6b6b;padding:40px;text-align:center;">Cannot connect to API at http://localhost:8080</p>';
+            });
+        }
+
+        // Load and display skymap for selected event
+        async function loadSkymap(event, btnElement) {
+            console.log(`Loading skymap for ${event.event_id}...`);
+
+            // Update button states
+            document.querySelectorAll('.event-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            // Show event details and legend
+            displayEventInfo(event);
+            document.getElementById('legend').style.display = 'block';
+
+            // Clear all previous catalogs (circles are now catalogs too!)
+            console.log('Clearing previous catalogs...');
+            if (aladin.view && aladin.view.catalogs) {
+                // Remove catalogs in reverse to avoid index issues
+                while (aladin.view.catalogs.length > 0) {
+                    try {
+                        const catalog = aladin.view.catalogs[aladin.view.catalogs.length - 1];
+                        aladin.removeCatalog(catalog);
+                    } catch (e) {
+                        console.warn('Failed to remove catalog:', e);
+                        break; // Avoid infinite loop if removal fails
+                    }
+                }
+            }
+            currentCatalogs = [];
+
+            document.getElementById('status').innerHTML =
+                `📡 Loading skymap for ${event.event_id}...`;
+
+            try {
+                // Center on event position
+                aladin.gotoRaDec(event.ra, event.dec);
+
+                // Add marker at event position
+                const markerCat = A.catalog({name: event.event_id, color: '#ff6b6b', sourceSize: 20});
+                aladin.addCatalog(markerCat);
+                currentCatalogs.push(markerCat);
+
+                const marker = A.marker(event.ra, event.dec, {
+                    popupTitle: event.event_id,
+                    popupDesc: `SNR: ${event.snr.toFixed(1)}<br>FAR: ${event.far.toExponential(2)}/yr`
+                });
+                markerCat.addSources([marker]);
+
+                // Add GRB detections with error circles (using catalog points)
+                if (event.grb_detections && event.grb_detections.length > 0) {
+                    event.grb_detections.forEach((grb, idx) => {
+                        // Create error circle as ring of catalog points
+                        const errorCat = A.catalog({
+                            name: `GRB ${idx + 1} Error (${grb.error_radius.toFixed(2)}°)`,
+                            color: '#ffff00',
+                            sourceSize: 8,
+                            shape: 'circle'
+                        });
+
+                        // Draw circle as 36 points (every 10 degrees)
+                        const numPoints = 36;
+                        const errorSources = [];
+                        for (let i = 0; i < numPoints; i++) {
+                            const angle = (i / numPoints) * 2 * Math.PI;
+                            const dRa = (grb.error_radius / Math.cos(grb.dec * Math.PI / 180)) * Math.cos(angle);
+                            const dDec = grb.error_radius * Math.sin(angle);
+                            errorSources.push(A.source(grb.ra + dRa, grb.dec + dDec));
+                        }
+                        errorCat.addSources(errorSources);
+                        aladin.addCatalog(errorCat);
+
+                        // Add center marker
+                        const grbCat = A.catalog({
+                            name: `GRB ${idx + 1} - ${grb.instrument}`,
+                            color: '#ffff00',
+                            sourceSize: 20,
+                            shape: 'triangle'
+                        });
+                        aladin.addCatalog(grbCat);
+
+                        const offset = calculateOffset(event.ra, event.dec, grb.ra, grb.dec);
+                        const grbMarker = A.marker(grb.ra, grb.dec, {
+                            popupTitle: `GRB - ${grb.instrument}`,
+                            popupDesc: `Error radius: ${grb.error_radius.toFixed(2)}°<br>Fluence: ${grb.fluence.toExponential(1)}<br>Offset: ${offset.toFixed(2)}°`
+                        });
+                        grbCat.addSources([grbMarker]);
+                    });
+                }
+
+                // Add optical detections with error circles (using catalog points)
+                if (event.optical_detections && event.optical_detections.length > 0) {
+                    event.optical_detections.forEach((optical, idx) => {
+                        // Add small error circle (typical optical localization ~2 arcsec = 0.00056 deg)
+                        // Make it visible by using at least 0.05 deg radius
+                        const errorRadius = 0.05; // degrees, for visibility
+                        const errorCat = A.catalog({
+                            name: `Optical ${idx + 1} Error (${errorRadius}°)`,
+                            color: '#00ff00',
+                            sourceSize: 6,
+                            shape: 'circle'
+                        });
+
+                        // Draw circle as 24 points
+                        const numPoints = 24;
+                        const errorSources = [];
+                        for (let i = 0; i < numPoints; i++) {
+                            const angle = (i / numPoints) * 2 * Math.PI;
+                            const dRa = (errorRadius / Math.cos(optical.dec * Math.PI / 180)) * Math.cos(angle);
+                            const dDec = errorRadius * Math.sin(angle);
+                            errorSources.push(A.source(optical.ra + dRa, optical.dec + dDec));
+                        }
+                        errorCat.addSources(errorSources);
+                        aladin.addCatalog(errorCat);
+
+                        // Add center marker
+                        const opticalCat = A.catalog({
+                            name: `Optical ${idx + 1} - ${optical.survey}`,
+                            color: '#00ff00',
+                            sourceSize: 18,
+                            shape: 'square'
+                        });
+                        aladin.addCatalog(opticalCat);
+
+                        const offset = calculateOffset(event.ra, event.dec, optical.ra, optical.dec);
+                        const optMarker = A.marker(optical.ra, optical.dec, {
+                            popupTitle: `${optical.survey} - ${optical.transient_type}`,
+                            popupDesc: `Magnitude: ${optical.magnitude.toFixed(1)}<br>Offset: ${offset.toFixed(2)}°`
+                        });
+                        opticalCat.addSources([optMarker]);
+                    });
+                }
+
+                // Try to load HEALPix overlay (MOC format)
+                try {
+                    const mocUrl = `http://localhost:8080/api/skymaps/${event.event_id}/moc`;
+                    const mocOverlay = aladin.createImageSurvey(
+                        event.event_id,
+                        event.event_id,
+                        mocUrl,
+                        'equatorial',
+                        9,  // max order
+                        {imgFormat: 'fits'}
+                    );
+                    aladin.setOverlayImageLayer(mocOverlay, event.event_id);
+                    console.log(`Added HEALPix overlay for ${event.event_id}`);
+                } catch (e) {
+                    console.warn('Failed to add HEALPix overlay:', e);
+                }
+
+                // Load probability contours (sampled from HEALPix map)
+                const contoursUrl = `http://localhost:8080/api/skymaps/${event.event_id}/contours`;
+                const contoursResponse = await fetch(contoursUrl);
+
+                if (contoursResponse.ok) {
+                    const contours = await contoursResponse.json();
+
+                    // Auto-zoom to fit the 90% contour first (before adding catalogs)
+                    const cr90 = contours.find(c => c.level === 0.9);
+                    if (cr90) {
+                        const radiusDeg = Math.sqrt(cr90.area_deg2 / Math.PI);
+                        const fov = Math.max(radiusDeg * 2.5, 10); // Minimum 10 degree FOV
+                        aladin.setFoV(fov);
+                    }
+
+                    // Display contours as catalogs (scatter of pixels)
+                    // Show 90% first (background), then 50% (foreground)
+                    const sortedContours = [...contours].reverse();
+
+                    sortedContours.forEach((contour, idx) => {
+                        const is50 = contour.level === 0.5;
+                        const color = is50 ? '#ff8800' : '#4da6ff'; // 50% bright orange, 90% light blue
+                        const size = is50 ? 10 : 6;  // 50% larger, 90% smaller
+                        const label = `${(contour.level * 100).toFixed(0)}% CR (${contour.area_deg2.toFixed(1)} sq deg)`;
+
+                        const contourCat = A.catalog({
+                            name: label,
+                            color: color,
+                            sourceSize: size,
+                            shape: 'circle'
+                        });
+
+                        // Add contour pixels as sources
+                        const sources = contour.pixels.map(p =>
+                            A.source(p.ra, p.dec)
+                        );
+                        contourCat.addSources(sources);
+                        aladin.addCatalog(contourCat);
+                        currentCatalogs.push(contourCat);
+                    });
+
+                    document.getElementById('status').innerHTML =
+                        `✅ Loaded ${event.event_id} skymap contours<br>` +
+                        `🎯 50% region: ${contours[0].area_deg2.toFixed(1)} sq deg (orange)<br>` +
+                        `🎯 90% region: ${contours[1].area_deg2.toFixed(1)} sq deg (blue)`;
+
+                } else {
+                    throw new Error(`Contours not found (HTTP ${contoursResponse.status})`);
+                }
+
+            } catch (err) {
+                document.getElementById('status').innerHTML =
+                    `❌ Error loading skymap: ${err.message}`;
+            }
+        }
+
+        // Display event information panel
+        function displayEventInfo(event) {
+            const infoPanel = document.getElementById('info-panel');
+            const detailsGrid = document.getElementById('event-details');
+
+            const hasEM = (event.grb_detections?.length > 0) || (event.optical_detections?.length > 0);
+
+            detailsGrid.innerHTML = `
+                <div class="info-item">
+                    <div class="info-label">Event ID</div>
+                    <div class="info-value">${event.event_id}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">GPS Time</div>
+                    <div class="info-value">${event.gpstime.toFixed(2)}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Position (RA, Dec)</div>
+                    <div class="info-value">${event.ra.toFixed(3)}°, ${event.dec.toFixed(3)}°</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">SNR</div>
+                    <div class="info-value">${event.snr.toFixed(2)}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">FAR</div>
+                    <div class="info-value">${event.far.toExponential(2)}/yr</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Classification</div>
+                    <div class="info-value">${hasEM ? '🔥 Multi-Messenger' : '🌊 GW Only'}</div>
+                </div>
+            `;
+
+            // Add EM counterpart info if available
+            if (event.grb_detections?.length > 0) {
+                const grbHtml = event.grb_detections.map(g =>
+                    `<div class="info-item">
+                        <div class="info-label">GRB Detection</div>
+                        <div class="info-value">${g.instrument}</div>
+                    </div>`
+                ).join('');
+                detailsGrid.innerHTML += grbHtml;
+            }
+
+            if (event.optical_detections?.length > 0) {
+                const opticalHtml = event.optical_detections.map(o =>
+                    `<div class="info-item">
+                        <div class="info-label">Optical Detection</div>
+                        <div class="info-value">${o.survey}: ${o.transient_type}</div>
+                    </div>`
+                ).join('');
+                detailsGrid.innerHTML += opticalHtml;
+            }
+
+            infoPanel.classList.add('visible');
+        }
+    </script>
+</body>
+</html>

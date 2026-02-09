@@ -2,12 +2,12 @@
 
 pub mod client;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 /// Multi-messenger event with skymap reference
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,7 +19,7 @@ pub struct MMEvent {
     pub skymap_url: Option<String>,
     pub snr: f64,
     pub far: f64,
-    
+
     // Associated counterparts
     pub grb_detections: Vec<GrbDetection>,
     pub optical_detections: Vec<OpticalDetection>,
@@ -48,8 +48,8 @@ pub struct OpticalDetection {
 /// Shared state for API
 pub struct ApiState {
     pub events: Arc<Mutex<HashMap<String, MMEvent>>>,
-    pub skymaps: Arc<Mutex<HashMap<String, Vec<u8>>>>,  // event_id -> FITS data
-    pub skymap_dir: Option<PathBuf>,  // Optional directory for storing skymap files
+    pub skymaps: Arc<Mutex<HashMap<String, Vec<u8>>>>, // event_id -> FITS data
+    pub skymap_dir: Option<PathBuf>, // Optional directory for storing skymap files
 }
 
 /// Get all recent events
@@ -62,12 +62,9 @@ async fn get_events(state: web::Data<ApiState>) -> impl Responder {
 
 /// Get specific event by ID
 #[get("/api/events/{event_id}")]
-async fn get_event(
-    event_id: web::Path<String>,
-    state: web::Data<ApiState>,
-) -> impl Responder {
+async fn get_event(event_id: web::Path<String>, state: web::Data<ApiState>) -> impl Responder {
     let events = state.events.lock().unwrap();
-    
+
     match events.get(event_id.as_str()) {
         Some(event) => HttpResponse::Ok().json(event),
         None => HttpResponse::NotFound().json(serde_json::json!({
@@ -89,17 +86,12 @@ async fn health() -> impl Responder {
 #[get("/")]
 async fn serve_dashboard() -> impl Responder {
     let html = include_str!("../../../skymap_dashboard.html");
-    HttpResponse::Ok()
-        .content_type("text/html")
-        .body(html)
+    HttpResponse::Ok().content_type("text/html").body(html)
 }
 
 /// Get skymap FITS file for an event
 #[get("/api/skymaps/{event_id}")]
-async fn get_skymap(
-    event_id: web::Path<String>,
-    state: web::Data<ApiState>,
-) -> impl Responder {
+async fn get_skymap(event_id: web::Path<String>, state: web::Data<ApiState>) -> impl Responder {
     use tracing::{info, warn};
 
     // Try to load from disk if skymap_dir is configured
@@ -108,7 +100,7 @@ async fn get_skymap(
         // Map event_id like "G1" to file "0.fits" (G1 -> 0, G2 -> 1, etc.)
         if event_id.starts_with("G") {
             if let Ok(num) = event_id[1..].parse::<usize>() {
-                let filename = format!("{}.fits", num - 1);  // G1 = 0.fits
+                let filename = format!("{}.fits", num - 1); // G1 = 0.fits
                 let filepath = skymap_dir.join(&filename);
                 info!("Attempting to read skymap from: {}", filepath.display());
 
@@ -117,7 +109,10 @@ async fn get_skymap(
                         info!("Successfully read skymap: {} bytes", fits_data.len());
                         return HttpResponse::Ok()
                             .content_type("application/fits")
-                            .append_header(("Content-Disposition", format!("attachment; filename=\"{}.fits\"", event_id)))
+                            .append_header((
+                                "Content-Disposition",
+                                format!("attachment; filename=\"{}.fits\"", event_id),
+                            ))
                             .body(fits_data);
                     }
                     Err(e) => {
@@ -135,7 +130,10 @@ async fn get_skymap(
     match skymaps.get(event_id.as_str()) {
         Some(fits_data) => HttpResponse::Ok()
             .content_type("application/fits")
-            .append_header(("Content-Disposition", format!("attachment; filename=\"{}.fits\"", event_id)))
+            .append_header((
+                "Content-Disposition",
+                format!("attachment; filename=\"{}.fits\"", event_id),
+            ))
             .body(fits_data.clone()),
         None => HttpResponse::NotFound().json(serde_json::json!({
             "error": "Skymap not found"
@@ -163,8 +161,8 @@ async fn get_skymap_contours(
     event_id: web::Path<String>,
     state: web::Data<ApiState>,
 ) -> impl Responder {
-    use tracing::{info, warn};
     use mm_core::ParsedSkymap;
+    use tracing::{info, warn};
 
     // Try to load from disk if skymap_dir is configured
     if let Some(ref skymap_dir) = state.skymap_dir {
@@ -177,12 +175,15 @@ async fn get_skymap_contours(
 
                 // Parse in blocking task
                 let filepath_clone = filepath.clone();
-                match tokio::task::spawn_blocking(move || {
-                    ParsedSkymap::from_fits(&filepath_clone)
-                }).await {
+                match tokio::task::spawn_blocking(move || ParsedSkymap::from_fits(&filepath_clone))
+                    .await
+                {
                     Ok(Ok(skymap)) => {
-                        info!("Parsed skymap: {} credible regions, NSIDE={}",
-                              skymap.credible_regions.len(), skymap.nside);
+                        info!(
+                            "Parsed skymap: {} credible regions, NSIDE={}",
+                            skymap.credible_regions.len(),
+                            skymap.nside
+                        );
 
                         // Convert credible regions to contour format
                         let contours = skymap_to_contours(&skymap);
@@ -216,43 +217,46 @@ fn skymap_to_contours(skymap: &mm_core::ParsedSkymap) -> Vec<ContourResponse> {
 
     let depth = (skymap.nside as f64).log2() as u8;
 
-    skymap.credible_regions.iter().map(|region| {
-        // Sample evenly across ALL pixels to show the full banana shape
-        // Take every Nth pixel instead of just the first N highest-probability ones
-        let total_pixels = region.pixel_indices.len();
-        let sample_rate = if region.level <= 0.5 {
-            (total_pixels / 1500).max(1) // 50% region: ~1500 pixels
-        } else {
-            (total_pixels / 2000).max(1) // 90% region: ~2000 pixels
-        };
+    skymap
+        .credible_regions
+        .iter()
+        .map(|region| {
+            // Sample evenly across ALL pixels to show the full banana shape
+            // Take every Nth pixel instead of just the first N highest-probability ones
+            let total_pixels = region.pixel_indices.len();
+            let sample_rate = if region.level <= 0.5 {
+                (total_pixels / 1500).max(1) // 50% region: ~1500 pixels
+            } else {
+                (total_pixels / 2000).max(1) // 90% region: ~2000 pixels
+            };
 
-        let pixels: Vec<ContourPixel> = region.pixel_indices.iter()
-            .enumerate()
-            .filter(|(i, _)| i % sample_rate == 0)
-            .map(|(_, &idx)| {
-                let hash = idx as u64;
-                let (lon, lat) = center(depth, hash);
-                ContourPixel {
-                    ra: lon.to_degrees(),
-                    dec: lat.to_degrees(),
-                }
-            })
-            .collect();
+            let pixels: Vec<ContourPixel> = region
+                .pixel_indices
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| i % sample_rate == 0)
+                .map(|(_, &idx)| {
+                    let hash = idx as u64;
+                    let (lon, lat) = center(depth, hash);
+                    ContourPixel {
+                        ra: lon.to_degrees(),
+                        dec: lat.to_degrees(),
+                    }
+                })
+                .collect();
 
-        ContourResponse {
-            level: region.level,
-            area_deg2: region.area,
-            pixels,
-        }
-    }).collect()
+            ContourResponse {
+                level: region.level,
+                area_deg2: region.area,
+                pixels,
+            }
+        })
+        .collect()
 }
 
 /// Get skymap as MOC FITS file (Aladin can load FITS directly)
 #[get("/api/skymaps/{event_id}/moc")]
-async fn get_skymap_moc(
-    event_id: web::Path<String>,
-    state: web::Data<ApiState>,
-) -> impl Responder {
+async fn get_skymap_moc(event_id: web::Path<String>, state: web::Data<ApiState>) -> impl Responder {
     use tracing::info;
 
     // Try to load from disk if skymap_dir is configured
@@ -269,7 +273,10 @@ async fn get_skymap_moc(
                     Ok(fits_data) => {
                         return HttpResponse::Ok()
                             .content_type("application/fits")
-                            .append_header(("Content-Disposition", format!("attachment; filename=\"{}_moc.fits\"", event_id)))
+                            .append_header((
+                                "Content-Disposition",
+                                format!("attachment; filename=\"{}_moc.fits\"", event_id),
+                            ))
                             .body(fits_data);
                     }
                     Err(e) => {
@@ -290,10 +297,7 @@ async fn get_skymap_moc(
 /// Convert ParsedSkymap credible regions to MOC JSON format
 /// Create or update an event
 #[post("/api/events")]
-async fn post_event(
-    event: web::Json<MMEvent>,
-    state: web::Data<ApiState>,
-) -> impl Responder {
+async fn post_event(event: web::Json<MMEvent>, state: web::Data<ApiState>) -> impl Responder {
     let mut events = state.events.lock().unwrap();
     events.insert(event.event_id.clone(), event.into_inner());
     HttpResponse::Ok().json(serde_json::json!({
@@ -369,10 +373,10 @@ pub async fn run_server(bind_addr: &str, state: ApiState) -> std::io::Result<()>
                 Cors::default()
                     .allow_any_origin()
                     .allow_any_method()
-                    .allow_any_header()
+                    .allow_any_header(),
             )
             .app_data(state_data.clone())
-            .app_data(web::PayloadConfig::new(10 * 1024 * 1024))  // 10MB payload limit for skymaps
+            .app_data(web::PayloadConfig::new(10 * 1024 * 1024)) // 10MB payload limit for skymaps
             .service(serve_dashboard)
             .service(health)
             .service(get_events)
