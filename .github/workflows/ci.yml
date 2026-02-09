@@ -77,13 +77,24 @@ jobs:
         key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-test-
 
+    - name: Free disk space
+      if: runner.os == 'Linux'
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        df -h /
+
     - name: Build all crates
       run: cargo build --all
 
-    - name: Run tests
-      run: cargo test --all
+    - name: Run tests (skip doc tests to save disk)
+      run: cargo test --all --lib --tests --bins
+
+    - name: Clean debug artifacts before release build
+      if: matrix.os == 'ubuntu-latest'
+      run: cargo clean --profile dev
 
     - name: Build release binaries
+      if: matrix.os == 'ubuntu-latest'
       run: |
         cargo build --release --bin mm-correlator-service
         cargo build --release --bin stream-events
