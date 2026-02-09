@@ -1,748 +1,255 @@
-# Rust Multi-Messenger Superevent Manager
+# ORIGIN: Multi-Messenger Superevent Simulation Framework
 
 [![CI](https://github.com/mcoughlin/origin/workflows/CI/badge.svg)](https://github.com/mcoughlin/origin/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
-A Rust implementation of a multi-messenger superevent correlator that combines gravitational wave (GW) events, gamma-ray bursts (GRBs), and optical transient alerts. Built for real-time correlation of compact-object formation events across multiple astronomical messengers.
+ORIGIN is a comprehensive simulation framework for testing multi-messenger superevent creation and correlation. It generates synthetic gravitational wave (GW), gamma-ray burst (GRB), and optical transient events, streams them through a Kafka-based pipeline, and correlates them in real-time using the RAVEN algorithm to form multi-messenger superevents.
 
-🎯 **Live Demo**: Detects three-way correlations (GW + GRB + Optical) in real-time!
-
-**Status**: ✅ Operational - Three-way correlations actively being detected
+The framework is designed to validate and stress-test the end-to-end pipeline that will process real alerts from LIGO/Virgo/KAGRA, Fermi/Swift, and optical surveys like ZTF and LSST during observing runs.
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-  - [Prerequisites](#prerequisites)
-  - [Running the Demo](#1-clone-and-build)
-  - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
-- [Features](#features)
-- [Usage Examples](#usage)
+- [Crates](#crates)
+- [Capabilities](#capabilities)
+- [Running the Demo](#running-the-demo)
 - [Configuration](#configuration)
 - [Testing](#testing)
-- [Development](#development)
+- [Future Development](#future-development)
 - [References](#references)
 
 ## Quick Start
 
-Get the three-way correlation system running in 5 minutes:
-
 ### Prerequisites
 
 - **Rust** (1.75+): Install from [rustup.rs](https://rustup.rs)
-- **Docker & Docker Compose**: For Kafka infrastructure
+- **Docker & Docker Compose**: For Kafka, Redis, Prometheus, and Grafana
 
-### 1. Clone and Build
+### Build and Run
 
 ```bash
 git clone https://github.com/mcoughlin/origin.git
 cd origin
 cargo build --release
-```
 
-### 2. Start Infrastructure
-
-```bash
-# Start Kafka, Prometheus, Grafana
+# Start infrastructure (Kafka, Redis, Prometheus, Grafana)
 docker compose up -d
-
-# Verify services are running
-docker ps
 ```
 
-### 3. Run the Three-Way Correlation Demo
-
-Open **4 terminal windows** and run these commands:
-
-**Terminal 1: Start the correlator service**
-```bash
-RUST_LOG=info ./target/release/mm-correlator-service
-```
-
-**Terminal 2: Stream GW + GRB events (30 second intervals)**
-```bash
-RUST_LOG=info ./target/release/stream-events 0.0333
-```
-
-**Terminal 3: Stream optical alerts (10 second intervals, simulation mode)**
-```bash
-# Default CSV path: /Users/mcoughlin/Code/ORIGIN/lightcurves_csv
-# Edit stream_optical_alerts.rs line 64 to change the path
-RUST_LOG=info ./target/release/stream-optical-alerts 0.1 --simulation
-```
-
-> **Note**: You need ZTF light curve CSV files. If you don't have them, the system will work with just GW-GRB correlations (skip this terminal).
-
-**Terminal 4: Export metrics (optional)**
-```bash
-RUST_LOG=info ./target/release/correlation-exporter
-```
-
-### 4. Watch Three-Way Correlations! 🎉
-
-In **Terminal 1** (correlator), you should see output like:
-
-```
-[INFO] === Multi-Messenger Correlator Service ===
-[INFO] Time windows:
-[INFO]   GW-GRB:     ±5 seconds
-[INFO]   GW-Optical: ±86400 seconds (1.0 days)
-[INFO] 📡 Subscribed to topics:
-[INFO]    • igwn.gwalert
-[INFO]    • gcn.notices.grb
-[INFO]    • optical.alerts
-[INFO]
-[INFO] 📡 GW event received: sim_id=8, GPS=0.54
-[INFO] 🌟 GRB event received: sim_id=8, GPS=0.54, inst=Fermi GBM
-[INFO] ✨ Correlation found! GW 8 ↔ GRB 8 (Δt=0.00s)
-[INFO] 🎯 Overlap computed for sim_id=8:
-[INFO]    GW 90% CR:       434.3 sq deg
-[INFO]    GRB 90% CR:      665.1 sq deg
-[INFO]    Overlap:          56.9 sq deg (13.1% of GW, 8.5% of GRB)
-[INFO]
-[INFO] 🔭 Optical alert received: ZTF25aaabnwi @ MJD=44244.00, (RA,Dec)=(352.00,85.00)
-[INFO]    ✨ Found 6 GW event(s) within ±1 day
-[INFO]    🎯 THREE-WAY CORRELATION! GW 8 ↔ GRB Fermi GBM ↔ Optical ZTF25aaabnwi
-[INFO]       Time offsets: GW→Optical=0.0s, GW→GRB=0.0s
-```
-
-**That's the magic!** 🌊💥🔭 The system is correlating gravitational waves, gamma-ray bursts, and optical transients in real-time!
-
-### 5. View Metrics & Dashboards
-
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **Metrics API**: http://localhost:9091/metrics
-
-### What's Happening?
-
-The system streams three types of events:
-- 🌊 **Gravitational Waves** - Simulated LIGO/Virgo/KAGRA detections
-- 💥 **Gamma-Ray Bursts** - Simulated Fermi/Swift observations
-- 🔭 **Optical Transients** - Real ZTF light curve data (1,019 objects)
-
-When events arrive within the correlation windows (GW-GRB: ±5s, GW-Optical: ±1 day), the correlator detects **three-way matches** and publishes them to the `mm.correlations` Kafka topic!
-
-For detailed documentation, see [THREE_WAY_CORRELATION_DEMO.md](THREE_WAY_CORRELATION_DEMO.md).
-
-### Troubleshooting
-
-**Docker containers not starting?**
-```bash
-docker compose down
-docker compose up -d
-docker ps  # Should show mm-kafka, mm-zookeeper, mm-prometheus, mm-grafana
-```
-
-**Kafka errors about unknown topics?**
-- Topics are created automatically when producers first publish
-- Wait 10-20 seconds after starting services before checking for messages
-
-**No optical alerts appearing?**
-- Check that the ZTF CSV directory path is correct in `stream_optical_alerts.rs:64`
-- Verify CSV files exist: `ls /Users/mcoughlin/Code/ORIGIN/lightcurves_csv/*.csv | wc -l`
-
-**No correlations detected?**
-- Make sure all 3 streamers are running (check with `ps aux | grep stream`)
-- Correlations require events within time windows (±5s for GW-GRB, ±1 day for GW-Optical)
-- In simulation mode, optical alerts use modified times to match GW simulations
-
-### Stopping Services
-
-```bash
-# Stop Rust processes (Ctrl+C in each terminal)
-
-# Stop Docker containers
-docker compose down
-```
-
-### Next Steps
-
-After running the demo:
-
-1. **Explore the data**: Check Prometheus metrics and Grafana dashboards
-2. **Read the docs**: See [OPTICAL_INTEGRATION.md](OPTICAL_INTEGRATION.md) for implementation details
-3. **Run tests**: `cargo test` to verify all components
-4. **Customize**: Edit correlation windows in `mm_correlator_service.rs:298-300`
-5. **Production mode**: Remove `--simulation` flag to use real ZTF timestamps
+See [Running the Demo](#running-the-demo) for the full multi-terminal walkthrough.
 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                   GCN Kafka Topics (NASA)                       │
-│  igwn.gwalert                    - GW alerts (LIGO/Virgo/KAGRA)│
-│  gcn.notices.swift.bat.guano     - Gamma-ray bursts (Swift)    │
-│  gcn.notices.einstein_probe.*    - X-ray transients            │
-│  gcn.notices.icecube.*           - Neutrino alerts             │
-└────────────────────────────────────────────────────────────────┘
-                │
-                ▼
-┌────────────────────────────────────────────────────────────────┐
-│              GCN Kafka Consumer (mm-gcn)                        │
-│  - Parse multi-messenger alerts                                │
-│  - Normalize to internal Event types                           │
-└────────────────────────────────────────────────────────────────┘
-                │
-                ▼
-┌────────────────────────────────────────────────────────────────┐
-│              MultiMessenger Superevent Correlator               │
-│  - Temporal matching (±time window)                            │
-│  - Spatial matching (sky position overlap)                     │
-│  - Joint FAR calculation (RAVEN algorithm)                     │
-│  - Maintains active superevent state                           │
-└────────────────────────────────────────────────────────────────┘
-                │
-                ▼
-┌────────────────────────────────────────────────────────────────┐
-│                   BOOM Kafka Consumer                           │
-│  Live: kaboom.caltech.edu:9093                                 │
-│  Simulation: ZTF CSV light curves                              │
-└────────────────────────────────────────────────────────────────┘
+                        Simulation Layer
+ ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+ │  GW + GRB Event  │  │  O4 Observing    │  │  Optical Alert   │
+ │  Generator       │  │  Scenario Sim    │  │  Streamer (ZTF)  │
+ │  (stream-events) │  │  (stream-o4-sim) │  │  (stream-optical)│
+ └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘
+          │                     │                      │
+          ▼                     ▼                      ▼
+ ┌────────────────────────────────────────────────────────────────┐
+ │                     Kafka Message Bus                          │
+ │  igwn.gwalert  │  gcn.notices.grb  │  optical.alerts          │
+ └────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+ ┌────────────────────────────────────────────────────────────────┐
+ │               Superevent Correlator (mm-correlator)            │
+ │                                                                │
+ │  Temporal matching ──► Spatial matching ──► Joint FAR (RAVEN)  │
+ │         │                                        │             │
+ │         ▼                                        ▼             │
+ │  SVI light curve fitting              GP feature extraction    │
+ │  (t0 estimation)                      (background rejection)   │
+ └──────────────────────────┬─────────────────────────────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+ ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+ │    Redis     │  │  Prometheus  │  │  REST API    │
+ │  (state)     │  │  + Grafana   │  │  (mm-api)    │
+ └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
 ## Crates
 
-- **mm-core**: Core data structures (events, time, positions, light curves)
-- **mm-gcn**: GCN Kafka consumer and alert parsers
-- **mm-correlator**: Superevent correlation engine with RAVEN algorithm
-- **mm-boom**: BOOM Kafka consumer and simulation mode
-- **mm-redis**: Redis state persistence with schema versioning and recovery
-- **mm-config**: Configuration management with TOML and environment variables
-- **mm-service**: Main binaries and services
+| Crate | Purpose |
+|-------|---------|
+| **mm-core** | Core data structures, light curve models, GP feature extraction, skymap handling, SVI fitting |
+| **mm-correlator** | Superevent correlation engine implementing the RAVEN algorithm |
+| **mm-simulation** | Synthetic event generation: GW mergers, GRB counterparts, optical transients, background populations |
+| **mm-gcn** | GCN Kafka consumer and VOEvent/JSON alert parsing |
+| **mm-boom** | BOOM Kafka consumer for ZTF/LSST optical alerts (Avro format) |
+| **mm-redis** | Redis state persistence with schema versioning and automatic recovery |
+| **mm-config** | TOML configuration with environment variable overrides |
+| **mm-api** | REST API server for event queries and Grafana integration |
+| **mm-service** | Executable binaries for all services, demos, and analysis tools |
 
-## Features
+## Capabilities
 
-### Phase 3 ✅ Complete
-- Temporal clustering using binary search (O(log n))
-- Spatial matching with angular separation
-- Joint FAR (False Alarm Rate) calculation using RAVEN formula
-- Multi-messenger superevent state management
-- In-memory BTreeMap index for fast time-based lookups
+### Event Simulation
 
-### Phase 4 ✅ Complete
-- BOOM Kafka integration for live optical alerts
-- Simulation mode using ZTF CSV light curves
-- Light curve parsing and processing
-- MJD ↔ GPS time conversion
-- Optical candidate matching with GW superevents
+- **Gravitational wave events**: Synthetic GW detections with realistic SNR, distance, and FAR distributions
+- **GRB counterparts**: Simulated Fermi GBM / Swift BAT detections with flux, fluence, localization error ellipses, and jet afterglow modeling
+- **Optical transients**: Kilonova, supernova, and fast transient light curves with survey-specific properties (ZTF, LSST)
+- **Background populations**: Poisson-distributed background GRBs and optical transients for false-positive characterization
+- **O4 observing scenarios**: Full O4 injection sets with realistic skymap localizations (~1000 events)
 
-### Phase 5 ✅ Partial
-- **Configuration management** ✅ - TOML files with environment variable overrides
-- **Redis state persistence** ✅ - Automatic recovery on restart with schema versioning
-- Kafka producer for publishing multi-messenger superevents 🚧
-- Prometheus metrics 🚧
+### Correlation Engine
 
-### Phase 6 ✅ Complete - **SVI Light Curve Fitting**
-- **Stochastic Variational Inference** ✅ - Bayesian inference for light curves
-- **Physical t0 estimation** ✅ - Extract merger/explosion time from optical data
-- **4 light curve models** ✅ - Bazin, Villar, PowerLaw, MetzgerKN (kilonova)
-- **Kilonova physics** ✅ - Full model validated against NMMA
-- **Sub-day precision** ✅ - 0.35-0.38 day t0 uncertainties on real ZTF data
-- **Real-time performance** ✅ - 0.5-1.5s per fit, handles ~60 alerts/minute
-- **Correlator integration** ✅ - Automatic t0-based GW+optical correlation
+- **Temporal matching**: O(log n) binary search on BTreeMap indexed by GPS time, configurable windows (GW-GRB: +/-5s, GW-Optical: -1s to +1 day)
+- **Spatial matching**: Angular separation and HEALPix credible region overlap computation
+- **Joint FAR**: RAVEN false alarm rate calculation combining temporal, spatial, and trial factor probabilities
+- **Superevent classification**: Automatic state tracking (GWOnly, GWWithOptical, GWWithGammaRay, MultiMessenger)
 
-See [demonstration below](#phase-6--complete---svi-light-curve-fitting) for real results!
+### Light Curve Fitting (SVI)
 
-### Redis State Persistence ✅
+Stochastic Variational Inference for physical t0 (merger/explosion time) estimation:
 
-The correlator now persists state to Redis, enabling service restarts without data loss!
+- **4 models**: Bazin (empirical SN), Villar (improved empirical), PowerLaw (simple rise+decay), MetzgerKN (physical kilonova validated against NMMA)
+- **Sub-day precision**: 0.35-0.38 day t0 uncertainties on real ZTF data
+- **Real-time performance**: 0.5-1.5s per fit (~60 alerts/minute)
+- **Correlator integration**: Automatic t0-based GW+optical correlation with per-measurement fallback
 
-**Features:**
-- Automatic state recovery on service restart
-- Schema-versioned storage with graceful degradation
-- TTL management: 2 hours for GW/GRB events, 1 day for optical alerts
-- Time-range queries using Redis sorted sets
-- Non-blocking persistence via tokio::spawn
-- Graceful degradation when Redis unavailable
+### GP-Based Background Rejection
 
-See [`crates/mm-redis/RECOVERY_DEMO.md`](crates/mm-redis/RECOVERY_DEMO.md) for detailed documentation.
+Gaussian Process regression for light curve feature extraction and background rejection:
 
-## Installation
+- **GP fitting**: RBF + Constant + White kernel with grid search over hyperparameters (amplitude, lengthscale, noise)
+- **Feature extraction**: Rise rate, decay rate, peak magnitude, FWHM, derivative features (dfdt_now, dfdt_max, dfdt_min)
+- **Soft downweighting**: FAR multiplier based on light curve evolution rates -- fast risers (> 1 mag/day) are boosted as KN-consistent, slow decayers (< 0.3 mag/day) are penalized as SN-like background
+- **Configurable**: Enable/disable, adjustable rate thresholds and penalty bounds via `LightCurveFilterConfig`
 
-See [Quick Start](#quick-start) above for the fastest way to get running.
+### Infrastructure
 
-**Manual build:**
+- **Kafka streaming**: Local broker for simulation; NASA GCN Kafka and BOOM (ZTF) for live alerts
+- **Redis persistence**: Schema-versioned state storage with TTL management, time-range queries, and automatic recovery on service restart
+- **Prometheus + Grafana**: Metrics export (correlation counts, FAR distributions, event rates) with pre-provisioned dashboards
+- **REST API**: Event listing, skymap serving (FITS and MOC), and health checks for external integration
+
+## Running the Demo
+
+Open 4 terminal windows from the repository root:
+
+**Terminal 1 -- Correlator service**
 ```bash
-cargo build --release
+RUST_LOG=info ./target/release/mm-correlator-service
+```
 
-# Build specific binaries
-cargo build --release --bin mm-correlator-service
-cargo build --release --bin stream-events
-cargo build --release --bin stream-optical-alerts
-cargo build --release --bin correlation-exporter
+**Terminal 2 -- GW + GRB event stream**
+```bash
+RUST_LOG=info ./target/release/stream-events 0.0333
+```
+
+**Terminal 3 -- Optical alert stream** (requires ZTF CSV light curves)
+```bash
+RUST_LOG=info ./target/release/stream-optical-alerts 0.1 --simulation
+```
+
+**Terminal 4 -- Metrics exporter** (optional)
+```bash
+RUST_LOG=info ./target/release/correlation-exporter
+```
+
+The correlator will log multi-messenger detections as events arrive:
+
+```
+[INFO] GW event received: sim_id=8, GPS=0.54
+[INFO] GRB event received: sim_id=8, GPS=0.54, inst=Fermi GBM
+[INFO] Correlation found! GW 8 <-> GRB 8 (dt=0.00s)
+[INFO] Overlap: 56.9 sq deg (13.1% of GW, 8.5% of GRB)
+[INFO] Optical alert received: ZTF25aaabnwi @ MJD=44244.00
+[INFO] THREE-WAY CORRELATION! GW 8 <-> GRB Fermi GBM <-> Optical ZTF25aaabnwi
+```
+
+Dashboards are available at:
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+
+### O4 Simulation Mode
+
+For realistic O4 observing run simulations with background populations:
+
+```bash
+RUST_LOG=info ./target/release/stream-o4-simulation
 ```
 
 ## Configuration
 
-### Setup
-
-1. **Copy the example configuration:**
-   ```bash
-   cp config/config.example.toml config/config.toml
-   ```
-
-2. **Edit `config/config.toml` with your credentials:**
-   ```toml
-   [gcn]
-   client_id = "your_gcn_client_id"
-   client_secret = "your_gcn_client_secret"
-
-   [boom]
-   sasl_username = "your_boom_username"
-   sasl_password = "your_boom_password"
-   ```
-
-3. **Or use environment variables:**
-   ```bash
-   export GCN_CLIENT_ID=your_client_id
-   export GCN_CLIENT_SECRET=your_client_secret
-   export BOOM_SASL_USERNAME=your_username
-   export BOOM_SASL_PASSWORD=your_password
-   export ZTF_CSV_DIR=/path/to/ztf/csv
-   ```
-
-### Configuration File Structure
-
-The configuration file (`config/config.toml`) contains:
-
-- **GCN credentials**: For connecting to NASA's GCN Kafka
-- **BOOM credentials**: For connecting to BOOM's optical alert stream
-- **Correlator parameters**: RAVEN time windows, spatial thresholds, FAR thresholds
-- **Simulation settings**: Enable/disable simulation mode, CSV directory path
-
-See [`config/config.example.toml`](config/config.example.toml) for full documentation.
-
-### Generate Config Template
+Generate a config template, then edit with your credentials:
 
 ```bash
 cargo run --bin generate-config
+cp config/config.example.toml config/config.toml
 ```
 
-## Usage
+Key sections:
 
-### 1. Multi-Messenger Correlator Demo
+```toml
+[gcn]
+client_id = "your_gcn_client_id"
+client_secret = "your_gcn_client_secret"
 
-Process 1,019 real ZTF light curves and correlate with synthetic GW event:
+[boom]
+sasl_username = "your_boom_username"
+sasl_password = "your_boom_password"
+
+[correlator]
+time_window_before = -1.0       # seconds
+time_window_after = 86400.0     # seconds (1 day)
+spatial_threshold = 5.0         # degrees
+far_threshold = 0.0333          # 1/month
+```
+
+Environment variables override config file values:
 
 ```bash
-cargo run --bin mm-correlator-demo
+export GCN_CLIENT_ID=your_client_id
+export GCN_CLIENT_SECRET=your_client_secret
+export BOOM_SASL_USERNAME=your_username
+export BOOM_SASL_PASSWORD=your_password
 ```
-
-**Output:**
-```
-INFO Starting Multi-Messenger Correlator Demo
-INFO Loading ZTF light curves from: /Users/mcoughlin/Code/ORIGIN/lightcurves_csv
-INFO Loaded 1019 light curves
-INFO First ZTF measurement: MJD 60831.46 → GPS 1433156802.00
-INFO Setting GW trigger time to GPS 1433153202.00 (1 hour before)
-INFO Processing synthetic GW event: S240101a
-INFO Created superevents: ["MS000001"]
-...
-=== Final Statistics ===
-INFO Total superevents: 1
-INFO GW-only: 0
-INFO With optical: 1
-INFO Optical alerts processed: 1019
-INFO Optical matches found: 129
-
-=== Multi-Messenger Superevents ===
-INFO Superevent MMS240101a:
-INFO   GW event: S240101a
-INFO   t_0: 1433153202.00 (GPS)
-INFO   Classification: GWWithOptical
-INFO   Optical candidates: 564
-INFO     1. Object: ZTF25aatrvpg
-INFO        Time offset: 3600.00 s
-INFO        Spatial offset: 0.00 deg
-INFO        SNR: 14.45
-INFO        Joint FAR: 1.54e-7 /yr
-```
-
-### 2. GCN Kafka Consumer
-
-Connect to live GCN Kafka stream (requires credentials):
-
-```bash
-cargo run --bin mm-service
-```
-
-Subscribes to:
-- `igwn.gwalert` - Gravitational wave alerts
-- `gcn.notices.swift.bat.guano` - Gamma-ray bursts
-- `gcn.notices.einstein_probe.wxt.alert` - X-ray transients
-- `gcn.notices.icecube.*` - Neutrino alerts
-
-### 3. Analyze ZTF Light Curves
-
-Analyze ZTF CSV files:
-
-```bash
-cargo run --bin analyze-ztf
-```
-
-**Output:**
-```
-INFO Loading light curves from: /Users/mcoughlin/Code/ORIGIN/lightcurves_csv
-INFO Loaded 1019 light curves with 110536 total measurements
-INFO Analyzing light curves...
-
-Statistics:
-  Total objects: 1019
-  Total measurements: 110536
-  Measurements per object: 108.5 (mean), 39.0 (median)
-  Bands: [("r", 59421), ("g", 51115)]
-  SNR range: [1.26, 5263.36]
-  Time range: MJD [60831.46, 60891.59] (60.1 days)
-```
-
-## Correlation Algorithm
-
-### Temporal Matching
-
-Uses binary search on a BTreeMap indexed by GPS time:
-
-```rust
-pub struct TemporalIndex {
-    times: BTreeMap<OrderedFloat<f64>, String>,
-}
-```
-
-Search window (RAVEN parameters):
-- **Before GW**: -1 second
-- **After GW**: +86400 seconds (1 day)
-
-### Spatial Matching
-
-Angular separation calculation:
-
-```rust
-let separation = pos1.angular_separation(pos2);
-if separation <= spatial_threshold {
-    // Match found
-}
-```
-
-### Joint FAR Calculation
-
-RAVEN formula:
-```
-FAR = background_rate × time_prob × spatial_prob × trials_factor
-```
-
-Where:
-- `time_prob = 1 / time_window`
-- `spatial_prob = search_area / sky_area`
-- `trials_factor = 7` (for 7 photometric bands)
-- `background_rate = 1.0` (1 alert per year)
-
-Significance threshold: `FAR < 1/30` (1 per month)
 
 ## Testing
 
-### Unit & Integration Tests
-
-Run all tests:
-
 ```bash
+# All tests
 cargo test
-```
 
-Run specific test suite:
+# Specific crates
+cargo test -p mm-core
+cargo test -p mm-correlator
+cargo test -p mm-simulation
 
-```bash
-cargo test --package mm-correlator
-cargo test --package mm-core
-cargo test --package mm-redis
-```
-
-### Redis State Recovery Tests
-
-These tests require Redis to be running:
-
-```bash
-# Start Redis
+# Redis integration tests (requires running Redis)
 docker compose up -d redis
-
-# Run Redis integration tests (with --ignored flag)
 cargo test -p mm-redis -- --ignored --test-threads=1
-cargo test -p mm-service --test state_recovery_integration -- --ignored --test-threads=1
-```
 
-The tests verify:
-- Events are persisted to Redis
-- Service can restart and recover state
-- Time-based filtering works correctly
-- TTL expiration is handled properly
-
-### Phase 6 ✅ Complete - **SVI Light Curve Fitting**
-
-**Breakthrough**: Physical t0 (merger/explosion time) estimation from optical transients! 🚀
-
-The correlator now uses **Stochastic Variational Inference (SVI)** to fit light curves and extract the physical merger or explosion time, dramatically improving GW+optical correlation accuracy.
-
-#### Why This Matters
-
-❌ **Old approach**: Used first detection time
-✅ **New approach**: Fits physical model to estimate actual merger/explosion time
-
-**Result**: Can now correlate transients discovered **hours or days** after the GW trigger by extrapolating back to the true t0!
-
-#### Live Demonstration
-
-Run the test suite to see real ZTF light curve fitting in action:
-
-```bash
+# Light curve fitting with visual output
 cargo test -p mm-core --test lightcurve_fitting_test -- --nocapture
 ```
 
-**Visual Results** - SVI fits on real ZTF transients:
+Test fixtures in `tests/fixtures/` include O4 observing scenario data, HEALPix skymaps (FITS), GRB VOEvent XMLs, and ZTF light curve CSVs, enabling the full test suite to run without external data dependencies.
 
-<table>
-<tr>
-<td width="33%">
-<img src="docs/plots/ZTF25aaaalin_Bazin_Supernova-like.png" alt="Supernova-like transient fit">
-<br><b>Supernova-like</b><br>36 measurements, Bazin model<br>t0 = 60674.730 ± 0.368 MJD
-</td>
-<td width="33%">
-<img src="docs/plots/ZTF25aaaawig_PowerLaw_Fast_transient.png" alt="Fast transient fit">
-<br><b>Fast transient</b><br>50 measurements, PowerLaw model<br>t0 = 60670.552 ± 0.344 MJD
-</td>
-<td width="33%">
-<img src="docs/plots/ZTF25aaabnwi_MetzgerKN_Kilonova_candidate.png" alt="Kilonova candidate fit">
-<br><b>Kilonova candidate</b><br>867 measurements, MetzgerKN model<br>t0 = 60483.478 ± 0.359 MJD
-</td>
-</tr>
-</table>
+## Future Development
 
-*Blue points: observed data with error bars. Red line: SVI model fit. Green line: estimated t0 (merger/explosion time).*
-
-**Console output from ZTF transients:**
-
-```
-test test_fit_bazin_model ...
-Loaded ZTF25aaaalin with 36 measurements
-Bazin fit for ZTF25aaaalin
-  t0: 60684.208 MJD
-  t0_err: 0.368 days
-  ELBO: -2193.12
-ok
-
-test test_fit_multiple_objects ...
-ZTF25aaaalin: t0=60682.077 ±0.350 MJD
-ZTF25aaaawig: t0=60670.836 ±0.368 MJD
-ZTF25aaabezb: t0=60670.493 ±0.364 MJD
-Fitted 3/3 objects successfully
-ok
-
-test test_fit_ztf_lightcurve ...
-Loaded ZTF25aaabnwi with 867 measurements
-Fit successful!
-  t0: 60480.753 MJD (±0.378 days)
-  ELBO: -1081688.78
-  Converged: true
-  Reliable: true
-ok
-```
-
-#### Key Results
-
-| Metric | Value | Impact |
-|--------|-------|--------|
-| **Precision** | 0.35-0.38 days | Sub-day t0 accuracy |
-| **Success Rate** | 100% on test data | Robust across transient types |
-| **Performance** | 0.5-1.5s per fit | Real-time capable (~1 alert/min) |
-| **Models** | 4 available | Bazin, Villar, PowerLaw, **MetzgerKN (kilonova)** |
-
-#### Technical Implementation
-
-**SVI Algorithm**:
-- Mean-field Gaussian variational family: q(θ) ~ N(μ, σ²)
-- ELBO optimization with Adam
-- Monte Carlo gradient estimation
-- 200 iterations, 4 MC samples
-
-**Physical Models**:
-- **Bazin**: Empirical supernova (5 params)
-- **Villar**: Improved empirical (6 params)
-- **PowerLaw**: Simple rise+decay (4 params)
-- **MetzgerKN**: Physical kilonova (4 params)
-  - Thermalization efficiency (Barnes+16)
-  - Neutron decay + r-process heating (Korobkin+Rosswog)
-  - Diffusion timescale (Arnett approximation)
-  - **Validated against full NMMA implementation** ✅
-
-#### Example: Correlator Integration
-
-```rust
-// Process optical light curve
-let t0_result = fit_lightcurve(lightcurve, FitModel::MetzgerKN);
-
-match t0_result {
-    Ok(fit) if fit.is_reliable() => {
-        info!("Fitted t0: {:.3} MJD (±{:.3} days)", fit.t0, fit.t0_err);
-        // Use fitted t0 for GW correlation
-        correlate_with_gw_events(fit.t0_gps(), ...);
-    }
-    _ => {
-        // Fall back to per-measurement correlation
-        correlate_per_measurement(lightcurve, ...);
-    }
-}
-```
-
-#### Documentation
-
-- **Physics validation**: [`docs/kilonova_model_validation.md`](docs/kilonova_model_validation.md)
-- **Implementation details**: [`docs/svi_fitting_implementation.md`](docs/svi_fitting_implementation.md)
-- **Integration guide**: [`docs/lightcurve_fitting_integration.md`](docs/lightcurve_fitting_integration.md)
-
-#### Performance Comparison
-
-| Approach | Time Accuracy | When Available | Limitations |
-|----------|---------------|----------------|-------------|
-| First detection | ~Hours off | Immediately | Misses early-time physics |
-| Linear extrapolation | ~1 day off | Needs 2+ points | Assumes linear rise |
-| **SVI fitting** | **~0.4 days** | **Needs 5+ points** | **None for well-sampled data** |
-
-**Impact on GW Correlation**: A transient discovered 12 hours after a GW trigger might have t0 within seconds of the GW! The SVI fitting recovers this information, dramatically improving correlation sensitivity.
-
-### Test Fixtures
-
-Sample data files are provided in [`tests/fixtures/`](tests/fixtures/):
-- **Observing scenarios (O4HL)**: 3 GW simulation data files + 10 HEALPix skymap FITS files
-  - `coincs.dat`, `allsky.dat`, `injections.dat`
-  - `0.fits` through `9.fits` - Skymap localizations
-- **GRB XMLs**: 10 VOEvent XML files (Fermi, Swift, Einstein Probe, SVOM)
-- **Optical light curves**: 10 ZTF CSV files with real transient data
-
-These fixtures enable tests to run without external data dependencies or downloads.
-
-See [`tests/fixtures/README.md`](tests/fixtures/README.md) for details.
-
-## Data Formats
-
-### ZTF CSV Format
-
-Light curves stored in `/Users/mcoughlin/Code/ORIGIN/lightcurves_csv`:
-
-```csv
-objectId,jd,flux,flux_err,band
-ZTF25aatrvpg,2460831.46,1000.0,10.0,r
-ZTF25aatrvpg,2460831.52,1050.0,12.0,g
-```
-
-### GCN Alert Format
-
-GW alerts (`igwn.gwalert`):
-```json
-{
-  "superevent_id": "S240101a",
-  "alert_type": "PRELIMINARY",
-  "time": 1234567890.0,
-  "instruments": ["H1", "L1", "V1"],
-  "far": 1e-10
-}
-```
-
-### BOOM Alert Format
-
-Avro-encoded with schema:
-- `objectId`: ZTF identifier
-- `candid`: Candidate ID
-- `ra`, `dec`: Sky position
-- `jd`: Julian date
-- `magpsf`, `sigmapsf`: PSF magnitude
-- `fid`: Filter ID (1=g, 2=r, 3=i)
-- `drb`: Real/bogus score
-- `prv_candidates`: Previous photometry
-
-## Performance
-
-- **Light curve loading**: 1,019 objects in ~300ms
-- **Correlation**: 1,019 alerts processed in ~20ms
-- **Memory**: ~50MB for 1,000 superevents with 100k optical candidates
-- **Temporal search**: O(log n) binary search
-
-## Time Conventions
-
-- **GPS time**: Gravitational wave standard (seconds since GPS epoch)
-- **MJD (Modified Julian Date)**: Optical astronomy standard (days)
-- **Unix time**: Standard Unix epoch (seconds since 1970-01-01)
-
-Conversions:
-```rust
-// MJD → GPS
-let gps = (mjd - 40587.0) * 86400.0 - 315964800.0 + 18.0;
-
-// GPS → MJD
-let mjd = (gps + 315964800.0 - 18.0) / 86400.0 + 40587.0;
-```
-
-## Dependencies
-
-Core:
-- `tokio` - Async runtime
-- `rdkafka` - Kafka client (SASL authentication)
-- `apache-avro` - BOOM alert parsing
-- `serde` - Serialization
-- `chrono` - Time handling
-
-Astronomy:
-- `ordered-float` - Ordered float types for BTreeMap
-- `healpix` - Sky pixelization (planned)
-
-## Development
-
-### Pre-commit Hooks
-
-Install [pre-commit](https://pre-commit.com/) to automatically format and lint code before commits:
-
-```bash
-# Install pre-commit (macOS)
-brew install pre-commit
-
-# Or with pip
-pip install pre-commit
-
-# Install git hooks
-pre-commit install
-
-# Run manually on all files
-pre-commit run --all-files
-```
-
-The pre-commit hooks will automatically:
-- Format code with `cargo fmt`
-- Lint code with `cargo clippy`
-
-### Manual Commands
-
-```bash
-# Format code
-cargo fmt
-
-# Check formatting without modifying files
-cargo fmt --check
-
-# Run linter
-cargo clippy -- -D warnings
-
-# Run linter on all targets
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Watch mode (requires cargo-watch)
-cargo install cargo-watch
-cargo watch -x "run --bin mm-correlator-demo"
-```
+- **Skymap-based spatial correlation**: Replace point-source angular separation with full HEALPix skymap overlap for GW-optical matching, using the parsed skymap credible regions already available in mm-core
+- **Live alert pipeline**: End-to-end integration with NASA GCN Kafka and BOOM for real O4/O5 alert processing
+- **Enhanced kilonova models**: Multi-component ejecta (dynamical + wind), multi-band fitting, and color evolution constraints
+- **Neutrino and X-ray correlation**: Extend the correlator to handle IceCube neutrino and Einstein Probe X-ray alerts as full messenger channels (data structures exist, correlation logic pending)
+- **Population inference**: Use the simulation framework to characterize detection efficiency and false alarm rates across a population of mergers, informing RAVEN parameter tuning for O5
+- **Improved t0 estimation**: Leverage GP features (rise rate, FWHM) as priors for SVI fitting to improve convergence on sparse early-time light curves
 
 ## References
 
-- **RAVEN**: Rapid identification of multi-messenger counterparts ([arXiv:1901.03588](https://arxiv.org/abs/1901.03588))
-- **GCN Kafka**: NASA's GCN Kafka archive ([gcn.nasa.gov](https://gcn.nasa.gov/))
-- **BOOM**: Rust alert broker for ZTF/LSST
-- **SGN-LLAI**: Python GW superevent creation pipeline
+- **RAVEN**: Urban et al. (2016), [arXiv:1901.03588](https://arxiv.org/abs/1901.03588) -- Rapid identification of multi-messenger counterparts
+- **GCN Kafka**: NASA's General Coordinates Network, [gcn.nasa.gov](https://gcn.nasa.gov/)
+- **BOOM**: Rust alert broker for ZTF/LSST optical streams
+- **NMMA**: Nuclear physics and Multi-Messenger Astronomy framework for kilonova model validation
 
 ## License
 
