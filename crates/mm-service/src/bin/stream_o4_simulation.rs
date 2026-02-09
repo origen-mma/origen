@@ -81,6 +81,10 @@ struct Args {
     /// Path to GRB VOEvent XML directory (for realistic localizations)
     #[arg(long)]
     grb_xml_dir: Option<PathBuf>,
+
+    /// Force at least one event to have all components (GW + GRB + optical)
+    #[arg(long, default_value = "false")]
+    force_multimessenger: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -352,6 +356,7 @@ async fn main() -> Result<()> {
     let mut n_optical_published = 0;
     let mut n_correlations_published = 0;
     let mut bg_stats = BackgroundRejectionStats::default();
+    let mut has_full_multimessenger = false; // Track if we've had GW+GRB+optical
 
     let start_time = Instant::now();
     let event_interval = Duration::from_secs_f64(1.0 / args.rate);
@@ -574,8 +579,18 @@ async fn main() -> Result<()> {
             }
         }
 
-        // 2. Publish GRB if detected
-        if mm_event.has_grb() {
+        // Check if we should force multi-messenger for this event
+        // (last event and we haven't had a full multi-messenger yet)
+        let is_last_event = args.max_events > 0 && n_events >= args.max_events;
+        let force_mm_this_event = args.force_multimessenger && !has_full_multimessenger && is_last_event;
+
+        if force_mm_this_event {
+            info!("🎯 FORCING MULTI-MESSENGER EVENT (GW+GRB+Optical) for demonstration");
+        }
+
+        // 2. Publish GRB if detected (or forced)
+        let has_grb = mm_event.has_grb() || force_mm_this_event;
+        if has_grb {
             let time_offset = 0.5; // ~0.5s after GW
 
             // Sample realistic GRB localization if available
@@ -631,13 +646,18 @@ async fn main() -> Result<()> {
             info!("   🌟 GRB detected! Δt={:.2}s", time_offset);
         }
 
-        // 3. Publish optical alert if detectable
-        let has_optical = mm_event.has_afterglow() || mm_event.has_kilonova();
-        let optical_magnitude = mm_event.afterglow.peak_magnitude;
+        // 3. Publish optical alert if detectable (or forced)
+        let has_optical = mm_event.has_afterglow() || mm_event.has_kilonova() || force_mm_this_event;
+        let optical_magnitude = if force_mm_this_event && mm_event.afterglow.peak_magnitude.is_none() {
+            // Force a bright optical counterpart
+            Some(20.0)
+        } else {
+            mm_event.afterglow.peak_magnitude
+        };
 
         if has_optical {
             if let Some(mag) = optical_magnitude {
-                if mag < args.limiting_magnitude {
+                if mag < args.limiting_magnitude || force_mm_this_event {
                     let time_offset = 3600.0; // 1 hour after GW
                     let optical_alert = OpticalAlert {
                         simulation_id: n_events,
@@ -694,10 +714,10 @@ async fn main() -> Result<()> {
         }
 
         // 4. Calculate and publish joint FAR if multi-messenger
-        if mm_event.has_grb() || (has_optical && optical_magnitude.is_some()) {
-            let has_grb = mm_event.has_grb();
+        if has_grb || (has_optical && optical_magnitude.is_some()) {
+            // Use has_grb from earlier (includes forced MM)
             let has_optical_detectable =
-                has_optical && optical_magnitude.is_some_and(|m| m < args.limiting_magnitude);
+                has_optical && (optical_magnitude.is_some_and(|m| m < args.limiting_magnitude) || force_mm_this_event);
 
             let skymap_area_90 = (distance / 100.0).powi(2) * 100.0; // Simplified
 
@@ -776,6 +796,7 @@ async fn main() -> Result<()> {
             );
             if has_grb && has_optical_detectable {
                 info!("      THREE-WAY CORRELATION (GW+GRB+Optical)");
+                has_full_multimessenger = true;
             }
         }
 

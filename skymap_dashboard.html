@@ -249,16 +249,36 @@
             // Clear all previous catalogs (circles are now catalogs too!)
             console.log('Clearing previous catalogs...');
             if (aladin.view && aladin.view.catalogs) {
-                // Remove catalogs in reverse to avoid index issues
+                const initialCount = aladin.view.catalogs.length;
+                console.log(`Starting with ${initialCount} catalogs`);
+
+                // Remove catalogs by repeatedly removing the first one until array is empty
                 while (aladin.view.catalogs.length > 0) {
                     try {
-                        const catalog = aladin.view.catalogs[aladin.view.catalogs.length - 1];
-                        aladin.removeCatalog(catalog);
+                        const catalog = aladin.view.catalogs[0];
+                        console.log(`Removing catalog: ${catalog.name || 'unnamed'}`);
+                        catalog.remove();
+
+                        // If remove() didn't actually remove it from the array, manually splice it out
+                        if (aladin.view.catalogs.length === initialCount || aladin.view.catalogs[0] === catalog) {
+                            console.warn('Catalog.remove() did not remove from array, manually splicing');
+                            aladin.view.catalogs.splice(0, 1);
+                        }
                     } catch (e) {
-                        console.warn('Failed to remove catalog:', e);
-                        break; // Avoid infinite loop if removal fails
+                        console.error('Error removing catalog:', e);
+                        // Force remove from array if there's an error
+                        aladin.view.catalogs.splice(0, 1);
+                    }
+
+                    // Safety check to prevent infinite loop
+                    if (aladin.view.catalogs.length >= initialCount) {
+                        console.error('Catalogs not decreasing, forcing clear');
+                        aladin.view.catalogs.length = 0;
+                        break;
                     }
                 }
+
+                console.log(`Remaining catalogs: ${aladin.view.catalogs.length}`);
             }
             currentCatalogs = [];
 
