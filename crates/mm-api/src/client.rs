@@ -42,11 +42,7 @@ impl ApiClient {
 
         // Publish event metadata
         let url = format!("{}/api/events", self.base_url);
-        self.client
-            .post(&url)
-            .json(&event)
-            .send()
-            .await?;
+        self.client.post(&url).json(&event).send().await?;
 
         // Publish skymap if provided
         if let Some(data) = skymap_data {
@@ -83,11 +79,7 @@ impl ApiClient {
         });
 
         let url = format!("{}/api/events/{}/grb", self.base_url, event_id);
-        self.client
-            .post(&url)
-            .json(&detection)
-            .send()
-            .await?;
+        self.client.post(&url).json(&detection).send().await?;
 
         Ok(())
     }
@@ -113,11 +105,7 @@ impl ApiClient {
         });
 
         let url = format!("{}/api/events/{}/optical", self.base_url, event_id);
-        self.client
-            .post(&url)
-            .json(&detection)
-            .send()
-            .await?;
+        self.client.post(&url).json(&detection).send().await?;
 
         Ok(())
     }

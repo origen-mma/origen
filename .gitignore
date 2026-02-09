@@ -2,8 +2,7 @@
 /target
 **/target
 
-# Cargo lock file
-Cargo.lock
+# Cargo lock file (tracked for reproducible builds since this is an application)
 
 # Editor files
 .vscode/

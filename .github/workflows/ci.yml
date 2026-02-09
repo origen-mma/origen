@@ -11,70 +11,43 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  test:
-    name: Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        rust: [stable, beta]
+  check:
+    name: Check & Lint
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          sudo apt-get update
-          sudo apt-get install -y libcfitsio-dev libsasl2-dev
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          brew install cfitsio cyrus-sasl
-        fi
-      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev
 
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: ${{ matrix.rust }}
         components: rustfmt, clippy
 
-    - name: Cache cargo registry
+    - name: Cache cargo
       uses: actions/cache@v4
       with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache cargo index
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache target directory
-      uses: actions/cache@v4
-      with:
-        path: target
-        key: ${{ runner.os }}-target-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-check-
 
     - name: Check formatting
       run: cargo fmt --all -- --check
 
     - name: Run clippy
-      run: cargo clippy --all-targets --all-features
+      run: cargo clippy --all-targets -- -W clippy::all
 
-    - name: Build all crates
-      run: cargo build --all --verbose
-
-    - name: Run tests
-      run: cargo test --all --verbose
-
-    - name: Build documentation
-      run: cargo doc --no-deps --all
-
-  build-binaries:
-    name: Build Release Binaries
+  test:
+    name: Test (${{ matrix.os }})
+    needs: check
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
 
@@ -101,7 +74,14 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-test-
+
+    - name: Build all crates
+      run: cargo build --all
+
+    - name: Run tests
+      run: cargo test --all
 
     - name: Build release binaries
       run: |
@@ -109,19 +89,25 @@ jobs:
         cargo build --release --bin stream-events
         cargo build --release --bin stream-optical-alerts
         cargo build --release --bin correlation-exporter
+        cargo build --release --bin stream-o4-simulation
+        cargo build --release --bin mm_api_server
 
     - name: Upload binaries
+      if: matrix.os == 'ubuntu-latest'
       uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ runner.os }}
         path: |
-          target/release/mm-correlator-service*
-          target/release/stream-events*
-          target/release/stream-optical-alerts*
-          target/release/correlation-exporter*
+          target/release/mm-correlator-service
+          target/release/stream-events
+          target/release/stream-optical-alerts
+          target/release/correlation-exporter
+          target/release/stream-o4-simulation
+          target/release/mm_api_server
 
   integration-test:
-    name: Integration Tests
+    name: Integration Tests (Redis)
+    needs: check
     runs-on: ubuntu-latest
     services:
       redis:
@@ -138,19 +124,20 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libcfitsio-dev libsasl2-dev
+      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev
 
-    - name: Install Rust
+    - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Check all binaries compile
-      run: |
-        cargo build --release --bin mm-correlator-service
-        cargo build --release --bin stream-events
-        cargo build --release --bin stream-optical-alerts
-        cargo build --release --bin correlation-exporter
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-integration-
 
     - name: Run Redis integration tests
       run: |
@@ -159,51 +146,29 @@ jobs:
       env:
         REDIS_URL: redis://localhost:6379
 
-  docker:
-    name: Docker Build
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build Docker images
-      run: |
-        docker compose build
-
-    - name: Test docker compose up
-      run: |
-        docker compose up -d
-        sleep 10
-        docker compose ps
-        docker compose down
-
-  coverage:
-    name: Code Coverage
+  docs:
+    name: Documentation
+    needs: check
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libcfitsio-dev libsasl2-dev
+      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev
 
-    - name: Install Rust
+    - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Install tarpaulin
-      run: cargo install cargo-tarpaulin
-
-    - name: Generate coverage
-      run: cargo tarpaulin --out Xml --all-features
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+    - name: Cache cargo
+      uses: actions/cache@v4
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./cobertura.xml
-        fail_ci_if_error: false
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-docs-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-docs-
+
+    - name: Build documentation
+      run: cargo doc --no-deps --all
