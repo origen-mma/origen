@@ -6,7 +6,10 @@ use crate::{
     },
     temporal::TemporalIndex,
 };
-use mm_core::{fit_lightcurve, Event, FitModel, GWEvent, GammaRayEvent, LightCurve, SkyPosition};
+use mm_core::{
+    background_rejection_score, extract_features, fit_lightcurve, Event, FitModel, GWEvent,
+    GammaRayEvent, LightCurve, LightCurveFeatures, SkyPosition,
+};
 use std::collections::HashMap;
 use thiserror::Error;
 use tracing::{debug, info, warn};
@@ -137,6 +140,11 @@ impl SupereventCorrelator {
     }
 
     /// Process optical light curve and match to GW events
+    ///
+    /// Performs GP-based feature extraction to compute rise/decay rates,
+    /// then uses these to soft-weight the joint FAR for background rejection.
+    /// Fast risers (> 1 mag/day) get boosted, slow decayers (< 0.3 mag/day)
+    /// get penalized.
     pub fn process_optical_lightcurve(
         &mut self,
         lightcurve: &LightCurve,
@@ -144,8 +152,43 @@ impl SupereventCorrelator {
     ) -> Result<Vec<String>, CorrelatorError> {
         let mut matched_superevents = Vec::new();
 
-        // Try to fit light curve to extract t0 (explosion/merger time)
-        // This is more accurate than using first detection time
+        // Step 1: Extract GP-based light curve features for background rejection
+        let lc_features = if self.config.lc_filter.enable {
+            match extract_features(lightcurve) {
+                Some(features) => {
+                    let penalty = background_rejection_score(&features, &self.config.lc_filter);
+                    info!(
+                        "GP features for {}: rise={:.3} mag/day, decay={:.3} mag/day, \
+                         peak={:.2} mag, fwhm={:.2} d, penalty={:.3}",
+                        lightcurve.object_id,
+                        features.rise_rate,
+                        features.decay_rate,
+                        features.peak_mag,
+                        features.fwhm,
+                        penalty
+                    );
+                    Some(features)
+                }
+                None => {
+                    debug!(
+                        "Could not extract GP features for {} (insufficient data)",
+                        lightcurve.object_id
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Compute penalty factor from light curve features
+        let lc_penalty = lc_features
+            .as_ref()
+            .filter(|_| self.config.lc_filter.enable)
+            .map(|f| background_rejection_score(f, &self.config.lc_filter))
+            .unwrap_or(1.0); // Neutral if no features
+
+        // Step 2: Try to fit light curve to extract t0 (explosion/merger time)
         let t0_result = fit_lightcurve(lightcurve, FitModel::MetzgerKN);
 
         match t0_result {
@@ -179,13 +222,18 @@ impl SupereventCorrelator {
                             self.config.spatial_threshold,
                         );
 
-                        let joint_far = calculate_joint_far(
+                        let mut joint_far = calculate_joint_far(
                             time_offset,
                             self.config.time_window_after,
                             spatial_prob,
                             self.config.background_rate,
                             self.config.trials_factor,
                         );
+
+                        // Apply light curve feature-based penalty to joint FAR
+                        // penalty > 1.0 increases FAR (background-like)
+                        // penalty < 1.0 decreases FAR (KN-like, boost)
+                        joint_far *= lc_penalty;
 
                         if joint_far < self.config.far_threshold {
                             let spatial_offset = if let Some(gw_pos) = gw_position.as_ref() {
@@ -209,11 +257,12 @@ impl SupereventCorrelator {
                                 spatial_offset,
                                 significance: peak_snr,
                                 joint_far: Some(joint_far),
+                                light_curve_features: lc_features.clone(),
                             };
 
                             info!(
-                                "Correlated {} with {} (Δt={:.1}s, joint_far={:.2e})",
-                                lightcurve.object_id, superevent_id, time_offset, joint_far
+                                "Correlated {} with {} (Δt={:.1}s, joint_far={:.2e}, lc_penalty={:.2})",
+                                lightcurve.object_id, superevent_id, time_offset, joint_far, lc_penalty
                             );
 
                             superevent.add_optical_candidate(candidate);
@@ -228,7 +277,13 @@ impl SupereventCorrelator {
                     "Light curve fit for {} not reliable (t0_err={:.3} days), using per-measurement correlation",
                     lightcurve.object_id, fit_result.t0_err
                 );
-                self.correlate_per_measurement(lightcurve, position, &mut matched_superevents)?;
+                self.correlate_per_measurement(
+                    lightcurve,
+                    position,
+                    &mut matched_superevents,
+                    lc_penalty,
+                    &lc_features,
+                )?;
             }
             Err(e) => {
                 // Fitting failed, fall back to per-measurement correlation
@@ -236,7 +291,13 @@ impl SupereventCorrelator {
                     "Failed to fit {}: {}, using per-measurement correlation",
                     lightcurve.object_id, e
                 );
-                self.correlate_per_measurement(lightcurve, position, &mut matched_superevents)?;
+                self.correlate_per_measurement(
+                    lightcurve,
+                    position,
+                    &mut matched_superevents,
+                    lc_penalty,
+                    &lc_features,
+                )?;
             }
         }
 
@@ -251,6 +312,8 @@ impl SupereventCorrelator {
         lightcurve: &LightCurve,
         position: &SkyPosition,
         matched_superevents: &mut Vec<String>,
+        lc_penalty: f64,
+        lc_features: &Option<LightCurveFeatures>,
     ) -> Result<(), CorrelatorError> {
         // Original per-measurement correlation logic
         for measurement in &lightcurve.measurements {
@@ -276,13 +339,16 @@ impl SupereventCorrelator {
                         self.config.spatial_threshold,
                     );
 
-                    let joint_far = calculate_joint_far(
+                    let mut joint_far = calculate_joint_far(
                         time_offset,
                         self.config.time_window_after,
                         spatial_prob,
                         self.config.background_rate,
                         self.config.trials_factor,
                     );
+
+                    // Apply light curve feature-based penalty
+                    joint_far *= lc_penalty;
 
                     if joint_far < self.config.far_threshold {
                         let spatial_offset = if let Some(gw_pos) = gw_position.as_ref() {
@@ -299,6 +365,7 @@ impl SupereventCorrelator {
                             spatial_offset,
                             significance: measurement.snr(),
                             joint_far: Some(joint_far),
+                            light_curve_features: lc_features.clone(),
                         };
 
                         superevent.add_optical_candidate(candidate);

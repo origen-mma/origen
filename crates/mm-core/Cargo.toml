@@ -24,6 +24,9 @@ cdshealpix = { workspace = true }
 argmin = { workspace = true }
 argmin-math = { workspace = true }
 rayon = { workspace = true }
+sklears-gaussian-process = { workspace = true }
+sklears-core = { workspace = true }
+scirs2-core = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.8"

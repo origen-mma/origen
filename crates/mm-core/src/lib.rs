@@ -2,6 +2,7 @@ pub mod error;
 pub mod events;
 pub mod explosion_time;
 pub mod fit_quality;
+pub mod gp_features;
 pub mod io;
 pub mod lightcurve;
 pub mod lightcurve_fitting;
@@ -24,6 +25,9 @@ pub use explosion_time::estimate_explosion_time;
 pub use fit_quality::{FitQuality, FitQualityAssessment};
 pub use io::{load_lightcurve_csv, load_lightcurves_dir};
 pub use lightcurve::{LightCurve, Photometry};
+pub use gp_features::{
+    background_rejection_score, extract_features, LightCurveFeatures, LightCurveFilterConfig,
+};
 pub use lightcurve_fitting::{
     fit_lightcurve, fit_lightcurve_with_config, FitConfig, FitModel, LightCurveFitResult,
 };

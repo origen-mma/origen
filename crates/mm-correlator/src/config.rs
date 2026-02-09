@@ -1,3 +1,5 @@
+use mm_core::LightCurveFilterConfig;
+
 /// Configuration for superevent correlation
 /// Based on RAVEN's proven parameters
 #[derive(Debug, Clone)]
@@ -29,6 +31,9 @@ pub struct CorrelatorConfig {
     /// Maximum age before cleanup (seconds)
     /// Default: 604800.0 (1 week)
     pub max_superevent_age: f64,
+
+    /// Light curve feature-based filtering configuration
+    pub lc_filter: LightCurveFilterConfig,
 }
 
 impl Default for CorrelatorConfig {
@@ -41,6 +46,7 @@ impl Default for CorrelatorConfig {
             far_threshold: 1.0 / 30.0,    // 1/month
             trials_factor: 7.0,           // 7 bands
             max_superevent_age: 604800.0, // 1 week
+            lc_filter: LightCurveFilterConfig::default(),
         }
     }
 }
@@ -60,5 +66,12 @@ impl CorrelatorConfig {
             max_superevent_age: 3600.0, // 1 hour
             ..Self::default()
         }
+    }
+
+    /// Create configuration with light curve filtering disabled
+    pub fn without_lc_filter() -> Self {
+        let mut config = Self::default();
+        config.lc_filter.enable = false;
+        config
     }
 }

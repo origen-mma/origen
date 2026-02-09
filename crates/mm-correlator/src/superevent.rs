@@ -148,6 +148,8 @@ pub struct OpticalCandidate {
     pub spatial_offset: f64, // Degrees from GW skymap
     pub significance: f64,   // SNR or similar
     pub joint_far: Option<f64>,
+    /// GP-based light curve features (if extraction succeeded)
+    pub light_curve_features: Option<mm_core::LightCurveFeatures>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

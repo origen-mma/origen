@@ -8,6 +8,7 @@ members = [
     "crates/mm-redis",
     "crates/mm-service",
     "crates/mm-simulation",
+    "crates/mm-api",
 ]
 resolver = "2"
 
@@ -63,8 +64,13 @@ rayon = "1.10"      # Parallel iterators for grid search
 argmin = "0.11"
 argmin-math = { version = "0.5", features = ["vec"] }
 
+# GP-based light curve feature extraction
+sklears-gaussian-process = "0.1.0-alpha.1"
+sklears-core = "0.1.0-alpha.1"
+scirs2-core = { version = "0.1.1", default-features = false, features = ["linalg"] }
+
 # HTTP client for skymap downloads
-reqwest = { version = "0.12", features = ["rustls-tls"] }
+reqwest = { version = "0.12", features = ["rustls-tls", "json"] }
 
 # CLI argument parsing
 clap = { version = "4.5", features = ["derive"] }
