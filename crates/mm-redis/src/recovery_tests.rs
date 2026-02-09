@@ -188,8 +188,26 @@ async fn test_basic_state_recovery() {
     }
 
     assert_eq!(recovered_events.len(), 2);
-    assert!(recovered_events.contains(&event1));
-    assert!(recovered_events.contains(&event2));
+    // Use tolerant comparison since f32 can lose precision through JSON round-trip
+    assert!(
+        recovered_events
+            .iter()
+            .any(|e| e.simulation_id == event1.simulation_id),
+        "event1 not found in recovered events"
+    );
+    assert!(
+        recovered_events
+            .iter()
+            .any(|e| e.simulation_id == event2.simulation_id),
+        "event2 not found in recovered events"
+    );
+    for recovered in &recovered_events {
+        if recovered.simulation_id == event1.simulation_id {
+            assert_gw_event_eq(recovered, &event1);
+        } else {
+            assert_gw_event_eq(recovered, &event2);
+        }
+    }
 
     // Cleanup
     new_store

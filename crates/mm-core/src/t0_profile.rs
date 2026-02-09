@@ -329,12 +329,14 @@ mod tests {
 
     #[test]
     fn test_uncertainty_estimation() {
-        let t0_grid = vec![-2.0, -1.0, 0.0, 1.0, 2.0];
-        let elbo_profile = vec![-5.0, -1.0, 10.0, -1.0, -5.0]; // Peak at 0.0
+        // Need grid points above threshold (elbo_best - 0.5 = 9.5) near the peak
+        let t0_grid = vec![-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0];
+        let elbo_profile = vec![-10.0, -3.0, 9.7, 10.0, 9.7, -3.0, -10.0];
 
         let t0_err = estimate_t0_uncertainty(&t0_grid, &elbo_profile, 0.0, 10.0);
 
-        // Should find bounds around ±1.0 where ELBO = 9.5 (threshold = 10.0 - 0.5)
+        // lower_bound = -1.0 (9.7 > 9.5), upper_bound = 1.0 (9.7 > 9.5)
+        // t0_err = (1.0 + 1.0) / 2.0 = 1.0
         assert!(t0_err > 0.5 && t0_err < 1.5);
     }
 }
