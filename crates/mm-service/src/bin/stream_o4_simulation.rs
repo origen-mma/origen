@@ -16,13 +16,15 @@
 ///! ```
 use anyhow::Result;
 use clap::Parser;
+use mm_api::client::ApiClient;
+use mm_core::ParsedSkymap;
 use mm_simulation::{
     background_grbs::{generate_background_grbs, BackgroundGrbConfig},
     background_optical::{generate_background_optical, BackgroundOpticalConfig},
     calculate_joint_far, simulate_multimessenger_event, BinaryParams, FarAssociation,
-    GrbSimulationConfig, GwEventParams, JointFarConfig,
+    GrbSimulationConfig, GwEventParams, JointFarConfig, VOEventParser,
 };
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
@@ -67,6 +69,18 @@ struct Args {
     /// Background simulation time window (days)
     #[arg(long, default_value = "365.0")]
     background_duration_days: f64,
+
+    /// API server URL for publishing events
+    #[arg(long, default_value = "http://localhost:8080")]
+    api_url: String,
+
+    /// Enable API publishing
+    #[arg(long, default_value = "false")]
+    publish_to_api: bool,
+
+    /// Path to GRB VOEvent XML directory (for realistic localizations)
+    #[arg(long)]
+    grb_xml_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -90,6 +104,7 @@ struct GrbAlert {
     fluence: f64,
     time_offset: f64,
     on_axis: bool,
+    error_radius: f64, // degrees (90% containment)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -128,6 +143,65 @@ struct BackgroundRejectionStats {
     optical_spatial_coincidences: usize,
     shock_cooling_spatial: usize,
     sne_ia_spatial: usize,
+}
+
+/// Realistic GRB localization from VOEvent XML
+#[derive(Debug, Clone)]
+struct GrbLocalizationTemplate {
+    instrument: String,
+    error_radius: f64, // degrees (90% containment)
+    trigger_id: String,
+}
+
+/// Load GRB VOEvent XMLs and filter out 1.0° defaults
+fn load_grb_localizations(grb_xml_dir: &PathBuf) -> Result<Vec<GrbLocalizationTemplate>> {
+    let mut localizations = Vec::new();
+
+    // Read all XML files
+    let entries = std::fs::read_dir(grb_xml_dir)?;
+
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+
+        // Only process .xml files
+        if path.extension().and_then(|s| s.to_str()) != Some("xml") {
+            continue;
+        }
+
+        // Parse VOEvent
+        let xml_content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let alert = match VOEventParser::parse_string(&xml_content) {
+            Ok(a) => a,
+            Err(_) => continue,
+        };
+
+        // Filter out 1.0° error radius (suspected default values)
+        if (alert.error_radius - 1.0).abs() < 0.01 {
+            continue;
+        }
+
+        // Also filter out unrealistically large (>30°) or small (<0.001°) error radii
+        if alert.error_radius > 30.0 || alert.error_radius < 0.001 {
+            continue;
+        }
+
+        localizations.push(GrbLocalizationTemplate {
+            instrument: alert.instrument,
+            error_radius: alert.error_radius,
+            trigger_id: alert.trigger_id,
+        });
+    }
+
+    if localizations.is_empty() {
+        anyhow::bail!("No valid GRB localizations found");
+    }
+
+    Ok(localizations)
 }
 
 async fn create_producer(brokers: &str) -> Result<FutureProducer> {
@@ -174,8 +248,43 @@ async fn main() -> Result<()> {
     let producer = create_producer(&args.kafka_brokers).await?;
     info!("✅ Connected to Kafka");
 
+    // Initialize API client if enabled
+    let api_client = if args.publish_to_api {
+        let client = ApiClient::new(&args.api_url);
+        match client.health_check().await {
+            Ok(true) => {
+                info!("✅ Connected to API server at {}", args.api_url);
+                Some(client)
+            }
+            _ => {
+                warn!("⚠️  API server at {} is not responding, continuing without API", args.api_url);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Initialize RNG
     let mut rng = StdRng::seed_from_u64(args.seed);
+
+    // Load GRB VOEvent XMLs for realistic localizations
+    let grb_localizations = if let Some(ref grb_xml_dir) = args.grb_xml_dir {
+        info!("Loading GRB VOEvent XMLs from {}...", grb_xml_dir.display());
+        match load_grb_localizations(grb_xml_dir) {
+            Ok(alerts) => {
+                info!("✅ Loaded {} GRB localizations (filtered out 1.0° defaults)", alerts.len());
+                Some(alerts)
+            }
+            Err(e) => {
+                warn!("⚠️  Failed to load GRB XMLs: {}, using default localizations", e);
+                None
+            }
+        }
+    } else {
+        info!("No GRB XML directory specified, using default localizations");
+        None
+    };
 
     // Read injections file
     let injections_file = args.bgp_path.join("injections.dat");
@@ -325,6 +434,58 @@ async fn main() -> Result<()> {
         publish_json(&producer, "igwn.gwalert", &n_events.to_string(), &gw_alert).await?;
         n_gw_published += 1;
 
+        // Try to load skymap FITS file (n_events starts at 1, but skymap files start at 0)
+        let skymap_path = args.bgp_path.join("allsky").join(format!("{}.fits", n_events - 1));
+
+        // Extract position from skymap (used for both API and later GRB/optical detections)
+        let (ra, dec) = if skymap_path.exists() {
+            match ParsedSkymap::from_fits(&skymap_path) {
+                Ok(skymap) => {
+                    (skymap.max_prob_position.ra, skymap.max_prob_position.dec)
+                }
+                Err(e) => {
+                    warn!("Failed to parse skymap for position {}: {}", skymap_path.display(), e);
+                    // Fallback to dummy position
+                    ((n_events as f64 * 37.5) % 360.0, ((n_events as f64 * 23.1) % 180.0) - 90.0)
+                }
+            }
+        } else {
+            // Fallback to dummy position if no skymap
+            ((n_events as f64 * 37.5) % 360.0, ((n_events as f64 * 23.1) % 180.0) - 90.0)
+        };
+
+        // Publish to API if enabled
+        if let Some(ref client) = api_client {
+            let event_id = format!("G{}", n_events);
+
+            let skymap_data = if skymap_path.exists() {
+                match std::fs::read(&skymap_path) {
+                    Ok(data) => {
+                        info!("📊 Loaded skymap for event {}: {} bytes", event_id, data.len());
+                        Some(data)
+                    }
+                    Err(e) => {
+                        warn!("Failed to read skymap {}: {}", skymap_path.display(), e);
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            if let Err(e) = client.publish_gw_event(
+                &event_id,
+                gpstime,
+                ra,
+                dec,
+                gw_snr as f64,
+                gw_far_per_year,
+                skymap_data,
+            ).await {
+                warn!("Failed to publish event {} to API: {}", event_id, e);
+            }
+        }
+
         info!(
             "📡 GW {} published: GPS={:.2}, SNR={:.1}, Distance={:.0} Mpc",
             n_events, gpstime, gw_snr, distance
@@ -389,13 +550,24 @@ async fn main() -> Result<()> {
         // 2. Publish GRB if detected
         if mm_event.has_grb() {
             let time_offset = 0.5; // ~0.5s after GW
+
+            // Sample realistic GRB localization if available
+            let (grb_instrument, grb_error_radius) = if let Some(ref locs) = grb_localizations {
+                let idx = rng.gen_range(0..locs.len());
+                (locs[idx].instrument.clone(), locs[idx].error_radius)
+            } else {
+                // Default: Fermi GBM with ~5° localization
+                ("Fermi GBM".to_string(), 5.0)
+            };
+
             let grb_alert = GrbAlert {
                 simulation_id: n_events,
                 detection_time: gpstime + time_offset,
-                instrument: "Fermi GBM".to_string(),
+                instrument: grb_instrument.clone(),
                 fluence: 1e-6,
                 time_offset,
                 on_axis: true, // If GRB detected, assume on-axis
+                error_radius: grb_error_radius,
             };
 
             publish_json(
@@ -406,6 +578,25 @@ async fn main() -> Result<()> {
             )
             .await?;
             n_grb_published += 1;
+
+            // Publish GRB to API
+            if let Some(ref client) = api_client {
+                let event_id = format!("G{}", n_events);
+                // GRB should be at same position as GW event (on-axis jet)
+                // Use ra/dec from skymap extraction above
+
+                if let Err(e) = client.add_grb_detection(
+                    &event_id,
+                    gpstime + time_offset,
+                    ra,  // Use skymap position
+                    dec, // Use skymap position
+                    &grb_alert.instrument,
+                    grb_alert.fluence,
+                    grb_alert.error_radius,
+                ).await {
+                    warn!("Failed to add GRB detection to API: {}", e);
+                }
+            }
 
             info!("   🌟 GRB detected! Δt={:.2}s", time_offset);
         }
@@ -440,6 +631,26 @@ async fn main() -> Result<()> {
                     )
                     .await?;
                     n_optical_published += 1;
+
+                    // Publish optical to API
+                    if let Some(ref client) = api_client {
+                        let event_id = format!("G{}", n_events);
+                        // Optical transient should be at same position as GW event
+                        // (kilonova/afterglow from same source)
+                        // Use ra/dec from skymap extraction above
+
+                        if let Err(e) = client.add_optical_detection(
+                            &event_id,
+                            gpstime + time_offset,
+                            ra,  // Use skymap position
+                            dec,
+                            mag,
+                            &optical_alert.survey,
+                            &optical_alert.source_type,
+                        ).await {
+                            warn!("Failed to add optical detection to API: {}", e);
+                        }
+                    }
 
                     info!(
                         "   🔭 Optical detected! mag={:.1}, type={}",

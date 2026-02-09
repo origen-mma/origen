@@ -1,0 +1,238 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "event_id"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "snr"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Multi-Messenger Events from API",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "event_id": "Event ID",
+              "gpstime": "GPS Time",
+              "ra": "RA (deg)",
+              "dec": "Dec (deg)",
+              "snr": "SNR",
+              "far": "FAR (Hz)",
+              "grb_count": "GRBs",
+              "optical_count": "Optical"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "text",
+        "uid": "grafana"
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "code": {
+          "language": "html",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "<!DOCTYPE html>\n<html>\n<head>\n    <script src=\"https://cdn.plot.ly/plotly-2.27.0.min.js\"></script>\n    <style>\n        #skymap { width: 100%; height: 600px; }\n        body { margin: 0; font-family: Arial, sans-serif; }\n    </style>\n</head>\n<body>\n    <div id=\"skymap\"></div>\n    <script>\n        async function loadEvents() {\n            try {\n                const response = await fetch('http://localhost:8080/api/events');\n                const events = await response.json();\n                \n                // Separate multi-messenger and GW-only events\n                const gwOnly = events.filter(e => \n                    (!e.grb_detections || e.grb_detections.length === 0) && \n                    (!e.optical_detections || e.optical_detections.length === 0)\n                );\n                const multiMessenger = events.filter(e => \n                    (e.grb_detections && e.grb_detections.length > 0) || \n                    (e.optical_detections && e.optical_detections.length > 0)\n                );\n                \n                // Create hover text\n                const makeHover = (e) => {\n                    let text = `<b>${e.event_id}</b><br>RA: ${e.ra.toFixed(2)}°<br>Dec: ${e.dec.toFixed(2)}°<br>SNR: ${e.snr.toFixed(1)}<br>FAR: ${e.far.toExponential(2)} Hz`;\n                    if (e.grb_detections && e.grb_detections.length > 0) {\n                        text += '<br><br><b>GRB Detections:</b>';\n                        e.grb_detections.forEach(g => text += `<br>• ${g.instrument}`);\n                    }\n                    if (e.optical_detections && e.optical_detections.length > 0) {\n                        text += '<br><br><b>Optical:</b>';\n                        e.optical_detections.forEach(o => text += `<br>• ${o.survey} (mag ${o.magnitude.toFixed(1)})`);\n                    }\n                    return text;\n                };\n                \n                // Create plot traces\n                const traces = [\n                    {\n                        x: multiMessenger.map(e => e.ra),\n                        y: multiMessenger.map(e => e.dec),\n                        text: multiMessenger.map(e => e.event_id),\n                        hovertemplate: multiMessenger.map(makeHover).map(t => t + '<extra></extra>'),\n                        mode: 'markers+text',\n                        type: 'scatter',\n                        name: 'Multi-Messenger',\n                        marker: { size: 20, color: '#ff6b6b', symbol: 'star' },\n                        textposition: 'top center',\n                        textfont: { size: 10, color: '#ff6b6b' }\n                    },\n                    {\n                        x: gwOnly.map(e => e.ra),\n                        y: gwOnly.map(e => e.dec),\n                        text: gwOnly.map(e => e.event_id),\n                        hovertemplate: gwOnly.map(makeHover).map(t => t + '<extra></extra>'),\n                        mode: 'markers+text',\n                        type: 'scatter',\n                        name: 'GW Only',\n                        marker: { size: 15, color: '#00d4ff', symbol: 'circle' },\n                        textposition: 'top center',\n                        textfont: { size: 10, color: '#00d4ff' }\n                    }\n                ];\n                \n                // Layout configuration\n                const layout = {\n                    title: { text: 'Multi-Messenger Events Sky Map', font: { size: 16 } },\n                    xaxis: { \n                        title: 'Right Ascension (deg)', \n                        range: [0, 360],\n                        dtick: 60,\n                        gridcolor: '#444'\n                    },\n                    yaxis: { \n                        title: 'Declination (deg)', \n                        range: [-90, 90],\n                        dtick: 30,\n                        gridcolor: '#444'\n                    },\n                    plot_bgcolor: '#1a1a1a',\n                    paper_bgcolor: '#1a1a1a',\n                    font: { color: '#fff' },\n                    hovermode: 'closest',\n                    showlegend: true,\n                    legend: { x: 0.02, y: 0.98 }\n                };\n                \n                Plotly.newPlot('skymap', traces, layout, {responsive: true});\n                console.log(`Loaded ${events.length} events`);\n                \n            } catch (error) {\n                console.error('Failed to load events:', error);\n                document.getElementById('skymap').innerHTML = \n                    '<div style=\"color: red; padding: 20px;\">Error: Could not connect to API at http://localhost:8080<br>Make sure mm_api_server is running!</div>';\n            }\n        }\n        \n        loadEvents();\n    </script>\n</body>\n</html>",
+        "mode": "html"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "Multi-Messenger Sky Map (Aladin Lite)",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "text",
+        "uid": "grafana"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 3,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Multi-Messenger Event Dashboard\n\nThis dashboard displays gravitational wave events and their electromagnetic counterparts.\n\n## Legend:\n\n🔵 **Blue markers** - GW events without EM counterparts\n🔴 **Red markers** - Multi-messenger events (GW + GRB/Optical)\n\n## Data Source:\n\nEvents are fetched in real-time from the REST API at `http://localhost:8080/api/events`\n\nClick on any marker to see event details including:\n- Event ID and SNR\n- False Alarm Rate\n- Associated GRB detections\n- Associated optical transients\n\n## Current Events:\n\nThe database currently contains famous multi-messenger events including **GW170817** - the first detected neutron star merger with EM counterparts!",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "Dashboard Information",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "text",
+        "uid": "grafana"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 4,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# API Endpoints\n\n## Query Events:\n```bash\ncurl http://localhost:8080/api/events | jq\n```\n\n## Get Specific Event:\n```bash\ncurl http://localhost:8080/api/events/G170817 | jq\n```\n\n## Add New Event:\n```bash\ncurl -X POST http://localhost:8080/api/events \\\n  -H \"Content-Type: application/json\" \\\n  -d '{...}'\n```\n\n## Add Detection:\n```bash\ncurl -X POST http://localhost:8080/api/events/G170817/optical \\\n  -H \"Content-Type: application/json\" \\\n  -d '{...}'\n```",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "API Usage",
+      "type": "text"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["multi-messenger", "gravitational-waves", "astronomy"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Multi-Messenger Events - Live View",
+  "uid": "mm-events-live",
+  "version": 0,
+  "weekStart": ""
+}

@@ -98,6 +98,10 @@ path = "src/bin/stream_optical_alerts.rs"
 name = "stream-o4-simulation"
 path = "src/bin/stream_o4_simulation.rs"
 
+[[bin]]
+name = "mm_api_server"
+path = "src/bin/mm_api_server.rs"
+
 [dependencies]
 mm-core = { path = "../mm-core" }
 mm-gcn = { path = "../mm-gcn" }
@@ -106,6 +110,7 @@ mm-boom = { path = "../mm-boom" }
 mm-config = { path = "../mm-config" }
 mm-redis = { path = "../mm-redis" }
 mm-simulation = { path = "../mm-simulation" }
+mm-api = { path = "../mm-api" }
 gcn-kafka = { workspace = true }
 rand = { workspace = true }
 rdkafka = { workspace = true }

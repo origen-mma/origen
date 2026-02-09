@@ -91,6 +91,10 @@ services:
       timeout: 3s
       retries: 5
 
+  # Multi-Messenger API server (runs on host, not in Docker)
+  # Run with: cargo run --bin mm_api_server --release -- --bind 0.0.0.0:8080
+  # API will be accessible at http://localhost:8080
+
 volumes:
   zookeeper-data:
   zookeeper-logs:
