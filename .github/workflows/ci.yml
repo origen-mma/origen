@@ -19,7 +19,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev
+      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev libfontconfig1-dev
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -58,7 +58,7 @@ jobs:
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
           sudo apt-get update
-          sudo apt-get install -y libcfitsio-dev libsasl2-dev
+          sudo apt-get install -y libcfitsio-dev libsasl2-dev libfontconfig1-dev
         elif [ "$RUNNER_OS" == "macOS" ]; then
           brew install cfitsio cyrus-sasl
         fi
@@ -124,7 +124,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev
+      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev libfontconfig1-dev
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -155,7 +155,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev
+      run: sudo apt-get update && sudo apt-get install -y libcfitsio-dev libsasl2-dev libfontconfig1-dev
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
