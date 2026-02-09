@@ -139,9 +139,7 @@ impl SupereventCorrelator {
                     };
 
                     // Populate spatial fields using skymap if both position and skymap available
-                    if let (Some(grb_pos), Some(gw_event)) =
-                        (&grb.position, &superevent.gw_event)
-                    {
+                    if let (Some(grb_pos), Some(gw_event)) = (&grb.position, &superevent.gw_event) {
                         if let Some(ref skymap) = gw_event.skymap {
                             // Use RAVEN method: integrate skymap over GRB error circle
                             let spatial_prob = if let Some(error_radius) = grb.error_radius {
@@ -155,8 +153,7 @@ impl SupereventCorrelator {
                             // Also calculate spatial offset metrics
                             let skymap_offset = calculate_skymap_offset(grb_pos, skymap);
 
-                            candidate.spatial_offset =
-                                Some(skymap_offset.angular_separation);
+                            candidate.spatial_offset = Some(skymap_offset.angular_separation);
                             candidate.skymap_probability = Some(spatial_prob);
                             candidate.in_50cr = Some(skymap_offset.in_50cr);
                             candidate.in_90cr = Some(skymap_offset.in_90cr);
@@ -260,29 +257,41 @@ impl SupereventCorrelator {
 
                         // Calculate spatial probability using skymap if available (RAVEN method)
                         // For optical: error is tiny (~2 arcsec), so use pixel probability directly
-                        let (spatial_prob, skymap_probability, in_50cr, in_90cr, spatial_significance) =
-                            if let Some(gw_event) = &superevent.gw_event {
-                                if let Some(ref skymap) = gw_event.skymap {
-                                    // Use RAVEN method: query pixel probability at optical position
-                                    let prob = calculate_spatial_probability_from_skymap(position, skymap);
-                                    let in_50 = is_in_credible_region(position, skymap, 0.5);
-                                    let in_90 = is_in_credible_region(position, skymap, 0.9);
-                                    let significance = calculate_spatial_significance(position, skymap);
+                        let (
+                            spatial_prob,
+                            skymap_probability,
+                            in_50cr,
+                            in_90cr,
+                            spatial_significance,
+                        ) = if let Some(gw_event) = &superevent.gw_event {
+                            if let Some(ref skymap) = gw_event.skymap {
+                                // Use RAVEN method: query pixel probability at optical position
+                                let prob =
+                                    calculate_spatial_probability_from_skymap(position, skymap);
+                                let in_50 = is_in_credible_region(position, skymap, 0.5);
+                                let in_90 = is_in_credible_region(position, skymap, 0.9);
+                                let significance = calculate_spatial_significance(position, skymap);
 
-                                    (prob, Some(prob), Some(in_50), Some(in_90), Some(significance))
-                                } else {
-                                    // Fallback: point-source with threshold
-                                    let prob = calculate_spatial_probability(
-                                        position,
-                                        gw_position,
-                                        self.config.spatial_threshold,
-                                    );
-                                    (prob, None, None, None, None)
-                                }
+                                (
+                                    prob,
+                                    Some(prob),
+                                    Some(in_50),
+                                    Some(in_90),
+                                    Some(significance),
+                                )
                             } else {
-                                // No GW event, default to low probability
-                                (0.0, None, None, None, None)
-                            };
+                                // Fallback: point-source with threshold
+                                let prob = calculate_spatial_probability(
+                                    position,
+                                    gw_position,
+                                    self.config.spatial_threshold,
+                                );
+                                (prob, None, None, None, None)
+                            }
+                        } else {
+                            // No GW event, default to low probability
+                            (0.0, None, None, None, None)
+                        };
 
                         let mut joint_far = calculate_joint_far(
                             time_offset,
@@ -794,9 +803,7 @@ mod tests {
             // GRB far from event should have low probability and likely not be in credible regions
             println!(
                 "GRB far from event - skymap_prob: {:?}, in_50cr: {:?}, in_90cr: {:?}",
-                grb_candidate.skymap_probability,
-                grb_candidate.in_50cr,
-                grb_candidate.in_90cr
+                grb_candidate.skymap_probability, grb_candidate.in_50cr, grb_candidate.in_90cr
             );
 
             // The spatial fields should still be populated even if values are low/false

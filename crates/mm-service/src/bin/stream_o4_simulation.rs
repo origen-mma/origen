@@ -621,11 +621,8 @@ async fn main() -> Result<()> {
             // Generate realistic GRB position with localization error
             // Use true GW position (ra, dec) and add instrument-specific error
             let grb_loc = add_localization_error(ra, dec, grb_inst_enum, &mut rng);
-            let (grb_error_radius, grb_ra, grb_dec) = (
-                grb_loc.error_radius,
-                grb_loc.obs_ra,
-                grb_loc.obs_dec,
-            );
+            let (grb_error_radius, grb_ra, grb_dec) =
+                (grb_loc.error_radius, grb_loc.obs_ra, grb_loc.obs_dec);
 
             let grb_alert = GrbAlert {
                 simulation_id: n_events,

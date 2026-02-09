@@ -230,7 +230,8 @@ mod tests {
         use mm_core::ParsedSkymap;
 
         // Create a test skymap from a real O4 simulation file
-        let skymap_path = "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
+        let skymap_path =
+            "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
         if std::path::Path::new(skymap_path).exists() {
             let skymap = ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
 
@@ -239,7 +240,10 @@ mod tests {
             let prob = calculate_spatial_probability_from_skymap(max_prob_pos, &skymap);
 
             println!("Probability at max position: {}", prob);
-            assert!(prob > 0.0, "Max probability position should have non-zero probability");
+            assert!(
+                prob > 0.0,
+                "Max probability position should have non-zero probability"
+            );
 
             // Max prob position should be in both 50% and 90% credible regions
             assert!(
@@ -259,7 +263,8 @@ mod tests {
     fn test_credible_region_membership() {
         use mm_core::ParsedSkymap;
 
-        let skymap_path = "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
+        let skymap_path =
+            "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
         if std::path::Path::new(skymap_path).exists() {
             let skymap = ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
 
@@ -285,7 +290,8 @@ mod tests {
     fn test_spatial_significance_calculation() {
         use mm_core::ParsedSkymap;
 
-        let skymap_path = "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
+        let skymap_path =
+            "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
         if std::path::Path::new(skymap_path).exists() {
             let skymap = ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
 
@@ -342,8 +348,7 @@ mod tests {
         let skymap_path =
             "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
         if std::path::Path::new(skymap_path).exists() {
-            let skymap =
-                ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
+            let skymap = ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
 
             // Test 1: Small circle at max prob position should capture significant probability
             let max_prob_pos = &skymap.max_prob_position;
@@ -370,8 +375,7 @@ mod tests {
             );
 
             // Test 3: Very small circle (~Swift BAT error) should be similar to pixel probability
-            let tiny_circle_prob =
-                integrate_skymap_over_circle(max_prob_pos, 0.1, &skymap);
+            let tiny_circle_prob = integrate_skymap_over_circle(max_prob_pos, 0.1, &skymap);
             let pixel_prob = calculate_spatial_probability_from_skymap(max_prob_pos, &skymap);
             println!(
                 "RAVEN integration - 0.1° circle: {:.6}, pixel prob: {:.6}",
@@ -601,7 +605,8 @@ mod tests {
                         // BNS: both masses < 3.0 solar masses
                         // NSBH: one mass < 3.0 (NS) and one mass >= 3.0 (BH)
                         let is_bns = mass1 < 3.0 && mass2 < 3.0;
-                        let is_nsbh = (mass1 < 3.0 && mass2 >= 3.0) || (mass1 >= 3.0 && mass2 < 3.0);
+                        let is_nsbh =
+                            (mass1 < 3.0 && mass2 >= 3.0) || (mass1 >= 3.0 && mass2 < 3.0);
 
                         if is_bns || is_nsbh {
                             // Convert radians to degrees
@@ -619,8 +624,8 @@ mod tests {
 
         // Test both Fermi-GBM and Swift-BAT with realistic error radii
         let instruments = vec![
-            ("Fermi-GBM", 13.2),    // Empirical median from 5832 real GRBs
-            ("Swift-BAT", 0.033),   // Literature value: ~2 arcmin
+            ("Fermi-GBM", 13.2),  // Empirical median from 5832 real GRBs
+            ("Swift-BAT", 0.033), // Literature value: ~2 arcmin
         ];
 
         let n_events = injections.len(); // Process ALL BNS+NSBH events
@@ -631,7 +636,10 @@ mod tests {
         let mut all_results = Vec::new();
 
         for (instrument_name, grb_error_deg) in instruments {
-            println!("\n========== {} (error radius = {:.4}°) ==========", instrument_name, grb_error_deg);
+            println!(
+                "\n========== {} (error radius = {:.4}°) ==========",
+                instrument_name, grb_error_deg
+            );
             println!("Processing {} BNS+NSBH events", n_events);
             println!("Background trials per event: {}", n_background_per_event);
             println!(
@@ -644,51 +652,52 @@ mod tests {
 
             // Process each event
             for i in 0..n_events {
-            let (sim_id, true_ra, true_dec) = injections[i];
-            let skymap_path = format!("{}/{}.fits", skymap_dir, sim_id);
+                let (sim_id, true_ra, true_dec) = injections[i];
+                let skymap_path = format!("{}/{}.fits", skymap_dir, sim_id);
 
-            if !std::path::Path::new(&skymap_path).exists() {
-                println!("  Event {}: skymap not found, skipping", sim_id);
-                continue;
-            }
-
-            let skymap = match ParsedSkymap::from_fits(&skymap_path) {
-                Ok(s) => s,
-                Err(e) => {
-                    println!("  Event {}: failed to load skymap: {}", sim_id, e);
+                if !std::path::Path::new(&skymap_path).exists() {
+                    println!("  Event {}: skymap not found, skipping", sim_id);
                     continue;
                 }
-            };
 
-            // SIGNAL: Add random offset within error circle (NOT centered at true position)
-            // This simulates a realistic GRB localization with error
-            let offset_angle: f64 = rng.gen_range(0.0..grb_error_deg); // Random radius within error circle
-            let offset_azimuth: f64 = rng.gen_range(0.0..360.0); // Random angle
+                let skymap = match ParsedSkymap::from_fits(&skymap_path) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        println!("  Event {}: failed to load skymap: {}", sim_id, e);
+                        continue;
+                    }
+                };
 
-            // Convert offset to RA/Dec offset (approximate for small angles)
-            let offset_ra = offset_angle * offset_azimuth.to_radians().cos() / true_dec.to_radians().cos();
-            let offset_dec = offset_angle * offset_azimuth.to_radians().sin();
+                // SIGNAL: Add random offset within error circle (NOT centered at true position)
+                // This simulates a realistic GRB localization with error
+                let offset_angle: f64 = rng.gen_range(0.0..grb_error_deg); // Random radius within error circle
+                let offset_azimuth: f64 = rng.gen_range(0.0..360.0); // Random angle
 
-            let observed_ra = true_ra + offset_ra;
-            let observed_dec = (true_dec + offset_dec).max(-90.0).min(90.0); // Clamp to valid range
+                // Convert offset to RA/Dec offset (approximate for small angles)
+                let offset_ra =
+                    offset_angle * offset_azimuth.to_radians().cos() / true_dec.to_radians().cos();
+                let offset_dec = offset_angle * offset_azimuth.to_radians().sin();
 
-            let grb_observed_pos = SkyPosition::new(observed_ra, observed_dec, 0.0);
+                let observed_ra = true_ra + offset_ra;
+                let observed_dec = (true_dec + offset_dec).max(-90.0).min(90.0); // Clamp to valid range
 
-            // Calculate spatial probability using RAVEN integration
-            let signal_prob =
-                integrate_skymap_over_circle(&grb_observed_pos, grb_error_deg, &skymap);
-            signal_probs.push(signal_prob);
+                let grb_observed_pos = SkyPosition::new(observed_ra, observed_dec, 0.0);
 
-            // BACKGROUND: Generate random positions
-            for _ in 0..n_background_per_event {
-                let bg_ra: f64 = rng.gen_range(0.0..360.0);
-                let sin_dec: f64 = rng.gen_range(-1.0..1.0);
-                let bg_dec = sin_dec.asin().to_degrees();
-                let bg_pos = SkyPosition::new(bg_ra, bg_dec, 0.0);
+                // Calculate spatial probability using RAVEN integration
+                let signal_prob =
+                    integrate_skymap_over_circle(&grb_observed_pos, grb_error_deg, &skymap);
+                signal_probs.push(signal_prob);
 
-                let bg_prob = integrate_skymap_over_circle(&bg_pos, grb_error_deg, &skymap);
-                background_probs.push(bg_prob);
-            }
+                // BACKGROUND: Generate random positions
+                for _ in 0..n_background_per_event {
+                    let bg_ra: f64 = rng.gen_range(0.0..360.0);
+                    let sin_dec: f64 = rng.gen_range(-1.0..1.0);
+                    let bg_dec = sin_dec.asin().to_degrees();
+                    let bg_pos = SkyPosition::new(bg_ra, bg_dec, 0.0);
+
+                    let bg_prob = integrate_skymap_over_circle(&bg_pos, grb_error_deg, &skymap);
+                    background_probs.push(bg_prob);
+                }
 
                 if (i + 1) % 50 == 0 {
                     println!("  Processed {}/{} events...", i + 1, n_events);
@@ -721,10 +730,7 @@ mod tests {
             );
             println!("  Median: {:.6}", signal_median);
             println!("  Mean: {:.6}", signal_mean);
-            println!(
-                "  Min: {:.6}",
-                signal_probs[signal_probs.len() - 1]
-            );
+            println!("  Min: {:.6}", signal_probs[signal_probs.len() - 1]);
 
             println!("\n========== BACKGROUND DISTRIBUTION ==========");
             println!("  Max: {:.6}", background_probs[0]);
@@ -738,10 +744,7 @@ mod tests {
             );
             println!("  Median: {:.6}", bg_median);
             println!("  Mean: {:.6}", bg_mean);
-            println!(
-                "  Min: {:.6}",
-                background_probs[background_probs.len() - 1]
-            );
+            println!("  Min: {:.6}", background_probs[background_probs.len() - 1]);
 
             // Write histogram data to instrument-specific file
             let instrument_filename = instrument_name.to_lowercase().replace("-", "_");
@@ -768,8 +771,7 @@ mod tests {
             );
 
             // Count how many signal trials exceed 95th percentile of background
-            let bg_95th =
-                background_probs[(background_probs.len() as f64 * 0.05) as usize];
+            let bg_95th = background_probs[(background_probs.len() as f64 * 0.05) as usize];
             let n_signal_exceeding = signal_probs.iter().filter(|&&p| p > bg_95th).count();
             let frac_signal_exceeding = n_signal_exceeding as f64 / signal_probs.len() as f64;
 
@@ -842,16 +844,32 @@ mod tests {
         println!("║           INSTRUMENT COMPARISON SUMMARY                       ║");
         println!("╚════════════════════════════════════════════════════════════════╝\n");
 
-        for (name, error, sig_med, sig_mean, bg_med, bg_mean, frac_exceed, sig_zero, bg_zero) in &all_results {
+        for (name, error, sig_med, sig_mean, bg_med, bg_mean, frac_exceed, sig_zero, bg_zero) in
+            &all_results
+        {
             println!("{}:", name);
             println!("  Error radius: {:.4}°", error);
-            println!("  Signal median: {:.6}, Background median: {:.6} (ratio: {:.1}x)",
-                     sig_med, bg_med, sig_med / bg_med);
-            println!("  Signal mean: {:.6}, Background mean: {:.6} (ratio: {:.1}x)",
-                     sig_mean, bg_mean, sig_mean / bg_mean);
-            println!("  Signal exceeding bg 95th percentile: {:.1}%", frac_exceed * 100.0);
-            println!("  Zero probability: Signal {:.1}%, Background {:.1}%",
-                     sig_zero * 100.0, bg_zero * 100.0);
+            println!(
+                "  Signal median: {:.6}, Background median: {:.6} (ratio: {:.1}x)",
+                sig_med,
+                bg_med,
+                sig_med / bg_med
+            );
+            println!(
+                "  Signal mean: {:.6}, Background mean: {:.6} (ratio: {:.1}x)",
+                sig_mean,
+                bg_mean,
+                sig_mean / bg_mean
+            );
+            println!(
+                "  Signal exceeding bg 95th percentile: {:.1}%",
+                frac_exceed * 100.0
+            );
+            println!(
+                "  Zero probability: Signal {:.1}%, Background {:.1}%",
+                sig_zero * 100.0,
+                bg_zero * 100.0
+            );
             println!();
         }
 
@@ -901,7 +919,8 @@ mod tests {
                     ) {
                         // Filter for BNS and NSBH only (same as GRB test)
                         let is_bns = mass1 < 3.0 && mass2 < 3.0;
-                        let is_nsbh = (mass1 < 3.0 && mass2 >= 3.0) || (mass1 >= 3.0 && mass2 < 3.0);
+                        let is_nsbh =
+                            (mass1 < 3.0 && mass2 >= 3.0) || (mass1 >= 3.0 && mass2 < 3.0);
 
                         if is_bns || is_nsbh {
                             let ra_deg = lon_rad.to_degrees();
@@ -920,8 +939,8 @@ mod tests {
         let optical_position_error_deg = 2.0 / 3600.0; // 2 arcsec in degrees
 
         // Time window for GW-optical correlation: -1s to +1 day
-        let time_window_start = -1.0;       // seconds before GW
-        let time_window_end = 86400.0;      // seconds after GW (+1 day)
+        let time_window_start = -1.0; // seconds before GW
+        let time_window_end = 86400.0; // seconds after GW (+1 day)
 
         // Rate ratio: Supernovae are ~10,000× more common than kilonovae
         // For fair comparison with GRB test (which had 1000 bg per event),
@@ -931,11 +950,26 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         println!("\n========== OPTICAL TRANSIENT PARAMETERS ==========");
-        println!("Position error: {:.4}° ({:.2} arcsec)", optical_position_error_deg, optical_position_error_deg * 3600.0);
-        println!("Time window: {:.1}s to +{:.0}s ({:.1} days)", time_window_start, time_window_end, time_window_end / 86400.0);
+        println!(
+            "Position error: {:.4}° ({:.2} arcsec)",
+            optical_position_error_deg,
+            optical_position_error_deg * 3600.0
+        );
+        println!(
+            "Time window: {:.1}s to +{:.0}s ({:.1} days)",
+            time_window_start,
+            time_window_end,
+            time_window_end / 86400.0
+        );
         println!("Processing {} BNS+NSBH events", n_events);
-        println!("Supernova background trials per event: {}", n_supernova_per_event);
-        println!("Total background trials: {}", n_events * n_supernova_per_event);
+        println!(
+            "Supernova background trials per event: {}",
+            n_supernova_per_event
+        );
+        println!(
+            "Total background trials: {}",
+            n_events * n_supernova_per_event
+        );
         println!("SN rate / KN rate: ~10,000× (empirical)");
 
         let mut signal_probs = Vec::new();
@@ -964,7 +998,8 @@ mod tests {
             let offset_angle: f64 = rng.gen_range(0.0..optical_position_error_deg);
             let offset_azimuth: f64 = rng.gen_range(0.0..360.0);
 
-            let offset_ra = offset_angle * offset_azimuth.to_radians().cos() / true_dec.to_radians().cos();
+            let offset_ra =
+                offset_angle * offset_azimuth.to_radians().cos() / true_dec.to_radians().cos();
             let offset_dec = offset_angle * offset_azimuth.to_radians().sin();
 
             let observed_ra = true_ra + offset_ra;
@@ -992,7 +1027,8 @@ mod tests {
                 // This is accounted for in temporal FAR, but spatial correlation is computed regardless
                 let _bg_time_offset: f64 = rng.gen_range(time_window_start..time_window_end);
 
-                let bg_prob = integrate_skymap_over_circle(&bg_pos, optical_position_error_deg, &skymap);
+                let bg_prob =
+                    integrate_skymap_over_circle(&bg_pos, optical_position_error_deg, &skymap);
                 background_probs.push(bg_prob);
             }
 
@@ -1003,7 +1039,10 @@ mod tests {
 
         println!("\nProcessed {} events", signal_probs.len());
         println!("  Kilonova (signal) trials: {}", signal_probs.len());
-        println!("  Supernova (background) trials: {}", background_probs.len());
+        println!(
+            "  Supernova (background) trials: {}",
+            background_probs.len()
+        );
 
         // Sort for statistics
         signal_probs.sort_by(|a, b| b.partial_cmp(a).unwrap());
@@ -1027,10 +1066,7 @@ mod tests {
         );
         println!("  Median: {:.6}", signal_median);
         println!("  Mean: {:.6}", signal_mean);
-        println!(
-            "  Min: {:.6}",
-            signal_probs[signal_probs.len() - 1]
-        );
+        println!("  Min: {:.6}", signal_probs[signal_probs.len() - 1]);
 
         println!("\n========== SUPERNOVA (BACKGROUND) DISTRIBUTION ==========");
         println!("  Max: {:.6}", background_probs[0]);
@@ -1044,10 +1080,7 @@ mod tests {
         );
         println!("  Median: {:.6}", bg_median);
         println!("  Mean: {:.6}", bg_mean);
-        println!(
-            "  Min: {:.6}",
-            background_probs[background_probs.len() - 1]
-        );
+        println!("  Min: {:.6}", background_probs[background_probs.len() - 1]);
 
         // Write histogram data to file
         let output_path = "/tmp/far_calibration_optical.dat";
@@ -1073,8 +1106,7 @@ mod tests {
         );
 
         // Count how many signal trials exceed 95th percentile of background
-        let bg_95th =
-            background_probs[(background_probs.len() as f64 * 0.05) as usize];
+        let bg_95th = background_probs[(background_probs.len() as f64 * 0.05) as usize];
         let n_signal_exceeding = signal_probs.iter().filter(|&&p| p > bg_95th).count();
         let frac_signal_exceeding = n_signal_exceeding as f64 / signal_probs.len() as f64;
 

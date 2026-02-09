@@ -56,6 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         instruments: vec!["H1".to_string(), "L1".to_string()],
         far: 1e-10,
         position: Some(gw_skymap.center()),
+        skymap: None,
     };
 
     let gw_superevent_ids = correlator.process_gcn_event(Event::GravitationalWave(gw_event))?;
