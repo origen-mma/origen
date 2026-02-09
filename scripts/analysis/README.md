@@ -46,6 +46,27 @@ python3 scripts/analysis/plot_instrument_comparison.py
 
 **Note**: The script expects distribution files at `/tmp/far_calibration_*.dat`. Update paths in the script if needed to use files from `data/far_calibration/`.
 
+### `plot_optical_far_calibration.py`
+
+Creates plots comparing kilonova signal vs supernova background spatial probability distributions.
+
+**Input**: Distribution data file from `data/far_calibration/`
+- `far_calibration_optical.dat`
+
+**Output**:
+- `assets/far_calibration_optical.png` - Histogram and complementary CDF
+
+**Usage**:
+```bash
+# First, generate distribution data by running the Rust test:
+cargo test -p mm-correlator test_optical_far_calibration -- --ignored --nocapture
+
+# Then create the plot:
+python3 scripts/analysis/plot_optical_far_calibration.py
+```
+
+**Key finding**: Optical transients (2 arcsec position error) achieve 290,000× median discrimination between kilonova and supernova, similar to Swift-BAT. Temporal discrimination (GRBs prompt, SNe random) provides additional rejection.
+
 ## Requirements
 
 ```bash

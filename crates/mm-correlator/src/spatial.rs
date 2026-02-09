@@ -857,4 +857,272 @@ mod tests {
 
         println!("\n========== ALL TESTS PASSED ==========\n");
     }
+
+    #[test]
+    #[ignore] // Run with: cargo test --package mm-correlator --lib test_optical_far_calibration -- --ignored --nocapture
+    fn test_optical_far_calibration() {
+        use mm_core::ParsedSkymap;
+        use rand::Rng;
+        use std::fs::File;
+        use std::io::{BufRead, BufReader, Write};
+
+        // Paths to O4 simulation data
+        let injections_path =
+            "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/injections.dat";
+        let skymap_dir = "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky";
+
+        if !std::path::Path::new(injections_path).exists() {
+            println!("Skipping population test - injections.dat not found");
+            return;
+        }
+
+        println!("\n========== OPTICAL FAR CALIBRATION (KILONOVA vs SUPERNOVA) ==========");
+        println!("Loading injections from: {}", injections_path);
+
+        // Parse injections.dat - same as GRB test
+        let file = File::open(injections_path).expect("Failed to open injections.dat");
+        let reader = BufReader::new(file);
+
+        let mut injections = Vec::new();
+        for line in reader.lines() {
+            let line = line.expect("Failed to read line");
+            if line.starts_with('#') || line.trim().is_empty() {
+                continue;
+            }
+
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 7 {
+                if let Ok(sim_id) = parts[0].parse::<usize>() {
+                    if let (Ok(lon_rad), Ok(lat_rad), Ok(mass1), Ok(mass2)) = (
+                        parts[1].parse::<f64>(),
+                        parts[2].parse::<f64>(),
+                        parts[5].parse::<f64>(),
+                        parts[6].parse::<f64>(),
+                    ) {
+                        // Filter for BNS and NSBH only (same as GRB test)
+                        let is_bns = mass1 < 3.0 && mass2 < 3.0;
+                        let is_nsbh = (mass1 < 3.0 && mass2 >= 3.0) || (mass1 >= 3.0 && mass2 < 3.0);
+
+                        if is_bns || is_nsbh {
+                            let ra_deg = lon_rad.to_degrees();
+                            let dec_deg = lat_rad.to_degrees();
+                            injections.push((sim_id, ra_deg, dec_deg));
+                        }
+                    }
+                }
+            }
+        }
+
+        println!("Loaded {} BNS+NSBH injections", injections.len());
+
+        // Optical parameters
+        // Typical optical localization uncertainty (ZTF: ~2 arcsec, LSST: ~0.5 arcsec)
+        let optical_position_error_deg = 2.0 / 3600.0; // 2 arcsec in degrees
+
+        // Time window for GW-optical correlation: -1s to +1 day
+        let time_window_start = -1.0;       // seconds before GW
+        let time_window_end = 86400.0;      // seconds after GW (+1 day)
+
+        // Rate ratio: Supernovae are ~10,000× more common than kilonovae
+        // For fair comparison with GRB test (which had 1000 bg per event),
+        // we'll also use 1000 supernova trials per event
+        let n_events = injections.len();
+        let n_supernova_per_event = 1000;
+        let mut rng = rand::thread_rng();
+
+        println!("\n========== OPTICAL TRANSIENT PARAMETERS ==========");
+        println!("Position error: {:.4}° ({:.2} arcsec)", optical_position_error_deg, optical_position_error_deg * 3600.0);
+        println!("Time window: {:.1}s to +{:.0}s ({:.1} days)", time_window_start, time_window_end, time_window_end / 86400.0);
+        println!("Processing {} BNS+NSBH events", n_events);
+        println!("Supernova background trials per event: {}", n_supernova_per_event);
+        println!("Total background trials: {}", n_events * n_supernova_per_event);
+        println!("SN rate / KN rate: ~10,000× (empirical)");
+
+        let mut signal_probs = Vec::new();
+        let mut background_probs = Vec::new();
+
+        // Process each event
+        for i in 0..n_events {
+            let (sim_id, true_ra, true_dec) = injections[i];
+            let skymap_path = format!("{}/{}.fits", skymap_dir, sim_id);
+
+            if !std::path::Path::new(&skymap_path).exists() {
+                println!("  Event {}: skymap not found, skipping", sim_id);
+                continue;
+            }
+
+            let skymap = match ParsedSkymap::from_fits(&skymap_path) {
+                Ok(s) => s,
+                Err(e) => {
+                    println!("  Event {}: failed to load skymap: {}", sim_id, e);
+                    continue;
+                }
+            };
+
+            // SIGNAL: Kilonova at true position + tiny optical localization error
+            // This simulates a real optical detection with ZTF/LSST astrometric uncertainty
+            let offset_angle: f64 = rng.gen_range(0.0..optical_position_error_deg);
+            let offset_azimuth: f64 = rng.gen_range(0.0..360.0);
+
+            let offset_ra = offset_angle * offset_azimuth.to_radians().cos() / true_dec.to_radians().cos();
+            let offset_dec = offset_angle * offset_azimuth.to_radians().sin();
+
+            let observed_ra = true_ra + offset_ra;
+            let observed_dec = (true_dec + offset_dec).max(-90.0).min(90.0);
+
+            let kn_pos = SkyPosition::new(observed_ra, observed_dec, 0.0);
+
+            // Calculate spatial probability at kilonova position
+            // Use tiny integration radius since optical position is very precise
+            let signal_prob =
+                integrate_skymap_over_circle(&kn_pos, optical_position_error_deg, &skymap);
+            signal_probs.push(signal_prob);
+
+            // BACKGROUND: Supernovae at random positions AND random times
+            // Key difference from GRB: SNe occur at random times, not coincident with GW
+            for _ in 0..n_supernova_per_event {
+                // Random sky position
+                let bg_ra: f64 = rng.gen_range(0.0..360.0);
+                let sin_dec: f64 = rng.gen_range(-1.0..1.0);
+                let bg_dec = sin_dec.asin().to_degrees();
+                let bg_pos = SkyPosition::new(bg_ra, bg_dec, 0.0);
+
+                // Random time within GW-optical correlation window
+                // Unlike GRBs (which are temporally coincident), SNe occur at random times
+                // This is accounted for in temporal FAR, but spatial correlation is computed regardless
+                let _bg_time_offset: f64 = rng.gen_range(time_window_start..time_window_end);
+
+                let bg_prob = integrate_skymap_over_circle(&bg_pos, optical_position_error_deg, &skymap);
+                background_probs.push(bg_prob);
+            }
+
+            if (i + 1) % 50 == 0 {
+                println!("  Processed {}/{} events...", i + 1, n_events);
+            }
+        }
+
+        println!("\nProcessed {} events", signal_probs.len());
+        println!("  Kilonova (signal) trials: {}", signal_probs.len());
+        println!("  Supernova (background) trials: {}", background_probs.len());
+
+        // Sort for statistics
+        signal_probs.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        background_probs.sort_by(|a, b| b.partial_cmp(a).unwrap());
+
+        // Calculate statistics
+        let signal_median = signal_probs[signal_probs.len() / 2];
+        let signal_mean = signal_probs.iter().sum::<f64>() / signal_probs.len() as f64;
+        let bg_median = background_probs[background_probs.len() / 2];
+        let bg_mean = background_probs.iter().sum::<f64>() / background_probs.len() as f64;
+
+        println!("\n========== KILONOVA (SIGNAL) DISTRIBUTION ==========");
+        println!("  Max: {:.6}", signal_probs[0]);
+        println!(
+            "  95th percentile: {:.6}",
+            signal_probs[(signal_probs.len() as f64 * 0.05) as usize]
+        );
+        println!(
+            "  75th percentile: {:.6}",
+            signal_probs[(signal_probs.len() as f64 * 0.25) as usize]
+        );
+        println!("  Median: {:.6}", signal_median);
+        println!("  Mean: {:.6}", signal_mean);
+        println!(
+            "  Min: {:.6}",
+            signal_probs[signal_probs.len() - 1]
+        );
+
+        println!("\n========== SUPERNOVA (BACKGROUND) DISTRIBUTION ==========");
+        println!("  Max: {:.6}", background_probs[0]);
+        println!(
+            "  95th percentile: {:.6}",
+            background_probs[(background_probs.len() as f64 * 0.05) as usize]
+        );
+        println!(
+            "  75th percentile: {:.6}",
+            background_probs[(background_probs.len() as f64 * 0.25) as usize]
+        );
+        println!("  Median: {:.6}", bg_median);
+        println!("  Mean: {:.6}", bg_mean);
+        println!(
+            "  Min: {:.6}",
+            background_probs[background_probs.len() - 1]
+        );
+
+        // Write histogram data to file
+        let output_path = "/tmp/far_calibration_optical.dat";
+        let mut output = File::create(&output_path).expect("Failed to create output file");
+        writeln!(output, "# type spatial_prob").unwrap();
+        for prob in &signal_probs {
+            writeln!(output, "signal {:.8}", prob).unwrap();
+        }
+        for prob in &background_probs {
+            writeln!(output, "background {:.8}", prob).unwrap();
+        }
+        println!("\nHistogram data written to: {}", output_path);
+
+        // Statistical test: signal should be significantly higher than background
+        println!("\n========== STATISTICAL COMPARISON ==========");
+        println!(
+            "  Kilonova median / Supernova median: {:.2}x",
+            signal_median / bg_median
+        );
+        println!(
+            "  Kilonova mean / Supernova mean: {:.2}x",
+            signal_mean / bg_mean
+        );
+
+        // Count how many signal trials exceed 95th percentile of background
+        let bg_95th =
+            background_probs[(background_probs.len() as f64 * 0.05) as usize];
+        let n_signal_exceeding = signal_probs.iter().filter(|&&p| p > bg_95th).count();
+        let frac_signal_exceeding = n_signal_exceeding as f64 / signal_probs.len() as f64;
+
+        println!(
+            "  Kilonova trials exceeding supernova 95th percentile: {} / {} ({:.1}%)",
+            n_signal_exceeding,
+            signal_probs.len(),
+            frac_signal_exceeding * 100.0
+        );
+
+        // Count zeros
+        let n_signal_zero = signal_probs.iter().filter(|&&p| p < 1e-8).count();
+        let n_bg_zero = background_probs.iter().filter(|&&p| p < 1e-8).count();
+        println!(
+            "  Zero probability trials: Kilonova {}/{} ({:.1}%), Supernova {}/{} ({:.1}%)",
+            n_signal_zero,
+            signal_probs.len(),
+            100.0 * n_signal_zero as f64 / signal_probs.len() as f64,
+            n_bg_zero,
+            background_probs.len(),
+            100.0 * n_bg_zero as f64 / background_probs.len() as f64
+        );
+
+        // Assertions
+        assert!(
+            signal_median > bg_median * 2.0,
+            "Kilonova median should be >2x supernova median (signal={:.6}, bg={:.6})",
+            signal_median,
+            bg_median
+        );
+
+        assert!(
+            signal_mean > bg_mean * 2.0,
+            "Kilonova mean should be >2x supernova mean (signal={:.6}, bg={:.6})",
+            signal_mean,
+            bg_mean
+        );
+
+        // For optical, expect very high discrimination due to tiny error circle
+        // Similar to Swift-BAT, use 40% threshold
+        assert!(
+            frac_signal_exceeding > 0.4,
+            "At least 40% of kilonova trials should exceed supernova 95th percentile (got {:.1}%)",
+            frac_signal_exceeding * 100.0
+        );
+
+        println!("\n========== OPTICAL TEST PASSED ==========\n");
+        println!("Note: This test uses spatial correlation only.");
+        println!("Temporal coincidence (GRBs are prompt, SNe are random in time) is handled separately in joint FAR.");
+    }
 }

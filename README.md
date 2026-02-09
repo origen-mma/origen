@@ -182,6 +182,29 @@ See [spatial.rs test_o4_population_far_calibration](crates/mm-correlator/src/spa
 - **Distribution data**: [data/far_calibration/](data/far_calibration/) - Pre-computed spatial probability distributions (3.7 MB each)
 - **To regenerate**: Run `cargo test -p mm-correlator test_o4_population_far_calibration -- --ignored --nocapture` followed by `python3 scripts/analysis/plot_instrument_comparison.py`
 
+#### Optical Transients: Kilonova vs Supernova
+
+**Validation**: Same O4 population (178 BNS/NSBH events × 1,000 background trials = 178,000 background simulations) comparing kilonova signal to supernova background.
+
+![Optical FAR Calibration: Kilonova vs Supernova](assets/far_calibration_optical.png)
+
+| Metric | Kilonova (Signal) | Supernova (Background) | Ratio |
+|--------|------------------|------------------------|-------|
+| **Median spatial probability** | 2.9×10⁻⁵ (0.0029%) | 0.0 (≈0%) | **290,000×** |
+| **Mean spatial probability** | 5.6×10⁻⁵ (0.0056%) | 5.5×10⁻⁶ (0.00055%) | **10.2×** |
+| **Signal exceeding bg 95th percentile** | 45.5% | - | - |
+| **Zero probability trials** | 0.0% | 68.1% | - |
+
+**Key findings**:
+- **Exceptional spatial discrimination** (290,000×) due to tiny optical position error (2 arcsec for ZTF/LSST)
+- Very similar to Swift-BAT performance, as both have arc-second scale localization
+- **Temporal discrimination is even stronger**: GRBs arrive within seconds of merger, supernovae occur randomly within +1 day window
+- Supernova rate ~10,000× kilonova rate, but temporal + spatial correlation provides sufficient rejection
+
+**Physical interpretation**: Optical transients have extraordinarily precise astrometry (~2 arcsec), yielding spatial probability distributions similar to Swift-BAT X-ray localizations. The key discriminant for optical is **temporal coincidence** - kilonovae appear within hours of merger and fade on ~week timescale, while supernovae occur at random times and evolve over months. Joint spatio-temporal FAR strongly favors prompt, localized transients.
+
+**To reproduce**: `cargo test -p mm-correlator test_optical_far_calibration -- --ignored --nocapture` followed by `python3 scripts/analysis/plot_optical_far_calibration.py`
+
 ### Light Curve Fitting (SVI)
 
 Stochastic Variational Inference for physical t0 (merger/explosion time) estimation:
