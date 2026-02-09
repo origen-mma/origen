@@ -1,0 +1,20 @@
+{
+  "type": "panel",
+  "name": "Multi-Messenger Aladin Skymap",
+  "id": "mm-aladin-skymap",
+  "info": {
+    "description": "Visualize gravitational wave skymaps with EM counterparts using Aladin Lite",
+    "author": {
+      "name": "ORIGIN Team",
+      "url": "https://github.com/mcoughlin/origin"
+    },
+    "keywords": ["multi-messenger", "skymap", "healpix", "aladin", "gravitational-waves"],
+    "version": "1.0.0",
+    "updated": "2026-02-08"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=9.0.0",
+    "grafanaVersion": "9.x.x",
+    "plugins": []
+  }
+}
