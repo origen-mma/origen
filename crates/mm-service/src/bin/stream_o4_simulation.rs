@@ -582,7 +582,8 @@ async fn main() -> Result<()> {
         // Check if we should force multi-messenger for this event
         // (last event and we haven't had a full multi-messenger yet)
         let is_last_event = args.max_events > 0 && n_events >= args.max_events;
-        let force_mm_this_event = args.force_multimessenger && !has_full_multimessenger && is_last_event;
+        let force_mm_this_event =
+            args.force_multimessenger && !has_full_multimessenger && is_last_event;
 
         if force_mm_this_event {
             info!("🎯 FORCING MULTI-MESSENGER EVENT (GW+GRB+Optical) for demonstration");
@@ -647,13 +648,15 @@ async fn main() -> Result<()> {
         }
 
         // 3. Publish optical alert if detectable (or forced)
-        let has_optical = mm_event.has_afterglow() || mm_event.has_kilonova() || force_mm_this_event;
-        let optical_magnitude = if force_mm_this_event && mm_event.afterglow.peak_magnitude.is_none() {
-            // Force a bright optical counterpart
-            Some(20.0)
-        } else {
-            mm_event.afterglow.peak_magnitude
-        };
+        let has_optical =
+            mm_event.has_afterglow() || mm_event.has_kilonova() || force_mm_this_event;
+        let optical_magnitude =
+            if force_mm_this_event && mm_event.afterglow.peak_magnitude.is_none() {
+                // Force a bright optical counterpart
+                Some(20.0)
+            } else {
+                mm_event.afterglow.peak_magnitude
+            };
 
         if has_optical {
             if let Some(mag) = optical_magnitude {
@@ -716,8 +719,9 @@ async fn main() -> Result<()> {
         // 4. Calculate and publish joint FAR if multi-messenger
         if has_grb || (has_optical && optical_magnitude.is_some()) {
             // Use has_grb from earlier (includes forced MM)
-            let has_optical_detectable =
-                has_optical && (optical_magnitude.is_some_and(|m| m < args.limiting_magnitude) || force_mm_this_event);
+            let has_optical_detectable = has_optical
+                && (optical_magnitude.is_some_and(|m| m < args.limiting_magnitude)
+                    || force_mm_this_event);
 
             let skymap_area_90 = (distance / 100.0).powi(2) * 100.0; // Simplified
 
