@@ -182,6 +182,44 @@ See [spatial.rs test_o4_population_far_calibration](crates/mm-correlator/src/spa
 - **Distribution data**: [data/far_calibration/](data/far_calibration/) - Pre-computed spatial probability distributions (3.7 MB each)
 - **To regenerate**: Run `cargo test -p mm-correlator test_o4_population_far_calibration -- --ignored --nocapture` followed by `python3 scripts/analysis/plot_instrument_comparison.py`
 
+#### RAVEN Methodology Comparison
+
+We validate our empirical FAR approach by comparing with LIGO RAVEN's analytical formula ([doi.org/10.3847/1538-4357/aabfd2](https://doi.org/10.3847/1538-4357/aabfd2)):
+
+```
+spatiotemporal_far = (time_window × ext_rate × gw_far) / P_spatial
+```
+
+![RAVEN Comparison](assets/raven_comparison.png)
+
+**Key Insight**: Our empirical and RAVEN's analytical approaches measure **different but complementary** metrics:
+
+| Approach | Measures | Use Case | Example (Fermi-GBM) |
+|----------|----------|----------|---------------------|
+| **Empirical** | Population-level discrimination<br>("How separable are signal & background?") | Understand instrument performance<br>Optimize search strategies | Signal/background median: **175×** |
+| **RAVEN Analytical** | Event-by-event FAR<br>("How often by chance?") | Assess individual coincidences<br>Alert thresholding | Median FAR: **0.0028 /yr**<br>98.9% of signals < 1/yr |
+
+**Validation Results**:
+
+| Instrument | Empirical Discrimination | RAVEN Median FAR | Signals < 1/yr |
+|------------|-------------------------|------------------|----------------|
+| **Fermi-GBM** (13.2° error) | 175× | 0.0028 /yr | 98.9% |
+| **Swift-BAT** (2' error) | 7× | 11.6 /yr | 0.0% |
+
+**Interpretation**:
+- **Fermi-GBM**: Wide error circles (13.2°) mean high spatial probabilities, leading to low FAR (< 1/yr) for most signals
+- **Swift-BAT**: Tiny error circles (2') mean low absolute spatial probabilities, but still provides discrimination via relative comparison
+- Both approaches confirm strong spatial discrimination for GW+GRB correlation
+- Empirical method better captures population statistics; RAVEN better for individual event significance
+
+**Technical Details**: See [docs/RAVEN_COMPARISON.md](docs/RAVEN_COMPARISON.md) for detailed methodology comparison.
+
+**To reproduce**: Run the O4 population test (includes RAVEN calculations) then visualize:
+```bash
+cargo test -p mm-correlator test_o4_population_far_calibration -- --ignored --nocapture
+python3 scripts/analysis/plot_raven_comparison.py
+```
+
 #### Optical Transients: Kilonova vs Supernova
 
 **Validation**: Same O4 population (178 BNS/NSBH events × 1,000 background trials = 178,000 background simulations) comparing kilonova signal to supernova background.
