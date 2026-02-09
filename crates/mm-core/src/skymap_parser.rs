@@ -1,12 +1,13 @@
 use cdshealpix::nested::{center, hash};
 use fitsio::FitsFile;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use thiserror::Error;
 
 use crate::SkyPosition;
 
 /// Parsed HEALPix skymap with probability distribution
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedSkymap {
     /// HEALPix probability values (normalized to sum to 1.0)
     pub probabilities: Vec<f64>,
@@ -27,13 +28,13 @@ pub struct ParsedSkymap {
     pub total_area: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SkymapOrdering {
     Nested,
     Ring,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CredibleRegion {
     /// Credible level (e.g., 0.5 for 50%, 0.9 for 90%)
     pub level: f64,

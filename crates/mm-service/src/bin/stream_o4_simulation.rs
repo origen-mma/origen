@@ -594,19 +594,43 @@ async fn main() -> Result<()> {
         if has_grb {
             let time_offset = 0.5; // ~0.5s after GW
 
-            // Sample realistic GRB localization if available
-            let (grb_instrument, grb_error_radius) = if let Some(ref locs) = grb_localizations {
+            // Sample realistic GRB localization and generate position with error
+            use mm_simulation::{add_localization_error, GrbInstrument};
+
+            let (grb_instrument_name, grb_inst_enum) = if let Some(ref locs) = grb_localizations {
                 let idx = rng.gen_range(0..locs.len());
-                (locs[idx].instrument.clone(), locs[idx].error_radius)
+                let loc = &locs[idx];
+                let inst_str = &loc.instrument;
+
+                // Parse instrument string to enum
+                let inst_enum = if inst_str.contains("Swift") {
+                    GrbInstrument::SwiftBAT
+                } else if inst_str.contains("Fermi") {
+                    GrbInstrument::FermiGBM
+                } else if inst_str.contains("Einstein") {
+                    GrbInstrument::EinsteinProbeWXT
+                } else {
+                    GrbInstrument::FermiGBM // default
+                };
+
+                (inst_str.clone(), inst_enum)
             } else {
-                // Default: Fermi GBM with ~5° localization
-                ("Fermi GBM".to_string(), 5.0)
+                ("Fermi GBM".to_string(), GrbInstrument::FermiGBM)
             };
+
+            // Generate realistic GRB position with localization error
+            // Use true GW position (ra, dec) and add instrument-specific error
+            let grb_loc = add_localization_error(ra, dec, grb_inst_enum, &mut rng);
+            let (grb_error_radius, grb_ra, grb_dec) = (
+                grb_loc.error_radius,
+                grb_loc.obs_ra,
+                grb_loc.obs_dec,
+            );
 
             let grb_alert = GrbAlert {
                 simulation_id: n_events,
                 detection_time: gpstime + time_offset,
-                instrument: grb_instrument.clone(),
+                instrument: grb_instrument_name.clone(),
                 fluence: 1e-6,
                 time_offset,
                 on_axis: true, // If GRB detected, assume on-axis
@@ -625,15 +649,14 @@ async fn main() -> Result<()> {
             // Publish GRB to API
             if let Some(ref client) = api_client {
                 let event_id = format!("G{}", n_events);
-                // GRB should be at same position as GW event (on-axis jet)
-                // Use ra/dec from skymap extraction above
+                // GRB uses observed position with realistic localization error
 
                 if let Err(e) = client
                     .add_grb_detection(
                         &event_id,
                         gpstime + time_offset,
-                        ra,  // Use skymap position
-                        dec, // Use skymap position
+                        grb_ra,  // Use GRB observed position with error
+                        grb_dec, // Use GRB observed position with error
                         &grb_alert.instrument,
                         grb_alert.fluence,
                         grb_alert.error_radius,

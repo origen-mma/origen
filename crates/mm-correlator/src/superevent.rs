@@ -1,4 +1,4 @@
-use mm_core::SkyPosition;
+use mm_core::{ParsedSkymap, SkyPosition};
 use serde::{Deserialize, Serialize};
 
 /// Multi-messenger superevent
@@ -57,6 +57,7 @@ impl MultiMessengerSuperevent {
                 far: None,
                 skymap_available: false,
                 position,
+                skymap: None,
             }),
             optical_candidates: Vec::new(),
             gamma_ray_candidates: Vec::new(),
@@ -136,6 +137,7 @@ pub struct GWComponent {
     pub far: Option<f64>,
     pub skymap_available: bool,
     pub position: Option<SkyPosition>, // Sky position for correlation
+    pub skymap: Option<ParsedSkymap>,  // Parsed HEALPix skymap for spatial correlation
 }
 
 /// Optical counterpart candidate
@@ -150,6 +152,12 @@ pub struct OpticalCandidate {
     pub joint_far: Option<f64>,
     /// GP-based light curve features (if extraction succeeded)
     pub light_curve_features: Option<mm_core::LightCurveFeatures>,
+
+    // Skymap-based spatial correlation fields
+    pub skymap_probability: Option<f64>,    // Probability density at position
+    pub in_50cr: Option<bool>,              // Inside 50% credible region
+    pub in_90cr: Option<bool>,              // Inside 90% credible region
+    pub spatial_significance: Option<f64>,  // Spatial significance score
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,6 +167,12 @@ pub struct GammaRayCandidate {
     pub position: Option<SkyPosition>,
     pub time_offset: f64,
     pub spatial_offset: Option<f64>,
+
+    // Skymap-based spatial correlation fields
+    pub skymap_probability: Option<f64>,    // Probability density at position
+    pub in_50cr: Option<bool>,              // Inside 50% credible region
+    pub in_90cr: Option<bool>,              // Inside 90% credible region
+    pub spatial_significance: Option<f64>,  // Spatial significance score
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -34,7 +34,8 @@ pub fn parse_gw_alert(payload: &str) -> Result<Event, ParseError> {
         gps_time: GpsTime::from_seconds(gps_time),
         instruments: event_info.instruments.unwrap_or_default(),
         far: event_info.far.unwrap_or(1.0),
-        position: None, // Will parse skymap in Phase 2
+        position: None,
+        skymap: None, // Skymap parsing will be added in future
     }))
 }
 

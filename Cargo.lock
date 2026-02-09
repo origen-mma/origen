@@ -2173,9 +2173,12 @@ dependencies = [
 name = "mm-correlator"
 version = "0.1.0"
 dependencies = [
+ "cdshealpix",
  "chrono",
  "mm-core",
+ "moc",
  "ordered-float",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "tempfile",

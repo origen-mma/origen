@@ -1,6 +1,10 @@
 use crate::{
     config::CorrelatorConfig,
-    spatial::{calculate_joint_far, calculate_spatial_probability},
+    spatial::{
+        calculate_joint_far, calculate_skymap_offset, calculate_spatial_probability,
+        calculate_spatial_probability_from_skymap, calculate_spatial_significance,
+        integrate_skymap_over_circle, is_in_credible_region,
+    },
     superevent::{
         GammaRayCandidate, MultiMessengerSuperevent, OpticalCandidate, SupereventClassification,
     },
@@ -74,11 +78,16 @@ impl SupereventCorrelator {
         let superevent_id = format!("MS{:06}", self.next_id);
         self.next_id += 1;
 
-        let superevent = MultiMessengerSuperevent::new_from_gw(
+        let mut superevent = MultiMessengerSuperevent::new_from_gw(
             gw.superevent_id.clone(),
             gps_time,
             gw.position.clone(), // Pass GW position for spatial correlation
         );
+
+        // Store skymap in GW component if available
+        if let Some(ref mut gw_event) = superevent.gw_event {
+            gw_event.skymap = gw.skymap.clone();
+        }
 
         // Add to indices
         self.temporal_index.insert(gps_time, superevent_id.clone());
@@ -116,17 +125,49 @@ impl SupereventCorrelator {
                 if let Some(superevent) = self.superevents.get_mut(&superevent_id) {
                     let time_offset = trigger_time - gw_time;
 
-                    // Calculate spatial offset if both have positions
-                    // TODO: Extract position from GW skymap when available
-                    let spatial_offset = None;
-
-                    let candidate = GammaRayCandidate {
+                    // Calculate spatial offset using skymap if available
+                    let mut candidate = GammaRayCandidate {
                         trigger_id: grb.trigger_id.clone(),
                         trigger_time,
                         position: grb.position.clone(),
                         time_offset,
-                        spatial_offset,
+                        spatial_offset: None,
+                        skymap_probability: None,
+                        in_50cr: None,
+                        in_90cr: None,
+                        spatial_significance: None,
                     };
+
+                    // Populate spatial fields using skymap if both position and skymap available
+                    if let (Some(grb_pos), Some(gw_event)) =
+                        (&grb.position, &superevent.gw_event)
+                    {
+                        if let Some(ref skymap) = gw_event.skymap {
+                            // Use RAVEN method: integrate skymap over GRB error circle
+                            let spatial_prob = if let Some(error_radius) = grb.error_radius {
+                                // GRB has error circle - integrate skymap over it (RAVEN method)
+                                integrate_skymap_over_circle(grb_pos, error_radius, skymap)
+                            } else {
+                                // No error radius - use pixel probability at center position
+                                calculate_spatial_probability_from_skymap(grb_pos, skymap)
+                            };
+
+                            // Also calculate spatial offset metrics
+                            let skymap_offset = calculate_skymap_offset(grb_pos, skymap);
+
+                            candidate.spatial_offset =
+                                Some(skymap_offset.angular_separation);
+                            candidate.skymap_probability = Some(spatial_prob);
+                            candidate.in_50cr = Some(skymap_offset.in_50cr);
+                            candidate.in_90cr = Some(skymap_offset.in_90cr);
+                            candidate.spatial_significance =
+                                Some(calculate_spatial_significance(grb_pos, skymap));
+                        } else if let Some(gw_pos) = &gw_event.position {
+                            // Fallback: point-source angular separation
+                            let separation = grb_pos.angular_separation(gw_pos);
+                            candidate.spatial_offset = Some(separation);
+                        }
+                    }
 
                     superevent.add_gamma_ray_candidate(candidate);
                     affected_superevents.push(superevent_id.clone());
@@ -216,11 +257,32 @@ impl SupereventCorrelator {
                             .and_then(|gw| gw.position.as_ref());
 
                         let time_offset = t0_gps - gw_time;
-                        let spatial_prob = calculate_spatial_probability(
-                            position,
-                            gw_position,
-                            self.config.spatial_threshold,
-                        );
+
+                        // Calculate spatial probability using skymap if available (RAVEN method)
+                        // For optical: error is tiny (~2 arcsec), so use pixel probability directly
+                        let (spatial_prob, skymap_probability, in_50cr, in_90cr, spatial_significance) =
+                            if let Some(gw_event) = &superevent.gw_event {
+                                if let Some(ref skymap) = gw_event.skymap {
+                                    // Use RAVEN method: query pixel probability at optical position
+                                    let prob = calculate_spatial_probability_from_skymap(position, skymap);
+                                    let in_50 = is_in_credible_region(position, skymap, 0.5);
+                                    let in_90 = is_in_credible_region(position, skymap, 0.9);
+                                    let significance = calculate_spatial_significance(position, skymap);
+
+                                    (prob, Some(prob), Some(in_50), Some(in_90), Some(significance))
+                                } else {
+                                    // Fallback: point-source with threshold
+                                    let prob = calculate_spatial_probability(
+                                        position,
+                                        gw_position,
+                                        self.config.spatial_threshold,
+                                    );
+                                    (prob, None, None, None, None)
+                                }
+                            } else {
+                                // No GW event, default to low probability
+                                (0.0, None, None, None, None)
+                            };
 
                         let mut joint_far = calculate_joint_far(
                             time_offset,
@@ -258,6 +320,11 @@ impl SupereventCorrelator {
                                 significance: peak_snr,
                                 joint_far: Some(joint_far),
                                 light_curve_features: lc_features.clone(),
+                                // Skymap-based spatial correlation fields
+                                skymap_probability,
+                                in_50cr,
+                                in_90cr,
+                                spatial_significance,
                             };
 
                             info!(
@@ -366,6 +433,11 @@ impl SupereventCorrelator {
                             significance: measurement.snr(),
                             joint_far: Some(joint_far),
                             light_curve_features: lc_features.clone(),
+                            // Skymap-based fields (not populated in this path)
+                            skymap_probability: None,
+                            in_50cr: None,
+                            in_90cr: None,
+                            spatial_significance: None,
                         };
 
                         superevent.add_optical_candidate(candidate);
@@ -463,6 +535,7 @@ mod tests {
             instruments: vec!["H1".to_string(), "L1".to_string()],
             far: 1e-10,
             position: None,
+            skymap: None,
         };
 
         let result = correlator.process_gw_event(gw).unwrap();
@@ -490,6 +563,7 @@ mod tests {
             instruments: vec!["H1".to_string(), "L1".to_string()],
             far: 1e-10,
             position: Some(SkyPosition::new(123.0, 45.0, 5.0)),
+            skymap: None,
         };
         correlator.process_gw_event(gw).unwrap();
 
@@ -533,8 +607,8 @@ mod tests {
             instruments: vec!["H1".to_string(), "L1".to_string()],
             far: 1e-6,
             position: Some(SkyPosition::new(123.0, 45.0, 5.0)),
-
             alert_type: "preliminary".to_string(),
+            skymap: None,
         };
 
         correlator.process_gw_event(gw).unwrap();
@@ -577,5 +651,298 @@ mod tests {
         // With real kilonova fitting, t0 should be ~GW time and this should match
         // For now, just verify it doesn't crash
         // TODO: Update assertion once SVI fitting is implemented
+    }
+
+    #[test]
+    fn test_grb_skymap_correlation() {
+        use mm_core::ParsedSkymap;
+
+        let skymap_path =
+            "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
+        if !std::path::Path::new(skymap_path).exists() {
+            println!("Skipping test - O4 skymap not found");
+            return;
+        }
+
+        // Load a real O4 skymap
+        let skymap = ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
+
+        let mut correlator = SupereventCorrelator::new(CorrelatorConfig::test());
+
+        // Create GW event WITH skymap
+        let gw_gps = 1234567890.0;
+        let gw = GWEvent {
+            superevent_id: "S240101a".to_string(),
+            alert_type: "PRELIMINARY".to_string(),
+            gps_time: GpsTime::from_seconds(gw_gps),
+            instruments: vec!["H1".to_string(), "L1".to_string()],
+            far: 1e-10,
+            position: Some(skymap.max_prob_position.clone()),
+            skymap: Some(skymap.clone()),
+        };
+
+        correlator.process_gw_event(gw).unwrap();
+
+        // Create GRB at max probability position (should match with high significance)
+        let grb = GammaRayEvent {
+            trigger_id: "GRB240101A".to_string(),
+            instrument: "Fermi GBM".to_string(),
+            trigger_time: gw_gps + 0.5, // 0.5s after GW
+            position: Some(skymap.max_prob_position.clone()),
+            significance: 10.0,
+            skymap_url: None,
+            error_radius: Some(5.0),
+        };
+
+        let affected = correlator.process_grb_event(grb).unwrap();
+        assert!(!affected.is_empty(), "GRB should match GW event");
+
+        // Verify the GRB candidate has skymap-based fields populated
+        let superevent = correlator.get_superevent(&affected[0]).unwrap();
+        assert_eq!(superevent.gamma_ray_candidates.len(), 1);
+
+        let grb_candidate = &superevent.gamma_ray_candidates[0];
+
+        // Check that skymap-based spatial fields are populated
+        assert!(
+            grb_candidate.skymap_probability.is_some(),
+            "GRB should have skymap probability"
+        );
+        assert!(
+            grb_candidate.in_50cr.is_some(),
+            "GRB should have 50% CR membership"
+        );
+        assert!(
+            grb_candidate.in_90cr.is_some(),
+            "GRB should have 90% CR membership"
+        );
+        assert!(
+            grb_candidate.spatial_significance.is_some(),
+            "GRB should have spatial significance"
+        );
+
+        // GRB at max prob should be in both credible regions
+        assert!(
+            grb_candidate.in_50cr.unwrap(),
+            "GRB at max prob should be in 50% CR"
+        );
+        assert!(
+            grb_candidate.in_90cr.unwrap(),
+            "GRB at max prob should be in 90% CR"
+        );
+        assert!(
+            grb_candidate.skymap_probability.unwrap() > 0.0,
+            "GRB at max prob should have non-zero probability"
+        );
+
+        println!(
+            "GRB correlation test - skymap_prob: {:.6e}, in_50cr: {}, in_90cr: {}, significance: {:.3}",
+            grb_candidate.skymap_probability.unwrap(),
+            grb_candidate.in_50cr.unwrap(),
+            grb_candidate.in_90cr.unwrap(),
+            grb_candidate.spatial_significance.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_grb_outside_credible_region() {
+        use mm_core::ParsedSkymap;
+
+        let skymap_path =
+            "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
+        if !std::path::Path::new(skymap_path).exists() {
+            println!("Skipping test - O4 skymap not found");
+            return;
+        }
+
+        let skymap = ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
+
+        let mut correlator = SupereventCorrelator::new(CorrelatorConfig::test());
+
+        let gw_gps = 1234567890.0;
+        let gw = GWEvent {
+            superevent_id: "S240101a".to_string(),
+            alert_type: "PRELIMINARY".to_string(),
+            gps_time: GpsTime::from_seconds(gw_gps),
+            instruments: vec!["H1".to_string(), "L1".to_string()],
+            far: 1e-10,
+            position: Some(skymap.max_prob_position.clone()),
+            skymap: Some(skymap.clone()),
+        };
+
+        correlator.process_gw_event(gw).unwrap();
+
+        // Create GRB far from the skymap (e.g., opposite side of sky)
+        let far_position = SkyPosition::new(0.0, 0.0, 5.0); // Very different from typical BBH positions
+
+        let grb = GammaRayEvent {
+            trigger_id: "GRB240101B".to_string(),
+            instrument: "Fermi GBM".to_string(),
+            trigger_time: gw_gps + 0.5,
+            position: Some(far_position),
+            significance: 10.0,
+            skymap_url: None,
+            error_radius: Some(5.0),
+        };
+
+        let affected = correlator.process_grb_event(grb).unwrap();
+
+        if !affected.is_empty() {
+            let superevent = correlator.get_superevent(&affected[0]).unwrap();
+            let grb_candidate = &superevent.gamma_ray_candidates[0];
+
+            // GRB far from event should have low probability and likely not be in credible regions
+            println!(
+                "GRB far from event - skymap_prob: {:?}, in_50cr: {:?}, in_90cr: {:?}",
+                grb_candidate.skymap_probability,
+                grb_candidate.in_50cr,
+                grb_candidate.in_90cr
+            );
+
+            // The spatial fields should still be populated even if values are low/false
+            assert!(
+                grb_candidate.skymap_probability.is_some(),
+                "Spatial fields should be populated even for distant GRB"
+            );
+        }
+    }
+
+    #[test]
+    fn test_optical_skymap_correlation() {
+        use mm_core::ParsedSkymap;
+
+        let skymap_path =
+            "/Users/mcoughlin/Code/ORIGIN/observing-scenarios/runs/O4HL/bgp/allsky/0.fits";
+        if !std::path::Path::new(skymap_path).exists() {
+            println!("Skipping test - O4 skymap not found");
+            return;
+        }
+
+        let skymap = ParsedSkymap::from_fits(skymap_path).expect("Failed to load test skymap");
+
+        let mut config = CorrelatorConfig::test();
+        config.far_threshold = 10.0; // Very permissive
+        config.lc_filter.enable = false; // Disable light curve filtering
+        let mut correlator = SupereventCorrelator::new(config);
+
+        let gw_gps = 1234567890.0;
+        let gw = GWEvent {
+            superevent_id: "S240101a".to_string(),
+            alert_type: "PRELIMINARY".to_string(),
+            gps_time: GpsTime::from_seconds(gw_gps),
+            instruments: vec!["H1".to_string(), "L1".to_string()],
+            far: 1e-10,
+            position: Some(skymap.max_prob_position.clone()),
+            skymap: Some(skymap.clone()),
+        };
+
+        correlator.process_gw_event(gw).unwrap();
+
+        // Create optical transient at max prob position, 1 hour after GW
+        let optical_gps = gw_gps + 3600.0;
+        let mjd = (optical_gps + 315964800.0 - 18.0) / 86400.0 + 40587.0;
+
+        let mut lc = LightCurve::new("ZTF24test".to_string());
+        lc.add_measurement(Photometry::new(mjd, 1000.0, 10.0, "r".to_string()));
+        lc.add_measurement(Photometry::new(mjd + 1.0, 900.0, 10.0, "r".to_string()));
+        lc.add_measurement(Photometry::new(mjd + 2.0, 800.0, 10.0, "r".to_string()));
+
+        let matches = correlator
+            .process_optical_lightcurve(&lc, &skymap.max_prob_position)
+            .unwrap();
+
+        if !matches.is_empty() {
+            let superevent = correlator.get_superevent(&matches[0]).unwrap();
+
+            if !superevent.optical_candidates.is_empty() {
+                let optical = &superevent.optical_candidates[0];
+
+                println!(
+                    "Optical correlation - skymap_prob: {:?}, in_50cr: {:?}, in_90cr: {:?}, significance: {:?}",
+                    optical.skymap_probability,
+                    optical.in_50cr,
+                    optical.in_90cr,
+                    optical.spatial_significance
+                );
+
+                // Note: Optical correlation uses light curve t0 fitting which may go through
+                // a different code path. The skymap fields should be populated when the
+                // light curve fit succeeds and uses the skymap-based correlation path.
+                // For this test with only 3 detections, the fit may use a fallback path.
+
+                // At minimum, verify the test completes without crashing
+                println!(
+                    "Optical candidate created successfully. Skymap fields populated: {}",
+                    optical.skymap_probability.is_some()
+                );
+            }
+        } else {
+            println!(
+                "No optical matches found - this is expected with short light curve and strict FAR threshold"
+            );
+        }
+    }
+
+    #[test]
+    fn test_grb_correlation_without_skymap() {
+        // Test that GRB correlation still works when skymap is not available (fallback mode)
+        let mut correlator = SupereventCorrelator::new(CorrelatorConfig::test());
+
+        let gw_gps = 1234567890.0;
+        let gw_position = SkyPosition::new(180.0, 30.0, 5.0);
+
+        let gw = GWEvent {
+            superevent_id: "S240101a".to_string(),
+            alert_type: "PRELIMINARY".to_string(),
+            gps_time: GpsTime::from_seconds(gw_gps),
+            instruments: vec!["H1".to_string(), "L1".to_string()],
+            far: 1e-10,
+            position: Some(gw_position.clone()),
+            skymap: None, // No skymap available
+        };
+
+        correlator.process_gw_event(gw).unwrap();
+
+        // Create GRB nearby
+        let grb_position = SkyPosition::new(181.0, 30.0, 5.0); // ~1 degree away
+
+        let grb = GammaRayEvent {
+            trigger_id: "GRB240101A".to_string(),
+            instrument: "Fermi GBM".to_string(),
+            trigger_time: gw_gps + 0.5,
+            position: Some(grb_position),
+            significance: 10.0,
+            skymap_url: None,
+            error_radius: Some(5.0),
+        };
+
+        let affected = correlator.process_grb_event(grb).unwrap();
+        assert!(!affected.is_empty(), "GRB should match GW event");
+
+        let superevent = correlator.get_superevent(&affected[0]).unwrap();
+        let grb_candidate = &superevent.gamma_ray_candidates[0];
+
+        // Without skymap, spatial_offset should be populated but skymap fields should be None
+        assert!(
+            grb_candidate.spatial_offset.is_some(),
+            "Should have angular separation"
+        );
+        assert!(
+            grb_candidate.skymap_probability.is_none(),
+            "Should not have skymap probability without skymap"
+        );
+        assert!(
+            grb_candidate.in_50cr.is_none(),
+            "Should not have CR membership without skymap"
+        );
+        assert!(
+            grb_candidate.in_90cr.is_none(),
+            "Should not have CR membership without skymap"
+        );
+
+        println!(
+            "GRB correlation without skymap - angular separation: {:.2}°",
+            grb_candidate.spatial_offset.unwrap()
+        );
     }
 }

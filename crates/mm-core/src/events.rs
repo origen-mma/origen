@@ -63,7 +63,7 @@ pub struct GWEvent {
     pub instruments: Vec<String>,
     pub far: f64,
     pub position: Option<SkyPosition>,
-    // Will add skymap in Phase 2
+    pub skymap: Option<crate::ParsedSkymap>,
 }
 
 /// Gamma-ray burst event (from Swift BAT, Fermi)

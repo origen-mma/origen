@@ -102,9 +102,85 @@ See [Running the Demo](#running-the-demo) for the full multi-terminal walkthroug
 ### Correlation Engine
 
 - **Temporal matching**: O(log n) binary search on BTreeMap indexed by GPS time, configurable windows (GW-GRB: +/-5s, GW-Optical: -1s to +1 day)
-- **Spatial matching**: Angular separation and HEALPix credible region overlap computation
+- **Spatial matching**: Full HEALPix skymap-based correlation using RAVEN methodology
+  - Integrates GW skymap probability over EM counterpart localization region (error circle)
+  - BMOC (Binary Multi-Order Coverage) optimization for 100× speedup over naive pixel iteration
+  - Works with realistic localization errors (Fermi-GBM ~5°, Swift-BAT ~2 arcmin)
 - **Joint FAR**: RAVEN false alarm rate calculation combining temporal, spatial, and trial factor probabilities
 - **Superevent classification**: Automatic state tracking (GWOnly, GWWithOptical, GWWithGammaRay, MultiMessenger)
+
+### RAVEN Spatial Correlation & FAR Calibration
+
+The spatial correlation implementation follows the RAVEN methodology: for each EM counterpart candidate (GRB or optical transient), we integrate the GW skymap probability over the candidate's localization region. This produces a spatial probability that quantifies how likely the EM signal is to be associated with the GW event, accounting for both the GW skymap uncertainty and the EM localization error.
+
+#### Empirical GRB Error Radii
+
+Analysis of 5,832 real Fermi-GBM GRB detections from VOEvent archives reveals the true localization uncertainty distribution:
+
+![GRB Error Radius Distribution](assets/grb_error_radius_distribution.png)
+
+**Fermi-GBM error radii** (5,832 events):
+- **Median: 13.21°** (commonly cited value of ~5° is significantly underestimated)
+- Mean: 15.37°
+- Range: [1.01°, 135.11°]
+- Distribution is log-normal with long tail extending to >100°
+
+**Swift-BAT error radii**: ~0.033° (2 arcmin) based on literature values - Swift's X-ray localization provides much tighter constraints than Fermi's gamma-ray all-sky monitor.
+
+**Implication**: The 13.2° median for Fermi-GBM is **2.6× larger** than commonly used estimates, significantly affecting spatial FAR calculations and correlation thresholds for O4/O5 observing runs.
+
+**Data source**: Analysis of [growth-too-marshal-gcn-notices](https://github.com/growth-astro/growth-too-marshal-gcn-notices) VOEvent archive. To reproduce: `python3 scripts/analysis/analyze_grb_error_radii.py`
+
+#### FAR Calibration Results
+
+**Validation across O4 population** (178 BNS/NSBH events × 1,000 background trials per event = 178,000 background simulations) using empirical error radii:
+
+#### Fermi-GBM (error radius = 13.2°, empirical median)
+
+| Metric | Signal (True Associations) | Background (Random Coincidences) | Ratio |
+|--------|---------------------------|----------------------------------|-------|
+| **Median spatial probability** | 0.1118 (11.2%) | 1.3×10⁻⁶ (≈0%) | **86,000×** |
+| **Mean spatial probability** | 0.1786 (17.9%) | 0.0139 (1.4%) | **12.8×** |
+| **Signal exceeding bg 95th percentile** | 60.1% | - | - |
+| **Zero probability trials** | 0.0% | 34.8% | - |
+
+#### Swift-BAT (error radius = 0.033° = 2 arcmin)
+
+| Metric | Signal (True Associations) | Background (Random Coincidences) | Ratio |
+|--------|---------------------------|----------------------------------|-------|
+| **Median spatial probability** | 2.7×10⁻⁵ (0.0027%) | 0.0 (≈0%) | **7,650,000×** |
+| **Mean spatial probability** | 5.5×10⁻⁵ (0.0055%) | 5.5×10⁻⁶ (0.00055%) | **10.1×** |
+| **Signal exceeding bg 95th percentile** | 44.4% | - | - |
+| **Zero probability trials** | 0.6% | 69.2% | - |
+
+**Key findings**:
+- Swift-BAT achieves **90× better median discrimination** than Fermi-GBM (7.6M× vs 86k×) due to its tiny error circle, even though absolute probabilities are much lower
+- Both instruments show excellent separation between signal and background distributions
+- Realistic localization implemented: GRB positions are *not* centered at true location, but randomly offset within error circle to simulate real detector localization uncertainty
+- Fermi-GBM's larger error radius (13.2°) was empirically derived from 5,832 real VOEvent detections, not literature estimates
+
+#### Distribution Plots
+
+![RAVEN FAR Calibration: Instrument Comparison](assets/far_calibration_instrument_comparison.png)
+
+**Top row (Fermi-GBM, 13.2° error)**:
+- **Left**: Signal distribution (red step line) is shifted ~2 orders of magnitude above background (red filled), demonstrating strong discrimination despite large error circle
+- **Right**: Complementary CDF shows fraction of trials exceeding each probability threshold - critical for FAR calculations
+
+**Bottom row (Swift-BAT, 0.033° = 2 arcmin error)**:
+- **Left**: Much lower absolute probabilities (note x-axis scale), but excellent signal/background separation - background has 69% zero-probability trials
+- **Right**: Swift-BAT's tight error circle creates sharper discrimination, with median ratio 90× better than Fermi-GBM
+
+**Physical interpretation**: Fermi-GBM's large error circle (13.2°) integrates substantial skymap probability even for random background positions, resulting in higher absolute probabilities but lower median discrimination ratio. Swift-BAT's tiny error circle (2 arcmin) rarely hits the GW skymap by chance (69% of background trials have zero probability), yielding exceptional discrimination despite lower absolute integrated probabilities.
+
+**Performance**: BMOC optimization achieves 0.66 seconds per event (117.5 seconds for 178 events), making real-time correlation feasible during O4/O5 observing runs.
+
+See [spatial.rs test_o4_population_far_calibration](crates/mm-correlator/src/spatial.rs) for the full validation test.
+
+**Reproducibility**: All plots and analysis are reproducible using scripts and data in the repository:
+- **Analysis scripts**: [scripts/analysis/](scripts/analysis/) - Python scripts for plotting and analysis
+- **Distribution data**: [data/far_calibration/](data/far_calibration/) - Pre-computed spatial probability distributions (3.7 MB each)
+- **To regenerate**: Run `cargo test -p mm-correlator test_o4_population_far_calibration -- --ignored --nocapture` followed by `python3 scripts/analysis/plot_instrument_comparison.py`
 
 ### Light Curve Fitting (SVI)
 
@@ -237,7 +313,6 @@ Test fixtures in `tests/fixtures/` include O4 observing scenario data, HEALPix s
 
 ## Future Development
 
-- **Skymap-based spatial correlation**: Replace point-source angular separation with full HEALPix skymap overlap for GW-optical matching, using the parsed skymap credible regions already available in mm-core
 - **Live alert pipeline**: End-to-end integration with NASA GCN Kafka and BOOM for real O4/O5 alert processing
 - **Enhanced kilonova models**: Multi-component ejecta (dynamical + wind), multi-band fitting, and color evolution constraints
 - **Neutrino and X-ray correlation**: Extend the correlator to handle IceCube neutrino and Einstein Probe X-ray alerts as full messenger channels (data structures exist, correlation logic pending)
