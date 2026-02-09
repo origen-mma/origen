@@ -912,7 +912,8 @@ mod tests {
                 .collect();
             background_fars.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            println!("\n  Temporal FAR (without spatial): {:.3e} Hz ({:.4} /yr)",
+            println!(
+                "\n  Temporal FAR (without spatial): {:.3e} Hz ({:.4} /yr)",
                 temporal_far,
                 temporal_far * 365.25 * 24.0 * 3600.0
             );
@@ -929,9 +930,15 @@ mod tests {
                 );
                 println!(
                     "    95th percentile: {:.3e} Hz ({:.2} /yr)",
-                    signal_fars[(signal_fars.len() as f64 * 0.95).min(signal_fars.len() as f64 - 1.0) as usize],
-                    signal_fars[(signal_fars.len() as f64 * 0.95).min(signal_fars.len() as f64 - 1.0) as usize]
-                        * 365.25 * 24.0 * 3600.0
+                    signal_fars[(signal_fars.len() as f64 * 0.95)
+                        .min(signal_fars.len() as f64 - 1.0)
+                        as usize],
+                    signal_fars[(signal_fars.len() as f64 * 0.95)
+                        .min(signal_fars.len() as f64 - 1.0)
+                        as usize]
+                        * 365.25
+                        * 24.0
+                        * 3600.0
                 );
 
                 println!("\n  Background FAR Distribution:");
@@ -944,7 +951,9 @@ mod tests {
                     "    5th percentile (best): {:.3e} Hz ({:.2e} /yr)",
                     background_fars[(background_fars.len() as f64 * 0.05).max(0.0) as usize],
                     background_fars[(background_fars.len() as f64 * 0.05).max(0.0) as usize]
-                        * 365.25 * 24.0 * 3600.0
+                        * 365.25
+                        * 24.0
+                        * 3600.0
                 );
 
                 // KEY INSIGHT: RAVEN discrimination = FAR_background / FAR_signal
@@ -972,8 +981,12 @@ mod tests {
 
                 // Count significant coincidences
                 let far_threshold = 1.0 / (365.25 * 24.0 * 3600.0); // 1/yr in Hz
-                let n_signal_significant = signal_fars.iter().filter(|&&f| f < far_threshold).count();
-                let n_bg_significant = background_fars.iter().filter(|&&f| f < far_threshold).count();
+                let n_signal_significant =
+                    signal_fars.iter().filter(|&&f| f < far_threshold).count();
+                let n_bg_significant = background_fars
+                    .iter()
+                    .filter(|&&f| f < far_threshold)
+                    .count();
 
                 println!("\n  Significant Coincidences (FAR < 1/yr threshold):");
                 println!(
@@ -1179,6 +1192,10 @@ mod tests {
 
         let mut signal_probs = Vec::new();
         let mut background_probs = Vec::new();
+        let mut signal_in_50cr = Vec::new();
+        let mut signal_in_90cr = Vec::new();
+        let mut background_in_50cr = Vec::new();
+        let mut background_in_90cr = Vec::new();
 
         // Process each event
         for i in 0..n_events {
@@ -1217,6 +1234,17 @@ mod tests {
             let signal_prob =
                 integrate_skymap_over_circle(&kn_pos, optical_position_error_deg, &skymap);
             signal_probs.push(signal_prob);
+
+            // Also track credible region membership (more intuitive than absolute probability)
+            if i == 0 {
+                // For first event, show what CR statistics look like
+                let in_50cr = is_in_credible_region(&kn_pos, &skymap, 0.5);
+                let in_90cr = is_in_credible_region(&kn_pos, &skymap, 0.9);
+                println!(
+                    "  Event {} (example): P={:.6}, in_50CR={}, in_90CR={}",
+                    sim_id, signal_prob, in_50cr, in_90cr
+                );
+            }
 
             // BACKGROUND: Supernovae at random positions AND random times
             // Key difference from GRB: SNe occur at random times, not coincident with GW
