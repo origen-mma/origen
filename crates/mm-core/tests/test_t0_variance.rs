@@ -22,6 +22,7 @@ impl CostFunction for PsoCost {
     type Param = Vec<f64>;
     type Output = f64;
 
+    #[allow(clippy::needless_range_loop)]
     fn cost(&self, p: &Self::Param) -> Result<Self::Output, ArgminError> {
         let se_idx = self.model.sigma_extra_idx();
         let sigma_extra = p[se_idx].exp();
@@ -79,6 +80,7 @@ fn generate_synthetic_kilonova() -> (Vec<f64>, Vec<f64>, Vec<f64>, f64) {
     (obs_times, noisy_fluxes, flux_errors, true_t0)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn test_single_run(
     pso_iters: u64,
     svi_iters: usize,

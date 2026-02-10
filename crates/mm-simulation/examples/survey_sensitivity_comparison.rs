@@ -32,7 +32,7 @@ fn main() {
     );
 
     for (survey_name, limiting_mag) in surveys {
-        let config = AfterglowConfig {
+        let _config = AfterglowConfig {
             limiting_magnitude: limiting_mag,
             ..Default::default()
         };

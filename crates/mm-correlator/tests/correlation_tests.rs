@@ -139,6 +139,7 @@ fn test_skymap_resampling() {
     let npix_low = npix_high / ratio as i64;
 
     let mut probs_low = vec![0.0; npix_low as usize];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..npix_low as usize {
         let start = i * ratio;
         probs_low[i] = probs_high[start..start + ratio].iter().sum();

@@ -59,12 +59,12 @@ impl Versionable for OpticalAlertWrapper {
 
 #[derive(Debug)]
 struct Correlation {
-    gw_event: GWEvent,
-    grb_event: GRBEvent,
-    time_offset: f64,
-    gw_90cr_area: f64,
-    grb_90cr_area: f64,
-    overlap_area: f64,
+    _gw_event: GWEvent,
+    _grb_event: GRBEvent,
+    _time_offset: f64,
+    _gw_90cr_area: f64,
+    _grb_90cr_area: f64,
+    _overlap_area: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -477,6 +477,7 @@ fn resample_skymap(probs: &[f64], from_nside: i64, to_nside: i64) -> Vec<f64> {
     if from_nside > to_nside {
         let ratio = ((from_nside / to_nside).pow(2)) as usize;
         let mut resampled = vec![0.0; to_npix];
+        #[allow(clippy::needless_range_loop)]
         for i in 0..to_npix {
             let start_idx = i * ratio;
             resampled[i] = probs[start_idx..start_idx + ratio].iter().sum();

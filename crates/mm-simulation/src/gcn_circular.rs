@@ -3,7 +3,7 @@
 //! Generates realistic GCN Circulars similar to those published for real GRB detections.
 //! Format follows the standard GCN Circular format used by the community.
 
-use crate::grb_localization::{GrbInstrument, GrbLocalization};
+use crate::grb_localization::GrbLocalization;
 use crate::grb_simulation::SimulatedGrb;
 use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
@@ -58,7 +58,7 @@ statistical uncertainty of {:.1} degrees (radius, 1-sigma containment, statistic
 there is additionally a systematic error which we have characterized as a core-plus-tail
 model, with 90% of GRBs having a 3.7 deg error and a small tail ranging from 3.7-10 deg).
 
-The angle from the Fermi LAT boresight at the GBM trigger time is {} degrees.
+The angle from the Fermi LAT boresight at the GBM trigger time is {:.0} degrees.
 
 The GBM light curve shows {} with a duration (T90) of about {:.2} s
 (50-300 keV). The time-averaged spectrum from T0-{:.1}s to T0+{:.1}s is best fit by
@@ -83,7 +83,7 @@ published in the GBM GRB Catalog."#,
             ((localization.obs_ra / 15.0).fract() * 60.0) as u32,
             localization.obs_dec,
             localization.error_radius,
-            format!("{:.0}", 60.0 + (trigger_time % 60.0)), // Mock angle from boresight
+            60.0 + (trigger_time % 60.0), // Mock angle from boresight
             if grb.t90_obs.unwrap_or(0.0) < 2.0 {
                 "a single pulse"
             } else {
@@ -284,7 +284,7 @@ fn gps_to_utc(gps_time: f64) -> DateTime<Utc> {
     const LEAP_SECONDS: i64 = 18; // GPS-UTC offset (approximate)
 
     let unix_time = GPS_EPOCH + gps_time as i64 - LEAP_SECONDS;
-    DateTime::from_timestamp(unix_time, 0).unwrap_or_else(|| Utc::now())
+    DateTime::from_timestamp(unix_time, 0).unwrap_or_else(Utc::now)
 }
 
 #[cfg(test)]

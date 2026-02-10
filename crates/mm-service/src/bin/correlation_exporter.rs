@@ -10,7 +10,7 @@ use tracing::{info, warn};
 
 #[derive(Debug, Deserialize)]
 struct CorrelationMessage {
-    simulation_id: usize,
+    _simulation_id: usize,
     gw_snr: f64,
     has_grb: bool,
     has_optical: bool,

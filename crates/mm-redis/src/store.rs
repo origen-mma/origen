@@ -264,6 +264,7 @@ mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
 
+    #[allow(dead_code)]
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct TestEvent {
         pub id: u32,

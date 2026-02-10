@@ -204,8 +204,7 @@ impl BackgroundOpticalTransient {
                 let cutoff = (-ratio * ratio).exp();
 
                 // Normalize to peak magnitude
-                let flux_norm = sig5 * cooling * cutoff;
-                flux_norm
+                sig5 * cooling * cutoff
             }
             OpticalTransientType::TypeIaSN => {
                 // Arnett model for Type Ia SNe (radioactive heating + diffusion)
@@ -236,8 +235,7 @@ impl BackgroundOpticalTransient {
                 let x = phase_soft / self.timescale;
                 let trap = 1.0 - (-x * x).exp();
 
-                let flux_norm = heat * trap;
-                flux_norm
+                heat * trap
             }
         }
     }

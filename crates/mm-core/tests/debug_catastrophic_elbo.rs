@@ -35,7 +35,7 @@ fn generate_synthetic_kilonova(seed: u64) -> LightCurve {
         let flux_err = 5.0;
         let true_flux = clean_fluxes[i] * scale_factor;
         let noise = rng.gen::<f64>() * flux_err - flux_err * 0.5;
-        let measured_flux = (true_flux + noise).max(0.0).min(limiting_flux);
+        let _measured_flux = (true_flux + noise).max(0.0).min(limiting_flux);
 
         lightcurve.add_measurement(Photometry::new_upper_limit(
             mjd_offset + all_obs_times[i],

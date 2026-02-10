@@ -11,7 +11,6 @@
 //! - Resmi & Zhang 2016: Off-axis afterglow emission
 //! - Ryan et al. 2020: GRB170817A afterglow modeling
 
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
@@ -196,7 +195,7 @@ pub fn simulate_afterglow(
 
     // 5. Determine detectability by comparing to limiting magnitude
     // Fainter magnitudes = higher numbers, so detectable if mag < limiting_mag
-    let detectable = peak_mag.map_or(false, |mag| mag < config.limiting_magnitude);
+    let detectable = peak_mag.is_some_and(|mag| mag < config.limiting_magnitude);
 
     // 6. Calculate visibility fraction (what fraction of viewing angles are detectable)
     let visibility_fraction = calculate_visibility_fraction(theta_core, &config.jet_structure);
@@ -296,7 +295,7 @@ fn calculate_afterglow_peak(
     // Deceleration time (when Γ ~ 1/θ_view)
     // t_dec ~ E_iso / (n * m_p * c^3 * Γ_0^8) * (1 + z)
 
-    let mp_c3 = 1.5e33; // m_p * c^3 in CGS
+    let _mp_c3 = 1.5e33; // m_p * c^3 in CGS
     let e_iso_52 = e_iso_eff / 1e52; // Energy in units of 10^52 erg
     let n = config.circumburst_density;
 
@@ -348,7 +347,7 @@ fn calculate_afterglow_peak(
 /// # Returns
 ///
 /// Apparent AB magnitude (R-band)
-fn flux_to_magnitude(flux_norm: f64, distance_mpc: f64, circumburst_density: f64) -> f64 {
+fn flux_to_magnitude(flux_norm: f64, distance_mpc: f64, _circumburst_density: f64) -> f64 {
     // Reference: On-axis SGRB at 100 Mpc with E_iso = 1e52 erg, n = 1e-3
     // Absolute magnitude M ~ -19 → apparent magnitude m ~ 16.0 at 100 Mpc
     let flux_ref = 1.0 * (1e-3_f64).sqrt() * 1.0; // On-axis, no beaming suppression
@@ -360,9 +359,7 @@ fn flux_to_magnitude(flux_norm: f64, distance_mpc: f64, circumburst_density: f64
     // - Fainter by 5*log10(d/d_ref) due to distance (inverse square law)
     // - Correction for density (sqrt(n) dependence in flux_norm already included)
 
-    let mag = m_ref + 2.5 * (flux_ref / flux_norm).log10() + 5.0 * (distance_mpc / d_ref).log10();
-
-    mag
+    m_ref + 2.5 * (flux_ref / flux_norm).log10() + 5.0 * (distance_mpc / d_ref).log10()
 }
 
 /// Calculate what fraction of viewing angles produce detectable afterglows

@@ -62,6 +62,7 @@ impl CostFunction for PsoCost {
     type Param = Vec<f64>;
     type Output = f64;
 
+    #[allow(clippy::needless_range_loop)]
     fn cost(&self, p: &Self::Param) -> Result<Self::Output, ArgminError> {
         let se_idx = self.model.sigma_extra_idx();
         let sigma_extra = p[se_idx].exp();

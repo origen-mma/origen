@@ -98,8 +98,8 @@ async fn get_skymap(event_id: web::Path<String>, state: web::Data<ApiState>) -> 
     if let Some(ref skymap_dir) = state.skymap_dir {
         info!("Skymap directory configured: {}", skymap_dir.display());
         // Map event_id like "G1" to file "0.fits" (G1 -> 0, G2 -> 1, etc.)
-        if event_id.starts_with("G") {
-            if let Ok(num) = event_id[1..].parse::<usize>() {
+        if let Some(rest) = event_id.strip_prefix("G") {
+            if let Ok(num) = rest.parse::<usize>() {
                 let filename = format!("{}.fits", num - 1); // G1 = 0.fits
                 let filepath = skymap_dir.join(&filename);
                 info!("Attempting to read skymap from: {}", filepath.display());
@@ -166,8 +166,8 @@ async fn get_skymap_contours(
 
     // Try to load from disk if skymap_dir is configured
     if let Some(ref skymap_dir) = state.skymap_dir {
-        if event_id.starts_with("G") {
-            if let Ok(num) = event_id[1..].parse::<usize>() {
+        if let Some(rest) = event_id.strip_prefix("G") {
+            if let Ok(num) = rest.parse::<usize>() {
                 let filename = format!("{}.fits", num - 1);
                 let filepath = skymap_dir.join(&filename);
 
@@ -261,8 +261,8 @@ async fn get_skymap_moc(event_id: web::Path<String>, state: web::Data<ApiState>)
 
     // Try to load from disk if skymap_dir is configured
     if let Some(ref skymap_dir) = state.skymap_dir {
-        if event_id.starts_with("G") {
-            if let Ok(num) = event_id[1..].parse::<usize>() {
+        if let Some(rest) = event_id.strip_prefix("G") {
+            if let Ok(num) = rest.parse::<usize>() {
                 let filename = format!("{}.fits", num - 1);
                 let filepath = skymap_dir.join(&filename);
 

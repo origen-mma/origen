@@ -104,10 +104,10 @@ fn calculate_rotation_matrix(
     tgt_dec: f64,
 ) -> [[f64; 3]; 3] {
     // Convert to radians
-    let src_ra_rad = src_ra * PI / 180.0;
-    let src_dec_rad = src_dec * PI / 180.0;
-    let tgt_ra_rad = tgt_ra * PI / 180.0;
-    let tgt_dec_rad = tgt_dec * PI / 180.0;
+    let _src_ra_rad = src_ra * PI / 180.0;
+    let _src_dec_rad = src_dec * PI / 180.0;
+    let _tgt_ra_rad = tgt_ra * PI / 180.0;
+    let _tgt_dec_rad = tgt_dec * PI / 180.0;
 
     // Source and target vectors
     let src = spherical_to_cartesian(src_ra, src_dec);

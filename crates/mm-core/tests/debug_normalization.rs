@@ -24,7 +24,7 @@ fn debug_normalization() {
             svi_models::eval_model_batch(svi_models::SviModel::MetzgerKN, &test_params, &obs_times);
 
         println!("t0 = {:.1}:", test_t0);
-        for (i, (&t, &pred)) in obs_times.iter().zip(predictions.iter()).enumerate() {
+        for (&t, &pred) in obs_times.iter().zip(predictions.iter()) {
             let phase = t - test_t0;
             println!("  t={:5.1}, phase={:6.1}, model_pred={:.4}", t, phase, pred);
         }

@@ -730,6 +730,7 @@ mod tests {
             let mut background_probs = Vec::new();
 
             // Process each event
+            #[allow(clippy::needless_range_loop)]
             for i in 0..n_events {
                 let (sim_id, true_ra, true_dec) = injections[i];
                 let skymap_path = format!("{}/{}.fits", skymap_dir, sim_id);
@@ -758,7 +759,7 @@ mod tests {
                 let offset_dec = offset_angle * offset_azimuth.to_radians().sin();
 
                 let observed_ra = true_ra + offset_ra;
-                let observed_dec = (true_dec + offset_dec).max(-90.0).min(90.0); // Clamp to valid range
+                let observed_dec = (true_dec + offset_dec).clamp(-90.0, 90.0); // Clamp to valid range
 
                 let grb_observed_pos = SkyPosition::new(observed_ra, observed_dec, 0.0);
 
@@ -1198,6 +1199,7 @@ mod tests {
         let mut background_in_90cr = Vec::new();
 
         // Process each event
+        #[allow(clippy::needless_range_loop)]
         for i in 0..n_events {
             let (sim_id, true_ra, true_dec) = injections[i];
             let skymap_path = format!("{}/{}.fits", skymap_dir, sim_id);
@@ -1225,7 +1227,7 @@ mod tests {
             let offset_dec = offset_angle * offset_azimuth.to_radians().sin();
 
             let observed_ra = true_ra + offset_ra;
-            let observed_dec = (true_dec + offset_dec).max(-90.0).min(90.0);
+            let observed_dec = (true_dec + offset_dec).clamp(-90.0, 90.0);
 
             let kn_pos = SkyPosition::new(observed_ra, observed_dec, 0.0);
 
@@ -1235,16 +1237,11 @@ mod tests {
                 integrate_skymap_over_circle(&kn_pos, optical_position_error_deg, &skymap);
             signal_probs.push(signal_prob);
 
-            // Also track credible region membership (more intuitive than absolute probability)
-            if i == 0 {
-                // For first event, show what CR statistics look like
-                let in_50cr = is_in_credible_region(&kn_pos, &skymap, 0.5);
-                let in_90cr = is_in_credible_region(&kn_pos, &skymap, 0.9);
-                println!(
-                    "  Event {} (example): P={:.6}, in_50CR={}, in_90CR={}",
-                    sim_id, signal_prob, in_50cr, in_90cr
-                );
-            }
+            // Track credible region membership (more intuitive than absolute probability)
+            let kn_in_50cr = is_in_credible_region(&kn_pos, &skymap, 0.5);
+            let kn_in_90cr = is_in_credible_region(&kn_pos, &skymap, 0.9);
+            signal_in_50cr.push(kn_in_50cr);
+            signal_in_90cr.push(kn_in_90cr);
 
             // BACKGROUND: Supernovae at random positions AND random times
             // Key difference from GRB: SNe occur at random times, not coincident with GW
@@ -1263,6 +1260,12 @@ mod tests {
                 let bg_prob =
                     integrate_skymap_over_circle(&bg_pos, optical_position_error_deg, &skymap);
                 background_probs.push(bg_prob);
+
+                // Track CR membership for background too
+                let bg_in_50cr = is_in_credible_region(&bg_pos, &skymap, 0.5);
+                let bg_in_90cr = is_in_credible_region(&bg_pos, &skymap, 0.9);
+                background_in_50cr.push(bg_in_50cr);
+                background_in_90cr.push(bg_in_90cr);
             }
 
             if (i + 1) % 50 == 0 {
@@ -1317,7 +1320,7 @@ mod tests {
 
         // Write histogram data to file
         let output_path = "/tmp/far_calibration_optical.dat";
-        let mut output = File::create(&output_path).expect("Failed to create output file");
+        let mut output = File::create(output_path).expect("Failed to create output file");
         writeln!(output, "# type spatial_prob").unwrap();
         for prob in &signal_probs {
             writeln!(output, "signal {:.8}", prob).unwrap();
@@ -1361,6 +1364,74 @@ mod tests {
             n_bg_zero,
             background_probs.len(),
             100.0 * n_bg_zero as f64 / background_probs.len() as f64
+        );
+
+        // ========== CREDIBLE REGION ANALYSIS ==========
+        println!("\n========== CREDIBLE REGION MEMBERSHIP ==========");
+        println!("(More intuitive than absolute probability for tiny optical errors)");
+
+        let n_signal_in_50cr = signal_in_50cr.iter().filter(|&&x| x).count();
+        let n_signal_in_90cr = signal_in_90cr.iter().filter(|&&x| x).count();
+        let n_bg_in_50cr = background_in_50cr.iter().filter(|&&x| x).count();
+        let n_bg_in_90cr = background_in_90cr.iter().filter(|&&x| x).count();
+
+        println!("\nKilonova (Signal):");
+        println!(
+            "  In 50% CR: {} / {} ({:.1}%)",
+            n_signal_in_50cr,
+            signal_in_50cr.len(),
+            100.0 * n_signal_in_50cr as f64 / signal_in_50cr.len() as f64
+        );
+        println!(
+            "  In 90% CR: {} / {} ({:.1}%)",
+            n_signal_in_90cr,
+            signal_in_90cr.len(),
+            100.0 * n_signal_in_90cr as f64 / signal_in_90cr.len() as f64
+        );
+
+        println!("\nSupernova (Background):");
+        println!(
+            "  In 50% CR: {} / {} ({:.3}%)",
+            n_bg_in_50cr,
+            background_in_50cr.len(),
+            100.0 * n_bg_in_50cr as f64 / background_in_50cr.len() as f64
+        );
+        println!(
+            "  In 90% CR: {} / {} ({:.3}%)",
+            n_bg_in_90cr,
+            background_in_90cr.len(),
+            100.0 * n_bg_in_90cr as f64 / background_in_90cr.len() as f64
+        );
+
+        // CR-based discrimination
+        let frac_signal_50cr = n_signal_in_50cr as f64 / signal_in_50cr.len() as f64;
+        let frac_bg_50cr = n_bg_in_50cr as f64 / background_in_50cr.len() as f64;
+        let cr_discrimination = if frac_bg_50cr > 0.0 {
+            frac_signal_50cr / frac_bg_50cr
+        } else {
+            f64::INFINITY
+        };
+
+        println!("\nCredible Region Discrimination:");
+        println!(
+            "  50% CR: Signal {:.1}% vs Background {:.3}% = {:.1}× enrichment",
+            frac_signal_50cr * 100.0,
+            frac_bg_50cr * 100.0,
+            cr_discrimination
+        );
+
+        println!("\n💡 KEY INSIGHT:");
+        println!(
+            "  Absolute P_spatial values are tiny ({:.2e}) due to 2 arcsec integration radius,",
+            signal_median
+        );
+        println!(
+            "  but CR membership shows kilonovae ARE preferentially in high-probability regions!"
+        );
+        println!(
+            "  This is more intuitive: ~{:.0}% of kilonovae in 50% CR vs ~{:.1}% random SNe.",
+            frac_signal_50cr * 100.0,
+            frac_bg_50cr * 100.0
         );
 
         // Assertions

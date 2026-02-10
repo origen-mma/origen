@@ -289,7 +289,7 @@ fn dynamic_vel_fitting_radice2018(mass_1: f64, mass_2: f64, comp_1: f64, comp_2:
     let vej =
         A * mass_1 / mass_2 * (1.0 + C * comp_1) + A * mass_2 / mass_1 * (1.0 + C * comp_2) + B;
 
-    vej.max(0.0).min(0.8) // Cap at 0.8c for physical realism
+    vej.clamp(0.0, 0.8) // Cap at 0.8c for physical realism
 }
 
 /// Remnant disk mass for BNS (Kruger et al. 2020)

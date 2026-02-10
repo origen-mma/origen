@@ -1,19 +1,19 @@
-///! Stream O4 multi-messenger events to Kafka in real-time
-///!
-///! This demonstrates the full simulation pipeline:
-///! - Reads O4 GW events from injections.dat
-///! - Simulates GRB emission (beaming, jet structure)
-///! - Simulates optical afterglows and kilonovae (magnitude-based)
-///! - Publishes to Kafka topics for real-time correlation
-///! - Calculates joint FARs for multi-messenger associations
-///!
-///! Usage:
-///! ```bash
-///! cargo run --release --bin stream-o4-simulation -- \
-///!     /path/to/O4HL/bgp \
-///!     --rate 1.0 \
-///!     --max-events 100
-///! ```
+//! Stream O4 multi-messenger events to Kafka in real-time
+//!
+//! This demonstrates the full simulation pipeline:
+//! - Reads O4 GW events from injections.dat
+//! - Simulates GRB emission (beaming, jet structure)
+//! - Simulates optical afterglows and kilonovae (magnitude-based)
+//! - Publishes to Kafka topics for real-time correlation
+//! - Calculates joint FARs for multi-messenger associations
+//!
+//! Usage:
+//! ```bash
+//! cargo run --release --bin stream-o4-simulation -- \
+//!     /path/to/O4HL/bgp \
+//!     --rate 1.0 \
+//!     --max-events 100
+//! ```
 use anyhow::Result;
 use clap::Parser;
 use mm_api::client::ApiClient;
@@ -153,8 +153,8 @@ struct BackgroundRejectionStats {
 #[derive(Debug, Clone)]
 struct GrbLocalizationTemplate {
     instrument: String,
-    error_radius: f64, // degrees (90% containment)
-    trigger_id: String,
+    _error_radius: f64, // degrees (90% containment)
+    _trigger_id: String,
 }
 
 /// Load GRB VOEvent XMLs and filter out 1.0° defaults
@@ -196,8 +196,8 @@ fn load_grb_localizations(grb_xml_dir: &PathBuf) -> Result<Vec<GrbLocalizationTe
 
         localizations.push(GrbLocalizationTemplate {
             instrument: alert.instrument,
-            error_radius: alert.error_radius,
-            trigger_id: alert.trigger_id,
+            _error_radius: alert.error_radius,
+            _trigger_id: alert.trigger_id,
         });
     }
 
@@ -508,7 +508,7 @@ async fn main() -> Result<()> {
                     gpstime,
                     ra,
                     dec,
-                    gw_snr as f64,
+                    gw_snr,
                     gw_far_per_year,
                     skymap_data,
                 )

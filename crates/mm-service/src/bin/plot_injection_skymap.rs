@@ -8,7 +8,7 @@ use tracing::info;
 
 #[derive(Debug)]
 struct InjectionParams {
-    simulation_id: u32,
+    _simulation_id: u32,
     longitude: f64, // radians (RA or lambda?)
     latitude: f64,  // radians (Dec or theta?)
     distance: f64,  // Mpc
@@ -253,7 +253,7 @@ fn read_injection_params(path: &str) -> Result<Vec<InjectionParams>> {
         }
 
         injections.push(InjectionParams {
-            simulation_id: parts[0].parse()?,
+            _simulation_id: parts[0].parse()?,
             longitude: parts[1].parse()?,
             latitude: parts[2].parse()?,
             distance: parts[4].parse()?,

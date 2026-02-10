@@ -271,7 +271,7 @@ mod tests {
             ra: 180.0,
             dec: 10.0,
         }; // 10° away
-        let pos_far = SkyPosition {
+        let _pos_far = SkyPosition {
             ra: 180.0,
             dec: 60.0,
         }; // 60° away

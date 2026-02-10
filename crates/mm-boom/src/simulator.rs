@@ -51,6 +51,7 @@ impl BoomSimulator {
     }
 
     /// Get next light curve
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&LightCurve> {
         if self.current_index < self.lightcurves.len() {
             let lc = &self.lightcurves[self.current_index];

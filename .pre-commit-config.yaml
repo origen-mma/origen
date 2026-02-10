@@ -4,22 +4,14 @@ repos:
       - id: cargo-fmt
         name: cargo fmt
         description: Format files with rustfmt.
-        entry: bash -c 'cargo fmt -- --check'
-        language: rust
+        entry: cargo fmt -- --check
+        language: system
         files: \.rs$
         pass_filenames: false
       - id: cargo-clippy
         name: cargo clippy
         description: Lint files with clippy.
-        entry: bash -c 'cargo clippy --all-targets --all-features -- -D warnings'
-        language: rust
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        language: system
         files: \.rs$
         pass_filenames: false
-
-# pre-commit.ci bot configuration
-ci:
-  autofix_prs: false
-  autofix_commit_msg: |
-    '[pre-commit.ci 🤖] Apply automatic fixes'
-  # How often to send PR for updating pre-commit-config.yaml versions
-  autoupdate_schedule: quarterly

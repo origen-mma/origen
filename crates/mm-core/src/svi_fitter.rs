@@ -136,6 +136,7 @@ fn prior_params(model: SviModel) -> Vec<(f64, f64)> {
 }
 
 /// Run SVI optimization
+#[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
 pub fn svi_fit(
     model: SviModel,
     data: &BandFitData,
@@ -395,6 +396,7 @@ pub fn svi_fit(
 /// # Returns
 ///
 /// SviFitResult with parameters EXCLUDING t0 (must be inserted manually)
+#[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
 pub fn svi_fit_fixed_t0(
     model: SviModel,
     data: &BandFitData,
@@ -428,7 +430,7 @@ pub fn svi_fit_fixed_t0(
 
     let mut final_elbo = f64::NEG_INFINITY;
 
-    for step in 0..n_steps {
+    for _step in 0..n_steps {
         let mut total_elbo = 0.0;
         let mut total_grad = vec![0.0; n_variational];
 

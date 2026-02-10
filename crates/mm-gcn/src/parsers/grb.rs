@@ -59,6 +59,7 @@ pub fn parse_swift_bat(payload: &str) -> Result<Event, ParseError> {
 }
 
 /// Fermi GBM alert formats
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct FermiGbmAlert {
     #[serde(rename = "trigger_id")]

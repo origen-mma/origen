@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn test_skymap_storage_creation() {
         let temp_dir = TempDir::new().unwrap();
-        let storage = SkymapStorage::new(temp_dir.path()).unwrap();
+        let _storage = SkymapStorage::new(temp_dir.path()).unwrap();
 
         assert!(temp_dir.path().exists());
     }

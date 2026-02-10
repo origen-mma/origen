@@ -92,6 +92,7 @@ fn generate_synthetic_kilonova_plot() {
     }
 
     // Detections: realistic SNR ~ 20
+    #[allow(clippy::needless_range_loop)]
     for i in n_nondet..all_obs_times.len() {
         let flux = clean_fluxes[i] * scale_factor;
         let snr = 20.0;
@@ -107,6 +108,7 @@ fn generate_synthetic_kilonova_plot() {
 
     // Add non-detections (upper limits)
     let limiting_flux = 15.0; // Same as used in generation
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n_nondet {
         lightcurve.add_measurement(Photometry::new_upper_limit(
             mjd_offset + all_obs_times[i],

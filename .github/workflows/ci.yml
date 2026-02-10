@@ -11,8 +11,8 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  check:
-    name: Check & Lint
+  pre-commit:
+    name: Pre-commit
     runs-on: ubuntu-latest
 
     steps:
@@ -36,15 +36,15 @@ jobs:
         key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-check-
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
 
-    - name: Run clippy
-      run: cargo clippy --all-targets -- -W clippy::all
+    - uses: pre-commit/action@v3.0.1
 
   test:
     name: Test (${{ matrix.os }})
-    needs: check
+    needs: pre-commit
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -118,7 +118,7 @@ jobs:
 
   integration-test:
     name: Integration Tests (Redis)
-    needs: check
+    needs: pre-commit
     runs-on: ubuntu-latest
     services:
       redis:
@@ -159,7 +159,7 @@ jobs:
 
   docs:
     name: Documentation
-    needs: check
+    needs: pre-commit
     runs-on: ubuntu-latest
 
     steps:

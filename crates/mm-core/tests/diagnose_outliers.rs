@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 use argmin::core::{CostFunction, Error as ArgminError, Executor, State};
 use argmin::solver::particleswarm::ParticleSwarm;
 use mm_core::pso_fitter::pso_bounds;

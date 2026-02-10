@@ -198,6 +198,7 @@ pub fn extract_features_with_config(
 /// Fit a GP to light curve data and predict on a uniform grid
 ///
 /// Port of the grid search pattern from fit_nonparametric_lightcurves_sklears.rs
+#[allow(clippy::type_complexity)]
 fn fit_gp_and_predict(
     times: &[f64],
     mags: &[f64],
@@ -341,6 +342,7 @@ fn fit_gp_and_predict(
 ///
 /// Ports feature extraction from fit_nonparametric_lightcurves_sklears.rs
 /// and rate computation from lightcurve_common.rs
+#[allow(clippy::too_many_arguments)]
 fn compute_features_from_gp(
     pred_times: &[f64],
     pred_mags: &[f64],
@@ -537,7 +539,7 @@ pub fn background_rejection_score(
     features: &LightCurveFeatures,
     config: &LightCurveFilterConfig,
 ) -> f64 {
-    let mut score = 1.0;
+    let mut score: f64 = 1.0;
 
     // Rise rate check: KN rises > 1 mag/day (negative slope in magnitude = brightening)
     // In magnitude space, rising = negative slope, so we use abs()
@@ -561,7 +563,7 @@ pub fn background_rejection_score(
     }
 
     // Clamp to configured bounds
-    (score as f64).clamp(1.0 / config.max_penalty_factor, config.max_penalty_factor)
+    score.clamp(1.0 / config.max_penalty_factor, config.max_penalty_factor)
 }
 
 #[cfg(test)]

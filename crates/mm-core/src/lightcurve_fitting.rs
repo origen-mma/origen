@@ -393,17 +393,7 @@ pub fn fit_lightcurve_with_config(
     );
 
     // Create band fit data with proper upper limit handling
-    let upper_flux_norm: Vec<f64> = flux_norm
-        .iter()
-        .zip(is_upper.iter())
-        .map(|(&f, &is_up)| {
-            if is_up {
-                f // For upper limits, flux is the limiting value
-            } else {
-                f // For detections, this field is unused but set to flux
-            }
-        })
-        .collect();
+    let upper_flux_norm: Vec<f64> = flux_norm.clone();
 
     let data = BandFitData {
         times: times.clone(),
@@ -431,16 +421,17 @@ pub fn fit_lightcurve_with_config(
         flux: Vec<f64>,
         flux_err: Vec<f64>,
         model: SviModel,
-        is_upper: Vec<bool>,
-        upper_flux: Vec<f64>,
-        enable_safeguards: bool,
-        scale_clamp_range: (f64, f64),
+        _is_upper: Vec<bool>,
+        _upper_flux: Vec<f64>,
+        _enable_safeguards: bool,
+        _scale_clamp_range: (f64, f64),
     }
 
     impl CostFunction for PsoCost {
         type Param = Vec<f64>;
         type Output = f64;
 
+        #[allow(clippy::needless_range_loop)]
         fn cost(&self, p: &Self::Param) -> Result<Self::Output, argmin::core::Error> {
             let se_idx = self.model.sigma_extra_idx();
             let sigma_extra = p[se_idx].exp();
@@ -470,10 +461,10 @@ pub fn fit_lightcurve_with_config(
         flux: data.flux.clone(),
         flux_err: data.flux_err.clone(),
         model: svi_model,
-        is_upper: data.is_upper.clone(),
-        upper_flux: data.upper_flux.clone(),
-        enable_safeguards: config.enable_safeguards,
-        scale_clamp_range: config.scale_clamp_range,
+        _is_upper: data.is_upper.clone(),
+        _upper_flux: data.upper_flux.clone(),
+        _enable_safeguards: config.enable_safeguards,
+        _scale_clamp_range: config.scale_clamp_range,
     };
 
     let solver = ParticleSwarm::new((lower, upper), 40);

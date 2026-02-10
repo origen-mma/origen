@@ -4,16 +4,14 @@
 //! to create realistic multi-messenger simulations.
 
 use anyhow::{Context, Result};
-use mm_core::{Event, GWEvent, GammaRayEvent, GpsTime, ParsedSkymap, SkyPosition};
-use mm_correlator::SupereventCorrelator;
+use mm_core::{ParsedSkymap, SkyPosition};
 use rand::Rng;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
-use crate::rotation::rotate_skymap;
-use crate::voevent::{GrbAlert, VOEventParser};
+use crate::voevent::VOEventParser;
 
 /// LIGO injection parameters
 #[derive(Debug, Clone)]
@@ -161,7 +159,7 @@ impl SimulationRunner {
 
             // Parse GRB alert
             let grb_xml_content = fs::read_to_string(grb_xml_path)?;
-            let mut grb_alert = VOEventParser::parse_string(&grb_xml_content)
+            let grb_alert = VOEventParser::parse_string(&grb_xml_content)
                 .context(format!("Failed to parse GRB XML: {:?}", grb_xml_path))?;
 
             // Set random GPS time for GW event
@@ -171,7 +169,7 @@ impl SimulationRunner {
             // Set GRB time with random offset
             let time_offset =
                 rng.gen_range(-self.config.time_offset_range..self.config.time_offset_range);
-            let grb_gps_time = gw_gps_time + time_offset;
+            let _grb_gps_time = gw_gps_time + time_offset;
 
             // Load GW skymap
             let skymap_path = self

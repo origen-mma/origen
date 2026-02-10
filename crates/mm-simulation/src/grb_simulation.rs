@@ -126,7 +126,7 @@ pub struct GwEventParams {
 
 impl GwEventParams {
     /// Create from mm-core GWEvent
-    pub fn from_gw_event(event: &mm_core::events::GWEvent) -> Self {
+    pub fn from_gw_event(_event: &mm_core::events::GWEvent) -> Self {
         // Note: mm-core GWEvent might not have these fields yet
         // This is a placeholder - adjust based on actual GWEvent structure
         Self {

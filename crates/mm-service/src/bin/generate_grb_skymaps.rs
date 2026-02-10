@@ -1,7 +1,6 @@
 use anyhow::Result;
 use fitsio::tables::{ColumnDataType, ColumnDescription};
 use fitsio::FitsFile;
-use rand::seq::SliceRandom;
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

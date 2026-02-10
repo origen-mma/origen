@@ -8,8 +8,8 @@ use tracing::info;
 #[derive(Debug)]
 struct InjectionParams {
     simulation_id: u32,
-    longitude: f64, // radians
-    latitude: f64,  // radians
+    _longitude: f64, // radians
+    _latitude: f64,  // radians
 }
 
 #[derive(Debug)]
@@ -200,6 +200,7 @@ fn resample_skymap(probs: &[f64], from_nside: i64, to_nside: i64) -> Vec<f64> {
         // Downsample: sum child pixels
         let ratio = ((from_nside / to_nside).pow(2)) as usize;
         let mut resampled = vec![0.0; to_npix];
+        #[allow(clippy::needless_range_loop)]
         for i in 0..to_npix {
             let start_idx = i * ratio;
             resampled[i] = probs[start_idx..start_idx + ratio].iter().sum();
@@ -239,8 +240,8 @@ fn read_injection_params(path: &str) -> Result<Vec<InjectionParams>> {
 
         injections.push(InjectionParams {
             simulation_id: parts[0].parse()?,
-            longitude: parts[1].parse()?,
-            latitude: parts[2].parse()?,
+            _longitude: parts[1].parse()?,
+            _latitude: parts[2].parse()?,
         });
     }
 

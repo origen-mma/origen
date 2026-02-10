@@ -12,9 +12,9 @@ struct InjectionParams {
     simulation_id: u32,
     longitude: f64, // radians
     latitude: f64,  // radians
-    distance: f64,
-    mass1: f64,
-    mass2: f64,
+    _distance: f64,
+    _mass1: f64,
+    _mass2: f64,
 }
 
 #[derive(Debug)]
@@ -328,9 +328,9 @@ fn read_injection_params(path: &str) -> Result<Vec<InjectionParams>> {
             simulation_id: parts[0].parse()?,
             longitude: parts[1].parse()?,
             latitude: parts[2].parse()?,
-            distance: parts[4].parse()?,
-            mass1: parts[5].parse()?,
-            mass2: parts[6].parse()?,
+            _distance: parts[4].parse()?,
+            _mass1: parts[5].parse()?,
+            _mass2: parts[6].parse()?,
         });
     }
 

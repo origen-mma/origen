@@ -24,7 +24,6 @@
 use rand::Rng;
 use rand_distr::{Distribution, Exp, Normal, Uniform};
 use serde::{Deserialize, Serialize};
-use std::f64::consts::PI;
 
 /// Configuration for background GRB simulation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -330,9 +329,7 @@ pub fn expected_chance_coincidences(
     let p_spatial = skymap_area_deg2 / 41253.0;
 
     // Expected false associations
-    let expected_false = n_gw_events as f64 * grb_rate_per_year * p_temporal * p_spatial;
-
-    expected_false
+    n_gw_events as f64 * grb_rate_per_year * p_temporal * p_spatial
 }
 
 /// Statistics on chance coincidences between GW events and background GRBs

@@ -66,6 +66,7 @@ fn generate_synthetic_kilonova(seed: u64) -> (LightCurve, f64) {
     let n_nondet = obs_times_nondetections.len();
     let limiting_flux = 15.0;
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n_nondet {
         let flux_err = 5.0;
         let true_flux = clean_fluxes[i] * scale_factor;
@@ -75,6 +76,7 @@ fn generate_synthetic_kilonova(seed: u64) -> (LightCurve, f64) {
         all_flux_errors.push(flux_err);
     }
 
+    #[allow(clippy::needless_range_loop)]
     for i in n_nondet..all_obs_times.len() {
         let flux = clean_fluxes[i] * scale_factor;
         let snr = 20.0;
@@ -87,6 +89,7 @@ fn generate_synthetic_kilonova(seed: u64) -> (LightCurve, f64) {
     let mut lightcurve = LightCurve::new(format!("SEED_{}", seed));
     let mjd_offset = 60000.0;
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n_nondet {
         lightcurve.add_measurement(Photometry::new_upper_limit(
             mjd_offset + all_obs_times[i],

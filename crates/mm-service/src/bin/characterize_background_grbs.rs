@@ -8,7 +8,7 @@
 use anyhow::Result;
 use mm_simulation::{
     background_grbs::{
-        calculate_chance_coincidences, generate_background_grbs, BackgroundGrbConfig, GrbSatellite,
+        calculate_chance_coincidences, generate_background_grbs, BackgroundGrbConfig,
     },
     expected_chance_coincidences,
 };

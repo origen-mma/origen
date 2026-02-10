@@ -35,6 +35,7 @@ fn generate_synthetic_kilonova(seed: u64) -> (LightCurve, f64) {
     let n_nondet = obs_times_nondetections.len();
     let limiting_flux = 15.0;
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n_nondet {
         lightcurve.add_measurement(Photometry::new_upper_limit(
             mjd_offset + all_obs_times[i],

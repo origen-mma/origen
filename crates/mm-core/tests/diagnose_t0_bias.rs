@@ -124,6 +124,7 @@ fn test_configuration(
     let limiting_flux = 15.0;
 
     // Non-detections
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n_nondet {
         let flux_err = 5.0;
         let true_flux = clean_fluxes[i] * scale_factor;
@@ -134,6 +135,7 @@ fn test_configuration(
     }
 
     // Detections
+    #[allow(clippy::needless_range_loop)]
     for i in n_nondet..obs_times.len() {
         let flux = clean_fluxes[i] * scale_factor;
         let snr = 20.0;
@@ -147,6 +149,7 @@ fn test_configuration(
     let mut lightcurve = LightCurve::new(format!("TEST_{}", label));
     let mjd_offset = 60000.0;
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n_nondet {
         lightcurve.add_measurement(Photometry::new_upper_limit(
             mjd_offset + obs_times[i],

@@ -6,7 +6,7 @@ use tracing::info;
 
 #[derive(Debug)]
 struct InjectionParams {
-    simulation_id: u32,
+    _simulation_id: u32,
     longitude: f64, // radians
     latitude: f64,  // radians
     distance: f64,
@@ -16,9 +16,9 @@ struct InjectionParams {
 
 #[derive(Debug)]
 struct SimulatedGrb {
-    simulation_id: u32,
-    true_ra: f64,
-    true_dec: f64,
+    _simulation_id: u32,
+    _true_ra: f64,
+    _true_dec: f64,
     grb_ra: f64,
     grb_dec: f64,
     error_radius: f64,
@@ -198,9 +198,9 @@ fn load_simulated_grb(path: &str, simulation_id: usize) -> Result<SimulatedGrb> 
         let sim_id: u32 = parts[0].parse()?;
         if sim_id == simulation_id as u32 {
             return Ok(SimulatedGrb {
-                simulation_id: sim_id,
-                true_ra: parts[1].parse()?,
-                true_dec: parts[2].parse()?,
+                _simulation_id: sim_id,
+                _true_ra: parts[1].parse()?,
+                _true_dec: parts[2].parse()?,
                 grb_ra: parts[3].parse()?,
                 grb_dec: parts[4].parse()?,
                 error_radius: parts[5].parse()?,
@@ -232,7 +232,7 @@ fn read_injection_params(path: &str) -> Result<Vec<InjectionParams>> {
         }
 
         injections.push(InjectionParams {
-            simulation_id: parts[0].parse()?,
+            _simulation_id: parts[0].parse()?,
             longitude: parts[1].parse()?,
             latitude: parts[2].parse()?,
             distance: parts[4].parse()?,

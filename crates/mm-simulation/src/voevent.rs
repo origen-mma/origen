@@ -57,35 +57,35 @@ impl VOEventParser {
 
         let mut instrument = String::new();
         let mut trigger_id = String::new();
-        let mut trigger_time = String::new();
-        let mut ra = 0.0;
-        let mut dec = 0.0;
-        let mut error_radius = 0.0;
+        let _trigger_time = String::new();
+        let ra = 0.0;
+        let dec = 0.0;
+        let error_radius = 0.0;
         let mut healpix_url: Option<String> = None;
-        let mut packet_type: Option<String> = None;
+        let packet_type: Option<String> = None;
         let mut duration: Option<f64> = None;
         let mut spectral_class: Option<String> = None;
 
         let mut buf = Vec::new();
         let mut in_who = false;
         let mut in_what = false;
-        let mut in_where_when = false;
-        let mut in_position = false;
+        let mut _in_where_when = false;
+        let mut _in_position = false;
 
         loop {
             match xml_reader.read_event_into(&mut buf) {
                 Ok(Event::Start(ref e)) => match e.name().as_ref() {
                     b"Who" => in_who = true,
                     b"What" => in_what = true,
-                    b"WhereWhen" => in_where_when = true,
-                    b"Position2D" => in_position = true,
+                    b"WhereWhen" => _in_where_when = true,
+                    b"Position2D" => _in_position = true,
                     _ => {}
                 },
                 Ok(Event::End(ref e)) => match e.name().as_ref() {
                     b"Who" => in_who = false,
                     b"What" => in_what = false,
-                    b"WhereWhen" => in_where_when = false,
-                    b"Position2D" => in_position = false,
+                    b"WhereWhen" => _in_where_when = false,
+                    b"Position2D" => _in_position = false,
                     _ => {}
                 },
                 Ok(Event::Empty(ref e)) => {
@@ -93,16 +93,14 @@ impl VOEventParser {
                         let mut param_name = String::new();
                         let mut param_value = String::new();
 
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                let key = String::from_utf8_lossy(attr.key.as_ref());
-                                let value = String::from_utf8_lossy(&attr.value);
+                        for attr in e.attributes().flatten() {
+                            let key = String::from_utf8_lossy(attr.key.as_ref());
+                            let value = String::from_utf8_lossy(&attr.value);
 
-                                match key.as_ref() {
-                                    "name" => param_name = value.to_string(),
-                                    "value" => param_value = value.to_string(),
-                                    _ => {}
-                                }
+                            match key.as_ref() {
+                                "name" => param_name = value.to_string(),
+                                "value" => param_value = value.to_string(),
+                                _ => {}
                             }
                         }
 
@@ -144,8 +142,8 @@ impl VOEventParser {
         }
 
         // Second pass to extract position and time (nested elements)
-        let file = File::open(Path::new("dummy"))?; // Reopen not possible with this API
-                                                    // For now, use a simplified approach with string searching
+        let _file = File::open(Path::new("dummy"))?; // Reopen not possible with this API
+                                                     // For now, use a simplified approach with string searching
 
         // Return parsed alert (with default values if parsing incomplete)
         Ok(GrbAlert {

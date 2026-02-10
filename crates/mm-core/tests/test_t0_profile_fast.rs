@@ -6,6 +6,7 @@ use mm_core::{
     Photometry,
 };
 
+#[allow(clippy::needless_range_loop)]
 fn generate_synthetic_kilonova() -> (LightCurve, f64) {
     use rand::Rng;
     use rand::SeedableRng;

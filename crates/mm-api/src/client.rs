@@ -18,6 +18,7 @@ impl ApiClient {
     }
 
     /// Publish a GW event with skymap
+    #[allow(clippy::too_many_arguments)]
     pub async fn publish_gw_event(
         &self,
         event_id: &str,
@@ -59,6 +60,7 @@ impl ApiClient {
     }
 
     /// Add GRB detection to an event
+    #[allow(clippy::too_many_arguments)]
     pub async fn add_grb_detection(
         &self,
         event_id: &str,
@@ -85,6 +87,7 @@ impl ApiClient {
     }
 
     /// Add optical detection to an event
+    #[allow(clippy::too_many_arguments)]
     pub async fn add_optical_detection(
         &self,
         event_id: &str,
