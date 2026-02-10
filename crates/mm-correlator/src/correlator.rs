@@ -537,6 +537,14 @@ impl SupereventCorrelator {
             .collect()
     }
 
+    /// Get superevents that have GW+GRB correlations
+    pub fn get_gw_grb_correlations(&self) -> Vec<&MultiMessengerSuperevent> {
+        self.superevents
+            .values()
+            .filter(|s| s.gw_event.is_some() && !s.gamma_ray_candidates.is_empty())
+            .collect()
+    }
+
     /// Cleanup old superevents
     pub fn cleanup_old(&mut self) {
         let now = chrono::Utc::now().timestamp() as f64;

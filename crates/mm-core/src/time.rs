@@ -28,6 +28,15 @@ impl GpsTime {
         }
     }
 
+    /// Create from ISO 8601 datetime string (e.g. "2026-01-09T08:02:45.420Z")
+    pub fn from_iso8601(s: &str) -> Result<Self, String> {
+        let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(s)
+            .map(|d| d.with_timezone(&Utc))
+            .map_err(|e| format!("Invalid ISO 8601 datetime '{}': {}", s, e))?;
+        let unix_ts = dt.timestamp() as f64 + dt.timestamp_subsec_nanos() as f64 / 1e9;
+        Ok(Self::from_unix_timestamp(unix_ts))
+    }
+
     /// Convert to DateTime
     pub fn to_datetime(&self) -> DateTime<Utc> {
         let unix_ts = self.to_unix_timestamp();

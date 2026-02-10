@@ -94,7 +94,7 @@ pub fn parse_fermi_gbm_fin_pos(payload: &str) -> Result<Event, ParseError> {
 }
 
 /// Generic Fermi GBM parser
-fn parse_fermi_gbm(payload: &str, instrument: &str) -> Result<Event, ParseError> {
+pub fn parse_fermi_gbm(payload: &str, instrument: &str) -> Result<Event, ParseError> {
     // Try to parse as JSON
     let json: Value = serde_json::from_str(payload)
         .map_err(|e| ParseError::JsonError(format!("Failed to parse Fermi JSON: {}", e)))?;
@@ -166,6 +166,132 @@ fn parse_fermi_gbm(payload: &str, instrument: &str) -> Result<Event, ParseError>
         skymap_url,
         error_radius,
     }))
+}
+
+/// Parse Fermi GBM classic VOEvent XML alerts
+/// These come from topics like gcn.classic.voevent.FERMI_GBM_FLT_POS
+pub fn parse_fermi_voevent(payload: &str, topic: &str) -> Result<Event, ParseError> {
+    // Determine instrument suffix from topic name
+    let instrument = if topic.contains("FLT_POS") {
+        "Fermi-GBM-FLT"
+    } else if topic.contains("GND_POS") {
+        "Fermi-GBM-GND"
+    } else if topic.contains("FIN_POS") {
+        "Fermi-GBM-FIN"
+    } else if topic.contains("SUBTHRESH") {
+        "Fermi-GBM-SUBTHRESH"
+    } else {
+        "Fermi-GBM-VOEvent"
+    };
+
+    // Classic VOEvent payloads are XML. Try to extract key fields with simple string parsing.
+    // A full XML parser (quick-xml) could be added later if needed.
+
+    // Extract trigger ID from <Param name="TrigID" value="..." />
+    let trigger_id = extract_voevent_param(payload, "TrigID")
+        .or_else(|| extract_voevent_param(payload, "Trigger_Number"))
+        .unwrap_or_else(|| "unknown".to_string());
+
+    // Extract RA/Dec from <C1> and <C2> inside <Position2D>
+    // Or from Param elements
+    let ra = extract_voevent_param(payload, "RA")
+        .and_then(|s| s.parse::<f64>().ok())
+        .or_else(|| extract_voevent_c1(payload));
+    let dec = extract_voevent_param(payload, "Dec")
+        .and_then(|s| s.parse::<f64>().ok())
+        .or_else(|| extract_voevent_c2(payload));
+    let error_radius =
+        extract_voevent_param(payload, "Error2Radius").and_then(|s| s.parse::<f64>().ok());
+
+    let position = if let (Some(ra), Some(dec)) = (ra, dec) {
+        let error_arcsec = error_radius.unwrap_or(1.0) * 3600.0;
+        Some(SkyPosition::new(ra, dec, error_arcsec))
+    } else {
+        None
+    };
+
+    // Extract trigger time from ISOTime or Param
+    let trigger_time = extract_voevent_isotime(payload)
+        .and_then(|s| mm_core::GpsTime::from_iso8601(&s).ok().map(|t| t.seconds))
+        .unwrap_or(0.0);
+
+    tracing::info!(
+        "Parsed {} VOEvent: trigger_id={}, time={}, position={:?}",
+        instrument,
+        trigger_id,
+        trigger_time,
+        position
+    );
+
+    Ok(Event::GammaRay(GammaRayEvent {
+        trigger_id,
+        instrument: instrument.to_string(),
+        trigger_time,
+        position,
+        significance: 0.0,
+        skymap_url: None,
+        error_radius,
+    }))
+}
+
+/// Extract a named parameter value from VOEvent XML
+fn extract_voevent_param(xml: &str, name: &str) -> Option<String> {
+    // Match patterns like: <Param name="TrigID" value="123456" />
+    // or: <Param value="123456" name="TrigID" />
+    let name_pattern = format!("name=\"{}\"", name);
+    for line in xml.lines() {
+        let line = line.trim();
+        if line.contains(&name_pattern) && line.contains("value=\"") {
+            if let Some(start) = line.find("value=\"") {
+                let rest = &line[start + 7..];
+                if let Some(end) = rest.find('"') {
+                    return Some(rest[..end].to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Extract C1 (RA) from VOEvent Position2D
+fn extract_voevent_c1(xml: &str) -> Option<f64> {
+    extract_xml_element(xml, "C1")
+}
+
+/// Extract C2 (Dec) from VOEvent Position2D
+fn extract_voevent_c2(xml: &str) -> Option<f64> {
+    extract_xml_element(xml, "C2")
+}
+
+/// Extract ISOTime from VOEvent
+fn extract_voevent_isotime(xml: &str) -> Option<String> {
+    // Look for <ISOTime>2026-01-15T12:34:56</ISOTime>
+    if let Some(start) = xml.find("<ISOTime>") {
+        let rest = &xml[start + 9..];
+        if let Some(end) = rest.find("</ISOTime>") {
+            let time_str = rest[..end].trim().to_string();
+            // Ensure it ends with Z for RFC 3339 compliance
+            if time_str.ends_with('Z') {
+                return Some(time_str);
+            } else {
+                return Some(format!("{}Z", time_str));
+            }
+        }
+    }
+    None
+}
+
+/// Extract a simple XML element's text content and parse as f64
+fn extract_xml_element(xml: &str, tag: &str) -> Option<f64> {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    if let Some(start) = xml.find(&open) {
+        let rest = &xml[start + open.len()..];
+        if let Some(end) = rest.find(&close) {
+            return rest[..end].trim().parse::<f64>().ok();
+        }
+    }
+    None
 }
 
 #[cfg(test)]

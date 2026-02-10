@@ -102,6 +102,10 @@ path = "src/bin/stream_o4_simulation.rs"
 name = "mm_api_server"
 path = "src/bin/mm_api_server.rs"
 
+[[bin]]
+name = "gcn-correlator"
+path = "src/bin/gcn_correlator.rs"
+
 [dependencies]
 mm-core = { path = "../mm-core" }
 mm-gcn = { path = "../mm-gcn" }
