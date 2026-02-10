@@ -153,6 +153,9 @@ pub struct OpticalCandidate {
     /// GP-based light curve features (if extraction succeeded)
     pub light_curve_features: Option<mm_core::LightCurveFeatures>,
 
+    /// Early linear rate features (if computed)
+    pub early_rates: Option<mm_core::EarlyRates>,
+
     // Skymap-based spatial correlation fields
     pub skymap_probability: Option<f64>, // Probability density at position
     pub in_50cr: Option<bool>,           // Inside 50% credible region

@@ -8,6 +8,7 @@
 //! - Fast risers: > 1.0 mag/day (KN-consistent)
 //! - Slow decayers: < 0.3 mag/day (SN-like background)
 
+use crate::early_rates::EarlyRateConfig;
 use crate::lightcurve::LightCurve;
 use scirs2_core::ndarray::{Array1, Axis};
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,9 @@ pub struct LightCurveFilterConfig {
 
     /// Maximum penalty/boost factor applied to joint FAR
     pub max_penalty_factor: f64,
+
+    /// Early linear rate source selection configuration
+    pub early_rate: EarlyRateConfig,
 }
 
 impl Default for LightCurveFilterConfig {
@@ -48,6 +52,7 @@ impl Default for LightCurveFilterConfig {
             min_decay_rate: 0.3, // < 0.3 mag/day = slow fader (SN-like)
             min_detections: 3,
             max_penalty_factor: 10.0,
+            early_rate: EarlyRateConfig::default(),
         }
     }
 }

@@ -1,3 +1,4 @@
+pub mod early_rates;
 pub mod error;
 pub mod events;
 pub mod explosion_time;
@@ -19,6 +20,10 @@ pub mod svi_models;
 pub mod t0_profile;
 pub mod time;
 
+pub use early_rates::{
+    compute_early_rates, early_source_selection_score, EarlyRateConfig, EarlyRates,
+    EarlySelectionResult,
+};
 pub use error::{CoreError, ParseError};
 pub use events::{Event, EventType, GWEvent, GammaRayEvent, NeutrinoEvent, XRayEvent};
 pub use explosion_time::estimate_explosion_time;

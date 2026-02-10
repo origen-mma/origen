@@ -11,7 +11,8 @@ use crate::{
     temporal::TemporalIndex,
 };
 use mm_core::{
-    background_rejection_score, extract_features, fit_lightcurve, Event, FitModel, GWEvent,
+    background_rejection_score, compute_early_rates, early_source_selection_score,
+    extract_features, fit_lightcurve, EarlyRates, EarlySelectionResult, Event, FitModel, GWEvent,
     GammaRayEvent, LightCurve, LightCurveFeatures, SkyPosition,
 };
 use std::collections::HashMap;
@@ -190,6 +191,55 @@ impl SupereventCorrelator {
     ) -> Result<Vec<String>, CorrelatorError> {
         let mut matched_superevents = Vec::new();
 
+        // Step 0: Early linear rate source selection (fast, works with 2+ points)
+        let (early_rates_result, early_rate_multiplier) = if self.config.lc_filter.early_rate.enable
+        {
+            match compute_early_rates(lightcurve, &self.config.lc_filter.early_rate) {
+                Some(rates) => {
+                    let selection =
+                        early_source_selection_score(&rates, &self.config.lc_filter.early_rate);
+                    info!(
+                        "Early rates for {}: rise={:.3} mag/day ({} pts, {:.2}d), \
+                             decay={:.3} mag/day ({} pts, {:.2}d), band={}",
+                        lightcurve.object_id,
+                        rates.rise_rate,
+                        rates.n_rise_points,
+                        rates.rise_baseline,
+                        rates.decay_rate,
+                        rates.n_decay_points,
+                        rates.decay_baseline,
+                        rates.band,
+                    );
+                    match &selection {
+                        EarlySelectionResult::Pass { far_multiplier } => {
+                            info!(
+                                "Early rate FAR multiplier for {}: {:.3}",
+                                lightcurve.object_id, far_multiplier
+                            );
+                            let mult = *far_multiplier;
+                            (Some(rates), mult)
+                        }
+                        EarlySelectionResult::Reject { reason } => {
+                            info!(
+                                "Early rate REJECTION for {}: {}",
+                                lightcurve.object_id, reason
+                            );
+                            return Ok(Vec::new());
+                        }
+                    }
+                }
+                None => {
+                    debug!(
+                        "Could not compute early rates for {} (insufficient data)",
+                        lightcurve.object_id
+                    );
+                    (None, 1.0)
+                }
+            }
+        } else {
+            (None, 1.0)
+        };
+
         // Step 1: Extract GP-based light curve features for background rejection
         let lc_features = if self.config.lc_filter.enable {
             match extract_features(lightcurve) {
@@ -305,6 +355,7 @@ impl SupereventCorrelator {
                         // penalty > 1.0 increases FAR (background-like)
                         // penalty < 1.0 decreases FAR (KN-like, boost)
                         joint_far *= lc_penalty;
+                        joint_far *= early_rate_multiplier;
 
                         if joint_far < self.config.far_threshold {
                             let spatial_offset = if let Some(gw_pos) = gw_position.as_ref() {
@@ -329,6 +380,7 @@ impl SupereventCorrelator {
                                 significance: peak_snr,
                                 joint_far: Some(joint_far),
                                 light_curve_features: lc_features.clone(),
+                                early_rates: early_rates_result.clone(),
                                 // Skymap-based spatial correlation fields
                                 skymap_probability,
                                 in_50cr,
@@ -358,7 +410,9 @@ impl SupereventCorrelator {
                     position,
                     &mut matched_superevents,
                     lc_penalty,
+                    early_rate_multiplier,
                     &lc_features,
+                    &early_rates_result,
                 )?;
             }
             Err(e) => {
@@ -372,7 +426,9 @@ impl SupereventCorrelator {
                     position,
                     &mut matched_superevents,
                     lc_penalty,
+                    early_rate_multiplier,
                     &lc_features,
+                    &early_rates_result,
                 )?;
             }
         }
@@ -383,13 +439,16 @@ impl SupereventCorrelator {
     }
 
     /// Correlate light curve using per-measurement approach (fallback)
+    #[allow(clippy::too_many_arguments)]
     fn correlate_per_measurement(
         &mut self,
         lightcurve: &LightCurve,
         position: &SkyPosition,
         matched_superevents: &mut Vec<String>,
         lc_penalty: f64,
+        early_rate_multiplier: f64,
         lc_features: &Option<LightCurveFeatures>,
+        early_rates: &Option<EarlyRates>,
     ) -> Result<(), CorrelatorError> {
         // Original per-measurement correlation logic
         for measurement in &lightcurve.measurements {
@@ -425,6 +484,7 @@ impl SupereventCorrelator {
 
                     // Apply light curve feature-based penalty
                     joint_far *= lc_penalty;
+                    joint_far *= early_rate_multiplier;
 
                     if joint_far < self.config.far_threshold {
                         let spatial_offset = if let Some(gw_pos) = gw_position.as_ref() {
@@ -442,6 +502,7 @@ impl SupereventCorrelator {
                             significance: measurement.snr(),
                             joint_far: Some(joint_far),
                             light_curve_features: lc_features.clone(),
+                            early_rates: early_rates.clone(),
                             // Skymap-based fields (not populated in this path)
                             skymap_probability: None,
                             in_50cr: None,
