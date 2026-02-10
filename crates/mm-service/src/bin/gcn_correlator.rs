@@ -574,10 +574,8 @@ async fn main() -> Result<()> {
                                 for id in &affected_ids {
                                     if let Some(superevent) = correlator.get_superevent(id) {
                                         // Check if this superevent now has GW+GRB
-                                        if superevent.gw_event.is_some()
-                                            && !superevent.gamma_ray_candidates.is_empty()
-                                        {
-                                            let gw = superevent.gw_event.as_ref().unwrap();
+                                        if let Some(gw) = &superevent.gw_event {
+                                        if !superevent.gamma_ray_candidates.is_empty() {
                                             for grb in &superevent.gamma_ray_candidates {
                                                 let record = CorrelationRecord {
                                                     superevent_id: superevent.id.clone(),
@@ -608,6 +606,7 @@ async fn main() -> Result<()> {
                                                     correlation_records.push(record);
                                                 }
                                             }
+                                        }
                                         }
                                     }
                                 }
