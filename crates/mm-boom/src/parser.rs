@@ -1,7 +1,6 @@
 use apache_avro::Reader;
 use mm_core::{LightCurve, Photometry, SkyPosition};
 use std::error::Error;
-use tracing::debug;
 
 /// Parse BOOM alert from Avro payload
 pub fn parse_boom_alert(payload: &[u8]) -> Result<BoomAlert, Box<dyn Error>> {
@@ -17,6 +16,35 @@ pub fn parse_boom_alert(payload: &[u8]) -> Result<BoomAlert, Box<dyn Error>> {
     }
 
     Err("No valid Avro record found".into())
+}
+
+/// Unwrap an Avro Union value to its inner value
+fn unwrap_union(value: apache_avro::types::Value) -> apache_avro::types::Value {
+    if let apache_avro::types::Value::Union(_, boxed) = value {
+        *boxed
+    } else {
+        value
+    }
+}
+
+/// Extract f64 from a Value (handles Double, Float, and Union-wrapped variants)
+fn extract_f64(value: apache_avro::types::Value) -> Option<f64> {
+    let value = unwrap_union(value);
+    match value {
+        apache_avro::types::Value::Double(d) => Some(d),
+        apache_avro::types::Value::Float(f) => Some(f as f64),
+        _ => None,
+    }
+}
+
+/// Extract f32 from a Value (handles Float, Double, and Union-wrapped variants)
+fn extract_f32(value: apache_avro::types::Value) -> Option<f32> {
+    let value = unwrap_union(value);
+    match value {
+        apache_avro::types::Value::Float(f) => Some(f),
+        apache_avro::types::Value::Double(d) => Some(d as f32),
+        _ => None,
+    }
 }
 
 fn parse_avro_record(
@@ -48,54 +76,66 @@ fn parse_avro_record(
                     candid = Some(l);
                 }
             }
-            "ra" => {
-                if let Value::Double(d) = value {
-                    ra = Some(d);
+            // BOOM schema nests candidate fields inside a "candidate" sub-record
+            "candidate" => {
+                let inner = unwrap_union(value);
+                if let Value::Record(candidate_fields) = inner {
+                    for (cname, cvalue) in candidate_fields {
+                        match cname.as_str() {
+                            "ra" => ra = extract_f64(cvalue),
+                            "dec" => dec = extract_f64(cvalue),
+                            "jd" => jd = extract_f64(cvalue),
+                            "magpsf" => magpsf = extract_f32(cvalue),
+                            "sigmapsf" => sigmapsf = extract_f32(cvalue),
+                            "fid" => {
+                                let v = unwrap_union(cvalue);
+                                if let Value::Int(i) = v {
+                                    fid = Some(i);
+                                }
+                            }
+                            "drb" => drb = extract_f32(cvalue),
+                            "band" => {
+                                // Some schemas use "band" string instead of "fid"
+                                let v = unwrap_union(cvalue);
+                                if let Value::String(s) = v {
+                                    if fid.is_none() {
+                                        fid = Some(band_to_fid(&s));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
-            "dec" => {
-                if let Value::Double(d) = value {
-                    dec = Some(d);
-                }
-            }
-            "jd" => {
-                if let Value::Double(d) = value {
-                    jd = Some(d);
-                }
-            }
-            "magpsf" => {
-                if let Value::Float(f) = value {
-                    magpsf = Some(f);
-                }
-            }
-            "sigmapsf" => {
-                if let Value::Float(f) = value {
-                    sigmapsf = Some(f);
-                }
-            }
+            // Also accept flat fields for backwards compatibility
+            "ra" => ra = ra.or(extract_f64(value)),
+            "dec" => dec = dec.or(extract_f64(value)),
+            "jd" => jd = jd.or(extract_f64(value)),
+            "magpsf" => magpsf = magpsf.or(extract_f32(value)),
+            "sigmapsf" => sigmapsf = sigmapsf.or(extract_f32(value)),
             "fid" => {
-                if let Value::Int(i) = value {
-                    fid = Some(i);
+                if fid.is_none() {
+                    let v = unwrap_union(value);
+                    if let Value::Int(i) = v {
+                        fid = Some(i);
+                    }
                 }
             }
-            "drb" => {
-                if let Value::Float(f) = value {
-                    drb = Some(f);
-                }
-            }
+            "drb" => drb = drb.or(extract_f32(value)),
             "prv_candidates" => {
-                if let Value::Array(arr) = value {
+                let inner = unwrap_union(value);
+                if let Value::Array(arr) = inner {
                     photometry = parse_photometry_array(arr);
                 }
             }
-            "classifications" => {
-                if let Value::Record(class_fields) = value {
+            "classifications" | "properties" => {
+                let inner = unwrap_union(value);
+                if let Value::Record(class_fields) = inner {
                     classifications = parse_classifications(class_fields);
                 }
             }
-            _ => {
-                debug!("Ignoring field: {}", name);
-            }
+            _ => {}
         }
     }
 
@@ -120,6 +160,7 @@ fn parse_photometry_array(arr: Vec<apache_avro::types::Value>) -> Vec<Photometry
     let mut result = Vec::new();
 
     for item in arr {
+        let item = unwrap_union(item);
         if let Value::Record(fields) = item {
             let mut jd: Option<f64> = None;
             let mut magpsf: Option<f32> = None;
@@ -128,44 +169,34 @@ fn parse_photometry_array(arr: Vec<apache_avro::types::Value>) -> Vec<Photometry
 
             for (name, value) in fields {
                 match name.as_str() {
-                    "jd" => {
-                        if let Value::Double(d) = value {
-                            jd = Some(d);
-                        }
-                    }
-                    "magpsf" => {
-                        if let Value::Float(f) = value {
-                            magpsf = Some(f);
-                        } else if let Value::Union(_idx, boxed) = value {
-                            if let Value::Float(f) = *boxed {
-                                magpsf = Some(f);
-                            }
-                        }
-                    }
-                    "sigmapsf" => {
-                        if let Value::Float(f) = value {
-                            sigmapsf = Some(f);
-                        } else if let Value::Union(_idx, boxed) = value {
-                            if let Value::Float(f) = *boxed {
-                                sigmapsf = Some(f);
-                            }
-                        }
-                    }
+                    "jd" => jd = extract_f64(value),
+                    "magpsf" => magpsf = extract_f32(value),
+                    "sigmapsf" => sigmapsf = extract_f32(value),
                     "fid" => {
-                        if let Value::Int(i) = value {
+                        let v = unwrap_union(value);
+                        if let Value::Int(i) = v {
                             fid = Some(i);
+                        }
+                    }
+                    "band" => {
+                        // BOOM prv_candidates use "band" string (e.g. "g", "r", "i")
+                        let v = unwrap_union(value);
+                        if let Value::String(s) = v {
+                            if fid.is_none() {
+                                fid = Some(band_to_fid(&s));
+                            }
                         }
                     }
                     _ => {}
                 }
             }
 
-            if let (Some(jd), Some(fid)) = (jd, fid) {
+            if let Some(jd) = jd {
                 result.push(PhotometryData {
                     jd,
                     magpsf,
                     sigmapsf,
-                    fid,
+                    fid: fid.unwrap_or(1),
                 });
             }
         }
@@ -180,6 +211,7 @@ fn parse_classifications(fields: Vec<(String, apache_avro::types::Value)>) -> Ve
     let mut result = Vec::new();
 
     for (classifier, value) in fields {
+        let value = unwrap_union(value);
         if let Value::Float(score) = value {
             result.push(Classification {
                 classifier,
@@ -191,6 +223,16 @@ fn parse_classifications(fields: Vec<(String, apache_avro::types::Value)>) -> Ve
     }
 
     result
+}
+
+/// Convert band name to ZTF filter ID
+fn band_to_fid(band: &str) -> i32 {
+    match band {
+        "g" => 1,
+        "r" => 2,
+        "i" => 3,
+        _ => 0,
+    }
 }
 
 /// BOOM alert structure

@@ -1,8 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
+use mm_boom::parse_boom_alert;
 use mm_config::Config;
+use mm_core::lightcurve_fitting::gps_to_mjd;
+use mm_core::{io::load_lightcurves_dir, LightCurve, MockSkymap, Photometry, SkyPosition};
 use mm_correlator::{CorrelatorConfig, SupereventCorrelator};
 use mm_gcn::AlertRouter;
+use rand::SeedableRng;
 use rdkafka::{
     client::{ClientContext, OAuthToken},
     config::RDKafkaLogLevel,
@@ -13,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::error::Error;
 use std::time::{Duration, Instant};
-use tracing::{error, info, warn};
+use tokio::sync::mpsc;
+use tracing::{debug, error, info, warn};
 
 /// Custom Kafka context that handles OAUTHBEARER token refresh for GCN.
 ///
@@ -112,6 +117,19 @@ struct Cli {
     /// List available topics from the broker and exit
     #[arg(long)]
     list_topics: bool,
+
+    /// Also consume BOOM optical transient alerts from kaboom.caltech.edu
+    #[arg(long)]
+    boom: bool,
+
+    /// Use simulated optical light curves from CSV directory instead of BOOM
+    /// (loads ZTF CSV files and time-shifts them to match GW events)
+    #[arg(long)]
+    simulate: bool,
+
+    /// Maximum number of simulated light curves to inject per GW event (default: all)
+    #[arg(long)]
+    max_sim: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -119,6 +137,7 @@ struct RunOutput {
     run_config: RunConfig,
     stats: RunStats,
     correlations: Vec<CorrelationRecord>,
+    optical_correlations: Vec<OpticalCorrelationRecord>,
 }
 
 #[derive(Serialize)]
@@ -132,9 +151,11 @@ struct RunConfig {
 struct RunStats {
     gw_events: usize,
     grb_events: usize,
+    optical_events: usize,
     other_events: usize,
     parse_errors: usize,
     correlations: usize,
+    optical_correlations: usize,
     runtime_s: f64,
 }
 
@@ -145,6 +166,17 @@ struct CorrelationRecord {
     gw_gps_time: f64,
     grb_trigger_id: String,
     grb_instrument: String,
+    time_offset_s: f64,
+    spatial_offset_deg: Option<f64>,
+    skymap_probability: Option<f64>,
+    in_90cr: Option<bool>,
+}
+
+#[derive(Serialize, Clone)]
+struct OpticalCorrelationRecord {
+    superevent_id: String,
+    gw_superevent_id: String,
+    object_id: String,
     time_offset_s: f64,
     spatial_offset_deg: Option<f64>,
     skymap_probability: Option<f64>,
@@ -309,14 +341,141 @@ async fn main() -> Result<()> {
     let topic_refs: Vec<&str> = topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topic_refs)?;
 
-    info!("Subscribed to {} topics:", topics.len());
+    info!("Subscribed to {} GCN topics:", topics.len());
     for t in &topics {
         info!("  - {}", t);
     }
     info!("Waiting for alerts (first heartbeat confirms connectivity)...");
 
+    // Validate --boom and --simulate are mutually exclusive
+    if cli.boom && cli.simulate {
+        anyhow::bail!("Cannot use --boom and --simulate together. Choose one optical source.");
+    }
+
+    // Load simulated light curves if --simulate is set
+    let simulated_lightcurves: Vec<LightCurve> = if cli.simulate {
+        let csv_dir = &app_config.simulation.ztf_csv_dir;
+        info!("=== Simulation Mode ===");
+        info!("Loading ZTF light curves from: {}", csv_dir);
+
+        let lcs = load_lightcurves_dir(csv_dir)
+            .map_err(|e| anyhow::anyhow!("Failed to load light curves from {}: {}", csv_dir, e))?;
+
+        info!(
+            "Loaded {} simulated light curves for injection after GW events",
+            lcs.len()
+        );
+        lcs
+    } else {
+        Vec::new()
+    };
+
+    // Set up BOOM optical transient consumer if requested
+    let (boom_tx, mut boom_rx) = mpsc::channel::<(LightCurve, SkyPosition, String)>(1000);
+
+    if cli.boom {
+        info!("=== BOOM Optical Transient Consumer ===");
+
+        // BOOM broker ACLs require group_id to be prefixed with the SASL username
+        let boom_group_id = format!("{}-gcn-correlator", app_config.boom.sasl_username);
+
+        let boom_topics = app_config.boom.topics.clone();
+        info!(
+            "BOOM broker: {} (group: {})",
+            app_config.boom.bootstrap_servers, boom_group_id
+        );
+
+        let boom_consumer: StreamConsumer = ClientConfig::new()
+            .set("bootstrap.servers", &app_config.boom.bootstrap_servers)
+            .set("security.protocol", "SASL_PLAINTEXT")
+            .set("sasl.mechanisms", "SCRAM-SHA-512")
+            .set("sasl.username", &app_config.boom.sasl_username)
+            .set("sasl.password", &app_config.boom.sasl_password)
+            .set("group.id", &boom_group_id)
+            .set("enable.auto.commit", "false")
+            .set(
+                "auto.offset.reset",
+                if cli.from_beginning {
+                    "earliest"
+                } else {
+                    "latest"
+                },
+            )
+            .set("session.timeout.ms", "45000")
+            .set_log_level(if cli.verbose {
+                RDKafkaLogLevel::Debug
+            } else {
+                RDKafkaLogLevel::Warning
+            })
+            .create()?;
+
+        let boom_topic_refs: Vec<&str> = boom_topics.iter().map(|s| s.as_str()).collect();
+        boom_consumer.subscribe(&boom_topic_refs)?;
+
+        info!("Subscribed to {} BOOM topics:", boom_topics.len());
+        for t in &boom_topics {
+            info!("  - {}", t);
+        }
+
+        // Spawn BOOM consumer task
+        let verbose = cli.verbose;
+        tokio::spawn(async move {
+            let mut boom_count: usize = 0;
+            let mut boom_errors: usize = 0;
+            loop {
+                match boom_consumer.recv().await {
+                    Ok(msg) => {
+                        if let Some(payload) = msg.payload() {
+                            // Parse in a block so the non-Send Result doesn't span the await
+                            let parsed = parse_boom_alert(payload)
+                                .map(|alert| {
+                                    let object_id = alert.object_id.clone();
+                                    let lc = alert.to_lightcurve();
+                                    let pos = alert.position();
+                                    (lc, pos, object_id)
+                                })
+                                .map_err(|e| e.to_string());
+
+                            match parsed {
+                                Ok(data) => {
+                                    boom_count += 1;
+
+                                    if verbose && boom_count % 1000 == 0 {
+                                        debug!(
+                                            "BOOM progress: {} alerts parsed, {} errors",
+                                            boom_count, boom_errors
+                                        );
+                                    }
+
+                                    if boom_tx.send(data).await.is_err() {
+                                        // Receiver dropped, exit
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    boom_errors += 1;
+                                    if verbose && boom_errors <= 5 {
+                                        debug!("BOOM parse error: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("BOOM Kafka error: {}", e);
+                    }
+                }
+            }
+            info!(
+                "BOOM consumer task exiting: {} alerts, {} errors",
+                boom_count, boom_errors
+            );
+        });
+    }
+
     // Initialize correlator and router
-    let correlator_config = CorrelatorConfig::default();
+    // Disable expensive GP-based light curve fitting; keep fast early linear rates
+    let correlator_config = CorrelatorConfig::without_lc_filter();
     let mut correlator = SupereventCorrelator::new(correlator_config);
     let router = AlertRouter::new();
 
@@ -324,10 +483,12 @@ async fn main() -> Result<()> {
     let start = Instant::now();
     let mut gw_count: usize = 0;
     let mut grb_count: usize = 0;
+    let mut optical_count: usize = 0;
     let mut other_count: usize = 0;
     let mut parse_errors: usize = 0;
     let mut total_messages: usize = 0;
     let mut correlation_records: Vec<CorrelationRecord> = Vec::new();
+    let mut optical_correlation_records: Vec<OpticalCorrelationRecord> = Vec::new();
 
     // Duration timer
     let deadline = cli
@@ -377,18 +538,19 @@ async fn main() -> Result<()> {
                             }
                         };
 
-                        // Track event type
+                        // Track event type and extract GW info for simulation
                         let event_type = event.event_type();
+                        let mut gw_info_for_sim: Option<(f64, Option<SkyPosition>)> = None;
                         match event_type {
                             mm_core::EventType::GravitationalWave => {
                                 gw_count += 1;
-                                if let Some(ts) = event.timestamp() {
-                                    info!("GW event: {} (GPS {:.2})",
-                                        if let mm_core::Event::GravitationalWave(ref gw) = event {
-                                            &gw.superevent_id
-                                        } else { "?" },
-                                        ts
-                                    );
+                                if let mm_core::Event::GravitationalWave(ref gw) = event {
+                                    let ts = gw.gps_time.seconds;
+                                    info!("GW event: {} (GPS {:.2})", gw.superevent_id, ts);
+                                    // Save GW info for simulation injection
+                                    if cli.simulate {
+                                        gw_info_for_sim = Some((ts, gw.position.clone()));
+                                    }
                                 }
                             }
                             mm_core::EventType::GammaRay => {
@@ -437,7 +599,7 @@ async fn main() -> Result<()> {
 
                                                 if is_new {
                                                     info!(
-                                                        "CORRELATION: {} + {} (dt={:.2}s, spatial={:?}deg)",
+                                                        "GW+GRB CORRELATION: {} + {} (dt={:.2}s, spatial={:?}deg)",
                                                         record.gw_superevent_id,
                                                         record.grb_trigger_id,
                                                         record.time_offset_s,
@@ -455,15 +617,221 @@ async fn main() -> Result<()> {
                             }
                         }
 
+                        // Inject simulated light curves after GW event
+                        if let Some((gw_gps_time, gw_position)) = gw_info_for_sim {
+                            let gw_mjd = gps_to_mjd(gw_gps_time);
+                            let n_available = simulated_lightcurves.len();
+                            let n_sim = cli.max_sim.unwrap_or(n_available).min(n_available);
+
+                            // Create MockSkymap centered on GW position for position sampling
+                            let skymap = if let Some(ref pos) = gw_position {
+                                MockSkymap::typical_ns_merger(pos.ra, pos.dec)
+                            } else {
+                                // No position info: use wide skymap at a default location
+                                MockSkymap::poor_localization(180.0, 0.0)
+                            };
+
+                            let mut sim_rng = rand::rngs::StdRng::seed_from_u64(42);
+                            let mut sim_injected = 0;
+                            let mut sim_correlated = 0;
+
+                            info!(
+                                "Injecting {} simulated light curves for GW at GPS {:.2} (MJD {:.2})",
+                                n_sim, gw_gps_time, gw_mjd
+                            );
+
+                            for orig_lc in simulated_lightcurves.iter().take(n_sim) {
+                                if orig_lc.measurements.is_empty() {
+                                    continue;
+                                }
+
+                                // Time-shift: align first detection to gw_mjd + 0.5 days
+                                // The fitter will estimate t0 ≈ first_detection - ~1 day ≈ gw_mjd - 0.5
+                                // which falls within the correlator's temporal window
+                                let first_mjd = orig_lc.measurements.iter()
+                                    .map(|m| m.mjd)
+                                    .fold(f64::INFINITY, f64::min);
+                                let mjd_shift = (gw_mjd + 0.5) - first_mjd;
+
+                                let mut shifted_lc = LightCurve::new(
+                                    format!("SIM_{}", orig_lc.object_id)
+                                );
+                                for m in &orig_lc.measurements {
+                                    shifted_lc.add_measurement(Photometry {
+                                        mjd: m.mjd + mjd_shift,
+                                        flux: m.flux,
+                                        flux_err: m.flux_err,
+                                        filter: m.filter.clone(),
+                                        is_upper_limit: m.is_upper_limit,
+                                    });
+                                }
+
+                                // Sample position from GW skymap
+                                let sim_pos = skymap.sample_position(&mut sim_rng);
+
+                                // Feed into correlator
+                                match correlator.process_optical_lightcurve(&shifted_lc, &sim_pos) {
+                                    Ok(matched_ids) => {
+                                        for id in &matched_ids {
+                                            if let Some(superevent) = correlator.get_superevent(id) {
+                                                if let Some(gw) = &superevent.gw_event {
+                                                    for opt in &superevent.optical_candidates {
+                                                        if opt.object_id == shifted_lc.object_id {
+                                                            let record = OpticalCorrelationRecord {
+                                                                superevent_id: superevent.id.clone(),
+                                                                gw_superevent_id: gw.superevent_id.clone(),
+                                                                object_id: shifted_lc.object_id.clone(),
+                                                                time_offset_s: opt.time_offset,
+                                                                spatial_offset_deg: Some(opt.spatial_offset),
+                                                                skymap_probability: opt.skymap_probability,
+                                                                in_90cr: opt.in_90cr,
+                                                            };
+
+                                                            let is_new = !optical_correlation_records.iter().any(|r| {
+                                                                r.gw_superevent_id == record.gw_superevent_id
+                                                                    && r.object_id == record.object_id
+                                                            });
+
+                                                            if is_new {
+                                                                sim_correlated += 1;
+                                                                info!(
+                                                                    "GW+SIM CORRELATION: {} + {} (dt={:.2}s, sep={:?}deg, skymap_prob={:?}, in_90cr={:?})",
+                                                                    record.gw_superevent_id,
+                                                                    record.object_id,
+                                                                    record.time_offset_s,
+                                                                    record.spatial_offset_deg,
+                                                                    record.skymap_probability,
+                                                                    record.in_90cr,
+                                                                );
+                                                                optical_correlation_records.push(record);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        if cli.verbose && sim_injected < 5 {
+                                            debug!("Sim correlator error for {}: {}", shifted_lc.object_id, e);
+                                        }
+                                    }
+                                }
+
+                                sim_injected += 1;
+                                optical_count += 1;
+
+                                if sim_injected % 100 == 0 {
+                                    info!(
+                                        "Simulation progress: {}/{} injected, {} correlated | {:.0}s",
+                                        sim_injected, n_sim, sim_correlated,
+                                        start.elapsed().as_secs_f64()
+                                    );
+                                }
+                            }
+
+                            info!(
+                                "Simulation injection complete: {}/{} injected, {} GW+optical correlations",
+                                sim_injected, n_sim, sim_correlated
+                            );
+                        }
+
                         // Periodic stats
                         if total_messages % 100 == 0 {
                             info!(
-                                "Progress: {} msgs ({} GW, {} GRB, {} other, {} errors) | {} correlations | {:.0}s elapsed",
-                                total_messages, gw_count, grb_count, other_count, parse_errors,
-                                correlation_records.len(),
+                                "Progress: {} msgs ({} GW, {} GRB, {} optical, {} other, {} errors) | {} corr | {:.0}s",
+                                total_messages, gw_count, grb_count, optical_count, other_count, parse_errors,
+                                correlation_records.len() + optical_correlation_records.len(),
                                 start.elapsed().as_secs_f64()
                             );
                         }
+                    }
+                }
+            }
+            // Receive parsed BOOM optical alerts from the background task
+            boom_msg = boom_rx.recv() => {
+                match boom_msg {
+                    Some((lc, pos, object_id)) => {
+                        optical_count += 1;
+                        total_messages += 1;
+
+                        if cli.verbose && optical_count <= 5 {
+                            info!("Optical alert: {} (RA={:.4}, Dec={:.4}, {} measurements)",
+                                object_id, pos.ra, pos.dec, lc.measurements.len());
+                        }
+
+                        // Skip heavy correlator processing if no GW events exist yet
+                        // (avoids expensive GP fitting with zero chance of correlation)
+                        if gw_count == 0 {
+                            if optical_count % 1000 == 0 {
+                                info!(
+                                    "BOOM progress: {} optical alerts (skipping correlation, no GW events yet) | {:.0}s",
+                                    optical_count, start.elapsed().as_secs_f64()
+                                );
+                            }
+                            continue;
+                        }
+
+                        // Feed into correlator
+                        match correlator.process_optical_lightcurve(&lc, &pos) {
+                            Ok(matched_ids) => {
+                                for id in &matched_ids {
+                                    if let Some(superevent) = correlator.get_superevent(id) {
+                                        if let Some(gw) = &superevent.gw_event {
+                                            for opt in &superevent.optical_candidates {
+                                                if opt.object_id == object_id {
+                                                    let record = OpticalCorrelationRecord {
+                                                        superevent_id: superevent.id.clone(),
+                                                        gw_superevent_id: gw.superevent_id.clone(),
+                                                        object_id: object_id.clone(),
+                                                        time_offset_s: opt.time_offset,
+                                                        spatial_offset_deg: Some(opt.spatial_offset),
+                                                        skymap_probability: opt.skymap_probability,
+                                                        in_90cr: opt.in_90cr,
+                                                    };
+
+                                                    let is_new = !optical_correlation_records.iter().any(|r| {
+                                                        r.gw_superevent_id == record.gw_superevent_id
+                                                            && r.object_id == record.object_id
+                                                    });
+
+                                                    if is_new {
+                                                        info!(
+                                                            "GW+OPTICAL CORRELATION: {} + {} (dt={:.2}s, skymap_prob={:?}, in_90cr={:?})",
+                                                            record.gw_superevent_id,
+                                                            record.object_id,
+                                                            record.time_offset_s,
+                                                            record.skymap_probability,
+                                                            record.in_90cr,
+                                                        );
+                                                        optical_correlation_records.push(record);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                if cli.verbose {
+                                    debug!("Optical correlator error for {}: {}", object_id, e);
+                                }
+                            }
+                        }
+
+                        // Periodic optical stats
+                        if optical_count % 1000 == 0 {
+                            info!(
+                                "BOOM progress: {} optical alerts | {} GW+optical correlations | {:.0}s",
+                                optical_count,
+                                optical_correlation_records.len(),
+                                start.elapsed().as_secs_f64()
+                            );
+                        }
+                    }
+                    None => {
+                        // Channel closed, BOOM task exited
+                        info!("BOOM consumer channel closed");
                     }
                 }
             }
@@ -487,21 +855,36 @@ async fn main() -> Result<()> {
     let runtime = start.elapsed().as_secs_f64();
     info!("========================================");
     info!("Run complete ({:.1}s)", runtime);
-    info!("  GW events:     {}", gw_count);
-    info!("  GRB events:    {}", grb_count);
-    info!("  Other events:  {}", other_count);
-    info!("  Parse errors:  {}", parse_errors);
-    info!("  Correlations:  {}", correlation_records.len());
+    info!("  GW events:       {}", gw_count);
+    info!("  GRB events:      {}", grb_count);
+    info!("  Optical events:  {}", optical_count);
+    info!("  Other events:    {}", other_count);
+    info!("  Parse errors:    {}", parse_errors);
+    info!("  GW+GRB corr:    {}", correlation_records.len());
+    info!("  GW+Optical corr: {}", optical_correlation_records.len());
 
-    // List all correlations
+    // List all GW+GRB correlations
     for (i, record) in correlation_records.iter().enumerate() {
         info!(
-            "  [{}] {} + {} | dt={:.2}s | spatial={:?}deg | skymap_prob={:?} | in_90cr={:?}",
+            "  [GRB {}] {} + {} | dt={:.2}s | spatial={:?}deg | skymap_prob={:?} | in_90cr={:?}",
             i + 1,
             record.gw_superevent_id,
             record.grb_trigger_id,
             record.time_offset_s,
             record.spatial_offset_deg,
+            record.skymap_probability,
+            record.in_90cr,
+        );
+    }
+
+    // List all GW+Optical correlations
+    for (i, record) in optical_correlation_records.iter().enumerate() {
+        info!(
+            "  [OPT {}] {} + {} | dt={:.2}s | skymap_prob={:?} | in_90cr={:?}",
+            i + 1,
+            record.gw_superevent_id,
+            record.object_id,
+            record.time_offset_s,
             record.skymap_probability,
             record.in_90cr,
         );
@@ -524,12 +907,15 @@ async fn main() -> Result<()> {
             stats: RunStats {
                 gw_events: gw_count,
                 grb_events: grb_count,
+                optical_events: optical_count,
                 other_events: other_count,
                 parse_errors,
                 correlations: correlation_records.len(),
+                optical_correlations: optical_correlation_records.len(),
                 runtime_s: runtime,
             },
             correlations: correlation_records,
+            optical_correlations: optical_correlation_records,
         };
 
         let json = serde_json::to_string_pretty(&output)?;
