@@ -303,8 +303,8 @@ ova Detection Efficiency:"
 
     let mut output = File::create("/tmp/t0_validation.dat").expect("Failed to create file");
     writeln!(output, "# transient_type t0_error t0_uncertainty").unwrap();
-    for err in &kn_t0_errors {
-        writeln!(output, "kilonova {:.6} {:.6}", err, kn_median_unc).unwrap();
+    for (err, unc) in kn_t0_errors.iter().zip(kn_t0_uncertainties.iter()) {
+        writeln!(output, "kilonova {:.6} {:.6}", err, unc).unwrap();
     }
     for (err, unc) in sn_t0_errors.iter().zip(sn_t0_uncertainties.iter()) {
         writeln!(output, "supernova {:.6} {:.6}", err, unc).unwrap();
