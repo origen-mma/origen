@@ -83,11 +83,24 @@ impl ManualAdam {
     }
 }
 
+/// Sigma inflation factor to calibrate mean-field VI posteriors.
+///
+/// Mean-field Gaussian VI systematically underestimates posterior variance
+/// because it cannot capture parameter correlations. This constant inflates
+/// the variational sigma by a fixed factor, calibrated via P-P plots on
+/// synthetic lightcurves.
+///
+/// Calibration source: ZTF lightcurve-fitting pipeline, calibrated from
+/// Bazin, Villar, Tde, Arnett, Magnetar, ShockCooling, Afterglow P-P plots
+/// (excluding t0 which has fundamental multi-modality issues).
+/// At 4.0x: median MAD*1.48 = 0.904 (slightly conservative).
+const SIGMA_INFLATION_FACTOR: f64 = 4.0;
+
 /// SVI fit result
 pub struct SviFitResult {
     pub model: SviModel,
     pub mu: Vec<f64>,        // Variational means (unconstrained space)
-    pub log_sigma: Vec<f64>, // Log of variational stds
+    pub log_sigma: Vec<f64>, // Log of variational stds (inflation-calibrated)
     pub elbo: f64,           // Final ELBO estimate
 }
 
@@ -379,10 +392,17 @@ pub fn svi_fit(
         }
     }
 
+    // Apply sigma inflation to calibrate mean-field VI posteriors
+    let log_inflation = SIGMA_INFLATION_FACTOR.ln();
+    let log_sigma: Vec<f64> = var_params[n_params..]
+        .iter()
+        .map(|ls| ls + log_inflation)
+        .collect();
+
     SviFitResult {
         model,
         mu: var_params[..n_params].to_vec(),
-        log_sigma: var_params[n_params..].to_vec(),
+        log_sigma,
         elbo: final_elbo,
     }
 }
@@ -436,9 +456,15 @@ pub fn svi_fit_fixed_t0(
 
         for _ in 0..n_samples {
             // Sample from variational distribution (excluding t0)
+            // Use Box-Muller transform for proper N(0,1) samples (matching svi_fit)
+            let mut eps_vec = vec![0.0; n_params];
             let mut theta_reduced = Vec::with_capacity(n_params);
             for i in 0..n_params {
-                let eps: f64 = rng.gen::<f64>() * 2.0 - 1.0;
+                let u1: f64 = rng.gen::<f64>().max(1e-10);
+                let u2: f64 = rng.gen();
+                let eps = (-2.0 * u1.ln()).sqrt()
+                    * (2.0 * std::f64::consts::PI * u2).cos();
+                eps_vec[i] = eps;
                 let sigma = var_params[n_params + i].exp();
                 theta_reduced.push(var_params[i] + eps * sigma);
             }
@@ -568,25 +594,29 @@ pub fn svi_fit_fixed_t0(
             let elbo = log_lik + log_prior + entropy;
             total_elbo += elbo;
 
-            // Gradients w.r.t. variational parameters
+            // Gradients w.r.t. variational parameters (reparameterization trick)
             for i in 0..n_params {
-                // Gradient w.r.t. mu
-                total_grad[i] += dll_dtheta[i] + dlp_dtheta[i];
+                let df_dtheta = dll_dtheta[i] + dlp_dtheta[i];
+                // Gradient w.r.t. mu: d(ELBO)/d(mu_j) = d(log_lik+log_prior)/d(theta_j)
+                total_grad[i] += df_dtheta;
 
-                // Gradient w.r.t. log_sigma
+                // Gradient w.r.t. log_sigma: d(ELBO)/d(log_sigma_j) =
+                //   d(log_lik+log_prior)/d(theta_j) * sigma_j * eps_j + 1 (entropy)
                 let sigma = var_params[n_params + i].exp();
-                total_grad[n_params + i] += (dll_dtheta[i] + dlp_dtheta[i]) * sigma + 1.0;
+                total_grad[n_params + i] += df_dtheta * sigma * eps_vec[i] + 1.0;
             }
         }
 
         // Average gradients and ELBO
+        let ns = n_samples as f64;
         for g in total_grad.iter_mut() {
-            *g /= n_samples as f64;
+            *g /= ns;
         }
-        final_elbo = total_elbo / n_samples as f64;
+        final_elbo = total_elbo / ns;
 
-        // Update variational parameters
-        optimizer.step(&mut var_params, &total_grad);
+        // Negate gradients: Adam minimizes, but we want to maximize ELBO
+        let neg_elbo_grad: Vec<f64> = total_grad.iter().map(|g| -g).collect();
+        optimizer.step(&mut var_params, &neg_elbo_grad);
 
         // Clamp log_sigma
         for i in 0..n_params {
@@ -594,10 +624,17 @@ pub fn svi_fit_fixed_t0(
         }
     }
 
+    // Apply sigma inflation to calibrate mean-field VI posteriors
+    let log_inflation = SIGMA_INFLATION_FACTOR.ln();
+    let log_sigma: Vec<f64> = var_params[n_params..]
+        .iter()
+        .map(|ls| ls + log_inflation)
+        .collect();
+
     SviFitResult {
         model,
         mu: var_params[..n_params].to_vec(),
-        log_sigma: var_params[n_params..].to_vec(),
+        log_sigma,
         elbo: final_elbo,
     }
 }

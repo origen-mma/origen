@@ -33,6 +33,9 @@ pub enum CoreError {
     #[error("Fitting error: {0}")]
     FittingError(String),
 
+    #[error("Fit failed: {0}")]
+    FitFailed(String),
+
     #[error("Parse error: {0}")]
     ParseError(#[from] ParseError),
 }
