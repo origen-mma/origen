@@ -462,8 +462,7 @@ pub fn svi_fit_fixed_t0(
             for i in 0..n_params {
                 let u1: f64 = rng.gen::<f64>().max(1e-10);
                 let u2: f64 = rng.gen();
-                let eps = (-2.0 * u1.ln()).sqrt()
-                    * (2.0 * std::f64::consts::PI * u2).cos();
+                let eps = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
                 eps_vec[i] = eps;
                 let sigma = var_params[n_params + i].exp();
                 theta_reduced.push(var_params[i] + eps * sigma);

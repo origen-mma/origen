@@ -210,7 +210,14 @@ fn bazin_t0_grid_search(
 
     let mut best_t0 = t_peak - 5.0;
     let mut best_cost = f64::INFINITY;
-    let mut best_params = vec![peak_flux.ln(), 0.0, best_t0, 3.0_f64.ln(), 25.0_f64.ln(), -3.0];
+    let mut best_params = vec![
+        peak_flux.ln(),
+        0.0,
+        best_t0,
+        3.0_f64.ln(),
+        25.0_f64.ln(),
+        -3.0,
+    ];
 
     // Precompute weights (inverse variance)
     let weights: Vec<f64> = flux_err.iter().map(|e| 1.0 / (e * e + 1e-10)).collect();
@@ -518,8 +525,7 @@ fn profile_t0_refine(
                     let poly = t
                         * (0.254829592
                             + t * (-0.284496736
-                                + t * (1.421413741
-                                    + t * (-1.453152027 + t * 1.061405429))));
+                                + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
                     let erfc_z = poly * (-z_neg * z_neg).exp();
                     let phi = if z_neg >= 0.0 {
                         0.5 * erfc_z
@@ -978,7 +984,10 @@ pub fn fit_lightcurve_with_config(
     // Only for Bazin/Villar/PowerLaw: these are linear in amplitude (flux = a * shape + b),
     // so the analytical WLS solve is valid. Physical models (MetzgerKN) have
     // complex normalization that breaks this assumption.
-    if matches!(svi_model, SviModel::Bazin | SviModel::Villar | SviModel::PowerLaw) {
+    if matches!(
+        svi_model,
+        SviModel::Bazin | SviModel::Villar | SviModel::PowerLaw
+    ) {
         profile_t0_refine(&mut result, data, svi_model, first_mjd);
     }
 
