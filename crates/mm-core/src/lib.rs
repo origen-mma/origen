@@ -17,7 +17,6 @@ pub mod skymap_parser;
 pub mod skymap_storage;
 pub mod svi_fitter;
 pub mod svi_models;
-pub mod t0_profile;
 pub mod time;
 
 pub use early_rates::{
@@ -42,5 +41,4 @@ pub use position::SkyPosition;
 pub use skymap::MockSkymap;
 pub use skymap_parser::{CredibleRegion, ParsedSkymap, SkymapOrdering, SkymapParseError};
 pub use skymap_storage::{SkymapStorage, SkymapStorageError};
-pub use t0_profile::fit_lightcurve_profile_t0;
 pub use time::GpsTime;

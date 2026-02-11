@@ -409,9 +409,8 @@ fn profile_t0_refine(
         let t0 = t0_lo + (t0_hi - t0_lo) * gi as f64 / (n_grid - 1).max(1) as f64;
 
         // Reset to SVI means with this t0
-        for j in 0..params.len() {
-            params[j] = result.parameters[j];
-        }
+        let n = params.len();
+        params.copy_from_slice(&result.parameters[..n]);
         params[t0_idx] = t0;
 
         // Analytically re-fit amplitude (and baseline for Bazin).
