@@ -22,6 +22,8 @@ pub struct Config {
     pub boom: BoomConfig,
     pub correlator: CorrelatorConfig,
     pub simulation: SimulationConfig,
+    #[serde(default)]
+    pub daily_comparison: Option<DailyComparisonConfig>,
 }
 
 /// GCN Kafka configuration
@@ -95,6 +97,33 @@ pub struct SimulationConfig {
 
     /// Directory for storing downloaded skymaps
     pub skymap_storage_dir: String,
+}
+
+/// Daily comparison service configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DailyComparisonConfig {
+    /// Output directory for daily JSON reports
+    pub output_dir: String,
+
+    /// Spatial cross-match threshold (degrees)
+    pub spatial_threshold: f64,
+
+    /// Temporal cross-match threshold (seconds)
+    pub temporal_threshold: f64,
+
+    /// Redis URL for report persistence (optional)
+    pub redis_url: Option<String>,
+}
+
+impl Default for DailyComparisonConfig {
+    fn default() -> Self {
+        Self {
+            output_dir: "./data/daily_reports".to_string(),
+            spatial_threshold: 5.0,
+            temporal_threshold: 86400.0,
+            redis_url: None,
+        }
+    }
 }
 
 impl Config {
@@ -177,6 +206,7 @@ impl Config {
                 delay_ms: 0,
                 skymap_storage_dir: "./data/skymaps".to_string(),
             },
+            daily_comparison: None,
         }
     }
 

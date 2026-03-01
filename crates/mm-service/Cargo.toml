@@ -106,6 +106,10 @@ path = "src/bin/mm_api_server.rs"
 name = "gcn-correlator"
 path = "src/bin/gcn_correlator.rs"
 
+[[bin]]
+name = "daily-comparison"
+path = "src/bin/daily_comparison.rs"
+
 [dependencies]
 mm-core = { path = "../mm-core" }
 mm-gcn = { path = "../mm-gcn" }
@@ -129,3 +133,5 @@ fitsio = { workspace = true }
 moc = { workspace = true }
 csv = { workspace = true }
 clap = { workspace = true }
+chrono = { workspace = true }
+redis = { version = "0.27", features = ["tokio-comp"] }

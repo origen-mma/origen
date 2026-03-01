@@ -26,7 +26,7 @@ tokio-stream = "0.1"
 
 # GCN Kafka (CRITICAL for Phase 1)
 gcn-kafka = "0.1"
-rdkafka = { version = "0.39", features = ["tokio", "ssl", "sasl", "curl"] }
+rdkafka = { version = "0.39", features = ["tokio", "ssl-vendored", "curl", "cmake-build"] }
 
 # Serialization (for parsing GCN alerts)
 serde = { version = "1.0", features = ["derive"] }
@@ -48,7 +48,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Astronomy (for later phases)
 healpix = "0.3"
-fitsio = "0.21"
+fitsio = { version = "0.21", features = ["fitsio-src", "src-cmake"] }
 moc = "0.19"  # Multi-Order Coverage maps
 cdshealpix = "0.7"  # Accurate HEALPix coordinate conversions
 
@@ -65,8 +65,8 @@ argmin = "0.11"
 argmin-math = { version = "0.5", features = ["vec"] }
 
 # GP-based light curve feature extraction
-sklears-gaussian-process = "0.1.0-alpha.1"
-sklears-core = "0.1.0-alpha.1"
+sklears-gaussian-process = "0.1.0-rc.1"
+sklears-core = "0.1.0-rc.1"
 scirs2-core = { version = "0.1.1", default-features = false, features = ["linalg"] }
 
 # HTTP client for skymap downloads
