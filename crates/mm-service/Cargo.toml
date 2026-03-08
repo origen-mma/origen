@@ -110,6 +110,10 @@ path = "src/bin/gcn_correlator.rs"
 name = "daily-comparison"
 path = "src/bin/daily_comparison.rs"
 
+[[bin]]
+name = "far-tuning-campaign"
+path = "src/bin/far_tuning_campaign.rs"
+
 [dependencies]
 mm-core = { path = "../mm-core" }
 mm-gcn = { path = "../mm-gcn" }

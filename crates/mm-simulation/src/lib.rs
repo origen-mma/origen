@@ -2,10 +2,12 @@ pub mod afterglow;
 pub mod background_grbs;
 pub mod background_optical;
 pub mod ejecta_properties;
+pub mod far_campaign;
 pub mod gcn_circular;
 pub mod grb_localization;
 pub mod grb_simulation;
 pub mod joint_far;
+pub mod optical_injection;
 pub mod rotation;
 pub mod runner;
 pub mod satellite;
@@ -23,6 +25,7 @@ pub use background_optical::{
 pub use ejecta_properties::{
     compute_ejecta_properties, BinaryParams, BinaryType, EjectaProperties,
 };
+pub use far_campaign::{CampaignConfig, CampaignResults};
 pub use gcn_circular::GcnCircular;
 pub use grb_localization::{add_localization_error, ErrorEllipse, GrbInstrument, GrbLocalization};
 pub use grb_simulation::{
@@ -34,6 +37,7 @@ pub use joint_far::{
     calculate_joint_far, calculate_pastro, FarComponents, JointFarConfig, JointFarResult,
     MultiMessengerAssociation as FarAssociation,
 };
+pub use optical_injection::{GwPopulationModel, KnLightCurveParams, SurveyModel};
 pub use rotation::rotate_skymap;
 pub use runner::{SimulationConfig, SimulationResult, SimulationRunner};
 pub use satellite::{is_grb_detectable, SatelliteConfig, SkyPosition};
