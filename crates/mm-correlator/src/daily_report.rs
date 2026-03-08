@@ -375,7 +375,7 @@ mod tests {
             event_type: if source == AlertSource::Gcn {
                 EventType::GammaRay
             } else {
-                EventType::GravitationalWave // placeholder; optical not in EventType
+                EventType::Circular // no Optical variant; Circular is inert
             },
             gps_time,
             position: Some(SkyPosition::new(ra, dec, 1.0)),
