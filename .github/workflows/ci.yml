@@ -188,8 +188,13 @@ jobs:
     - name: Build API documentation
       run: cargo doc --no-deps --all
 
-    - name: Install mdbook
-      run: cargo install mdbook --no-default-features
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
 
-    - name: Build mdbook documentation
-      run: mdbook build
+    - name: Install zensical
+      run: pip install zensical
+
+    - name: Build documentation site
+      run: zensical build --clean

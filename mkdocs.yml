@@ -1,0 +1,87 @@
+site_name: ORIGIN
+site_url: https://origen-mma.github.io/origen/
+repo_url: https://github.com/origen-mma/origen
+repo_name: origen-mma/origen
+site_description: Multi-messenger superevent simulation and correlation framework
+site_author: Michael Coughlin
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+  - Architecture:
+    - System Overview: architecture/overview.md
+    - Crate Reference: architecture/crates.md
+    - RAVEN Comparison: architecture/raven-comparison.md
+  - Physics:
+    - GW Population & KN Model: physics/population-model.md
+    - GRB Simulation: physics/grb-simulation.md
+    - Kilonova Model Validation: physics/kilonova-validation.md
+    - Light Curve Fitting: physics/lightcurve-fitting.md
+    - Afterglow Detection: physics/afterglow-detection.md
+  - Services:
+    - Daily GCN-BOOM Comparison: services/daily-comparison.md
+    - FAR Tuning Campaign: services/far-campaign.md
+  - Analysis:
+    - O4 Detection Summary: analysis/o4-detection-summary.md
+    - O4 Joint FAR Analysis: analysis/o4-joint-far.md
+    - O4 vs O5 Comparison: analysis/o4-vs-o5.md
+    - Afterglow Magnitude Distributions: analysis/afterglow-magnitudes.md
+  - Examples:
+    - Light Curve Classification: examples/lightcurve-classification.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+
+plugins:
+  - search
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
