@@ -113,20 +113,20 @@ struct Cli {
     config: String,
 
     /// Output directory for daily JSON reports
-    #[arg(long, default_value = "./data/daily_reports")]
-    output_dir: String,
+    #[arg(long)]
+    output_dir: Option<String>,
 
     /// Redis URL for report persistence (optional)
     #[arg(long)]
     redis_url: Option<String>,
 
     /// Spatial cross-match threshold (degrees)
-    #[arg(long, default_value = "5.0")]
-    spatial_threshold: f64,
+    #[arg(long)]
+    spatial_threshold: Option<f64>,
 
     /// Temporal cross-match threshold (seconds)
-    #[arg(long, default_value = "86400.0")]
-    temporal_threshold: f64,
+    #[arg(long)]
+    temporal_threshold: Option<f64>,
 
     /// Exit after producing one daily report (for testing/cron usage)
     #[arg(long)]
@@ -375,12 +375,6 @@ async fn main() -> Result<()> {
             "continuous"
         }
     );
-    info!("Output directory: {}", cli.output_dir);
-    info!(
-        "Thresholds: spatial={:.1}deg, temporal={:.0}s",
-        cli.spatial_threshold, cli.temporal_threshold
-    );
-
     // Load configuration
     let config_path = env::var("MM_CONFIG_PATH").unwrap_or_else(|_| cli.config.clone());
     let app_config = match Config::from_file_with_env(&config_path) {
@@ -394,28 +388,30 @@ async fn main() -> Result<()> {
         }
     };
 
-    // Override thresholds from config if daily_comparison section exists
-    let spatial_threshold = if let Some(ref dc) = app_config.daily_comparison {
-        dc.spatial_threshold
-    } else {
-        cli.spatial_threshold
-    };
-    let temporal_threshold = if let Some(ref dc) = app_config.daily_comparison {
-        dc.temporal_threshold
-    } else {
-        cli.temporal_threshold
-    };
-    let output_dir = if let Some(ref dc) = app_config.daily_comparison {
-        dc.output_dir.clone()
-    } else {
-        cli.output_dir.clone()
-    };
-    let redis_url = cli.redis_url.clone().or_else(|| {
-        app_config
-            .daily_comparison
-            .as_ref()
-            .and_then(|dc| dc.redis_url.clone())
+    // Precedence: CLI flag > config file > default
+    let dc = app_config.daily_comparison.as_ref();
+    let spatial_threshold = cli
+        .spatial_threshold
+        .unwrap_or_else(|| dc.map_or(5.0, |c| c.spatial_threshold));
+    let temporal_threshold = cli
+        .temporal_threshold
+        .unwrap_or_else(|| dc.map_or(86400.0, |c| c.temporal_threshold));
+    let output_dir = cli.output_dir.clone().unwrap_or_else(|| {
+        dc.map_or_else(
+            || "./data/daily_reports".to_string(),
+            |c| c.output_dir.clone(),
+        )
     });
+    let redis_url = cli
+        .redis_url
+        .clone()
+        .or_else(|| dc.and_then(|c| c.redis_url.clone()));
+
+    info!("Output directory: {}", output_dir);
+    info!(
+        "Thresholds: spatial={:.1}deg, temporal={:.0}s",
+        spatial_threshold, temporal_threshold
+    );
 
     // GCN topics — same as gcn-correlator
     let topics = vec![
@@ -713,11 +709,14 @@ async fn main() -> Result<()> {
 
                         acc.boom_by_type.increment_optical();
 
+                        let gps_time = lc.measurements.first()
+                            .map(|m| m.to_gps_time())
+                            .unwrap_or(0.0);
                         let entry = InventoryEntry {
                             event_id: object_id.clone(),
                             source: AlertSource::Boom,
-                            event_type: EventType::GravitationalWave, // placeholder; BOOM is optical
-                            gps_time: lc.measurements.first().map(|m| m.mjd).unwrap_or(0.0),
+                            event_type: EventType::Circular, // no Optical variant; Circular is inert in EventTypeCounts
+                            gps_time,
                             position: Some(pos.clone()),
                             received_at: now_unix_secs(),
                         };
@@ -778,6 +777,9 @@ fn event_id_from(event: &Event) -> String {
         Event::GammaRay(grb) => grb.trigger_id.clone(),
         Event::XRay(xray) => xray.event_id.clone(),
         Event::Neutrino(nu) => nu.event_id.clone(),
-        Event::Circular { text } => format!("circular-{}", &text[..40.min(text.len())]),
+        Event::Circular { text } => {
+            let prefix: String = text.chars().take(40).collect();
+            format!("circular-{}", prefix)
+        }
     }
 }
