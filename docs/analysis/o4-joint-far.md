@@ -4,9 +4,9 @@ Statistical significance assessment of 178 O4 multi-messenger associations using
 
 ## Joint FAR Formula
 
-\[
-\text{FAR}_\text{joint} = N_\text{trials} \times P(\text{spatial}) \times P(\text{temporal}) \times R_\text{GW} \times R_\text{EM}
-\]
+```
+FAR_joint = N_trials × P(spatial) × P(temporal) × R_GW × R_EM
+```
 
 ### Configuration
 
@@ -32,24 +32,24 @@ Statistical significance assessment of 178 O4 multi-messenger associations using
 
 | Statistic | Value (per year) |
 |-----------|------------------|
-| Mean | \\(4.33 \times 10^4\\) |
-| Median | \\(2.75 \times 10^4\\) |
-| Minimum | \\(1.64 \times 10^{-3}\\) |
-| Maximum | \\(5.01 \times 10^5\\) |
+| Mean | 4.33 × 10^4 |
+| Median | 2.75 × 10^4 |
+| Minimum | 1.64 × 10^-3 |
+| Maximum | 5.01 × 10^5 |
 
 ### Significance Distribution
 
 | Threshold | Count | Fraction |
 |-----------|-------|----------|
-| > 3\\(\sigma\\) | 3 | 1.7% |
-| > 5\\(\sigma\\) | 2 | 1.1% |
+| > 3σ | 3 | 1.7% |
+| > 5σ | 2 | 1.1% |
 
 !!! warning "Key Finding"
-    Only **2 events (1.1%)** exceed the 5\\(\sigma\\) discovery threshold.
+    Only **2 events (1.1%)** exceed the 5σ discovery threshold.
 
 ## Highly Significant Events
 
-### Event 72 -- 34.9\\(\sigma\\) (Exceptional)
+### Event 72 -- 34.9σ (Exceptional)
 
 | Property | Value |
 |----------|-------|
@@ -58,19 +58,19 @@ Statistical significance assessment of 178 O4 multi-messenger associations using
 | Skymap area | 32 sq deg |
 | Has GRB | Yes |
 | Optical mag | 18.0 |
-| Joint FAR | \\(1.64 \times 10^{-3}\\) / year |
-| \\(P_\text{astro}\\) | 99.8% |
+| Joint FAR | 1.64 × 10^-3 / year |
+| P_astro | 99.8% |
 
 This is analogous to GW170817 -- nearby event with excellent localization, on-axis GRB, and bright optical counterpart.
 
-### Event 95 -- 12.4\\(\sigma\\)
+### Event 95 -- 12.4σ
 
 | Property | Value |
 |----------|-------|
 | Distance | 76 Mpc |
 | Skymap area | 58 sq deg |
 | Optical mag | 19.5 |
-| \\(P_\text{astro}\\) | 93.8% |
+| P_astro | 93.8% |
 
 ## Comparison with GW170817
 
@@ -80,8 +80,8 @@ This is analogous to GW170817 -- nearby event with excellent localization, on-ax
 | GW localization | 28 sq deg | 32 sq deg |
 | GRB | Yes (off-axis) | Yes (on-axis) |
 | Optical magnitude | 17--18 mag | 18.0 mag |
-| Significance | >5\\(\sigma\\) | 34.9\\(\sigma\\) |
-| \\(P_\text{astro}\\) | >99% | 99.8% |
+| Significance | >5σ | 34.9σ |
+| P_astro | >99% | 99.8% |
 
 ## Why Most Associations Are Low Significance
 
@@ -96,7 +96,7 @@ This is analogous to GW170817 -- nearby event with excellent localization, on-ax
 | <100 Mpc | 3.4% | ~1% |
 | <200 Mpc | 21.3% | ~8% |
 
-**O5 Prediction**: ~1--2 significant (>5\\(\sigma\\)) associations per year, similar to O4 absolute rate despite 10x more events. Most O5 events will be distant (>300 Mpc) with poor localization.
+**O5 Prediction**: ~1--2 significant (>5σ) associations per year, similar to O4 absolute rate despite 10x more events. Most O5 events will be distant (>300 Mpc) with poor localization.
 
 ## Strategies to Improve Significance
 

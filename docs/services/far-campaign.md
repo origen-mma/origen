@@ -58,23 +58,23 @@ BNS mergers drawn from astrophysically-motivated distributions:
 
 | Parameter | Distribution | O4 Default | O5 Default |
 |---|---|---|---|
-| Distance | Uniform in comoving volume (\\(\propto d^3\\)) | 0--190 Mpc | 0--330 Mpc |
-| Inclination | Uniform in \\(\cos i\\) | \\([0, \pi]\\) | \\([0, \pi]\\) |
-| NS mass | Truncated Gaussian | \\(\mu\\)=1.35, \\(\sigma\\)=0.15 \\(M_\odot\\) | same |
+| Distance | Uniform in comoving volume (∝ d³) | 0--190 Mpc | 0--330 Mpc |
+| Inclination | Uniform in cos(i) | [0, π] | [0, π] |
+| NS mass | Truncated Gaussian | μ=1.35, σ=0.15 M☉ | same |
 | Sky position | Isotropic | -- | -- |
-| GW FAR | Log-uniform | \\(10^{-4}\\)--\\(10^{-1}\\) yr\\(^{-1}\\) | same |
+| GW FAR | Log-uniform | 10⁻⁴--10⁻¹ yr⁻¹ | same |
 
 ### Kilonova Light Curve
 
 1. **Ejecta properties** from Kruger & Foucart (2020) fitting formulae: BNS masses to dynamical + wind ejecta mass and velocity
 2. **Peak absolute magnitude** from empirical scaling calibrated to AT2017gfo:
 
-\[
-M_\text{peak} = -15.8 - 2.5 \log_{10}\!\left(\frac{M_\text{ej}}{0.05\,M_\odot}\right) - 1.25 \log_{10}\!\left(\frac{v_\text{ej}}{0.3c}\right)
-\]
+```
+M_peak = -15.8 - 2.5 × log₁₀(M_ej / 0.05 M☉) - 1.25 × log₁₀(v_ej / 0.3c)
+```
 
 3. **Light curve shape** from the MetzgerKN semi-analytic model (Metzger 2017), including r-process heating, thermalization, and diffusion
-4. **Survey sampling** at the appropriate cadence (ZTF: 2-day, LSST: 3-day) with photometric noise scaling as \\(\text{SNR} = 5 \times 10^{(m_\text{lim} - m)/2.5}\\)
+4. **Survey sampling** at the appropriate cadence (ZTF: 2-day, LSST: 3-day) with photometric noise scaling as `SNR = 5 × 10^((m_lim - m) / 2.5)`
 
 ### Survey Models
 

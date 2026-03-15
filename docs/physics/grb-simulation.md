@@ -14,18 +14,18 @@ The simulation is based on observational constraints from short GRBs, which are 
 ### Key Assumptions
 
 1. **Beamed Emission**: GRBs are emitted in narrow jets
-    - Jet opening angle: \\(\theta_\text{jet} \sim \mathcal{N}(10°, 2°)\\) (Fong et al. 2015)
-    - Visibility criterion: GRB visible only if inclination \\(\leq \theta_\text{jet}\\)
+    - Jet opening angle: `θ_jet ~ N(10°, 2°)` (Fong et al. 2015)
+    - Visibility criterion: GRB visible only if inclination `≤ θ_jet`
 
 2. **Intrinsic Properties** (source frame):
-    - Isotropic energy: \\(E_\text{iso} \sim \text{LogNormal}(10^{51.5}, 0.5)\\) erg
-    - Duration: \\(T_{90} \sim \text{LogNormal}(0.3\text{--}2, 0.3)\\) seconds
-    - Peak energy: \\(E_\text{peak} \sim \text{LogNormal}(200, \sigma)\\) keV
+    - Isotropic energy: `E_iso ~ LogNormal(10^51.5, 0.5)` erg
+    - Duration: `T_90 ~ LogNormal(0.3-2, 0.3)` seconds
+    - Peak energy: `E_peak ~ LogNormal(200, σ)` keV
 
 3. **Cosmological Effects**:
-    - Observed \\(T_{90}\\): \\(T_{90,\text{obs}} = T_{90} \times (1 + z)\\)
-    - Observed \\(E_\text{peak}\\): \\(E_{\text{peak,obs}} = E_\text{peak} / (1 + z)\\)
-    - Fluence: \\(F = E_\text{iso} / (4\pi d^2)\\)
+    - Observed T_90: `T_90,obs = T_90 × (1 + z)`
+    - Observed E_peak: `E_peak,obs = E_peak / (1 + z)`
+    - Fluence: `F = E_iso / (4π d²)`
 
 ### Visibility Rate
 
@@ -106,8 +106,8 @@ let bright = GrbSimulationConfig {
 | Sample size | 50,000 | 1,000 |
 | Visible GRBs | 899 (1.8%) | 50 (5.0%) |
 | Jet angle distribution | ~10 +/- 2 deg | ~9.9 +/- 2 deg |
-| \\(E_\text{iso}\\) range | \\(10^{50}\\)--\\(10^{52}\\) | \\(10^{51}\\)--\\(10^{52}\\) |
-| \\(T_{90}\\) range | 0.3--2 s | 0.3--2 s |
+| E_iso range | 10^50 - 10^52 | 10^51 - 10^52 |
+| T_90 range | 0.3-2 s | 0.3-2 s |
 
 !!! note
     The higher visibility rate (5.0% vs 1.8%) is due to statistical fluctuation with a smaller sample. With 10k+ events, rates converge to ~2%.

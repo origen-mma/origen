@@ -12,10 +12,10 @@ ZTF25aaabnwi was identified as a kilonova candidate by the MetzgerKN forward mod
 
 The fit extracts physical parameters:
 
-- Ejecta mass \\(M_\text{ej}\\)
-- Ejecta velocity \\(v_\text{ej}\\)
-- Opacity \\(\kappa\\)
-- Merger time \\(t_0\\)
+- Ejecta mass `M_ej`
+- Ejecta velocity `v_ej`
+- Opacity `κ`
+- Merger time `t_0`
 
 ### Classification
 
@@ -25,7 +25,7 @@ Key indicators of a kilonova:
 
 - Rapid rise (<1 day)
 - Red color evolution from lanthanide-rich ejecta
-- Smooth decline consistent with r-process heating (\\(\propto t^{-1.3}\\))
+- Smooth decline consistent with r-process heating (∝ t⁻¹·³)
 
 ## Type Ia Supernova (Bazin Model)
 
@@ -37,9 +37,9 @@ ZTF25aaaalin was classified as a supernova-like transient using the Bazin phenom
 
 The Bazin model:
 
-\[
-f(t) = A \frac{e^{-(t - t_0)/\tau_\text{fall}}}{1 + e^{-(t - t_0)/\tau_\text{rise}}} + c
-\]
+```
+f(t) = A × exp(-(t - t_0) / τ_fall) / (1 + exp(-(t - t_0) / τ_rise)) + c
+```
 
 ### Classification
 
@@ -61,13 +61,13 @@ ZTF25aaaawig showed rapid power-law decay consistent with a GRB afterglow or oth
 
 ![Power law model fit](../plots/ZTF25aaaawig_PowerLaw_PowerLaw_model_example.png)
 
-Power-law decay: \\(f(t) \propto (t - t_0)^{-\alpha}\\)
+Power-law decay: `f(t) ∝ (t - t_0)^(-α)`
 
 ### Classification
 
 ![Fast transient classification](../plots/ZTF25aaaawig_PowerLaw_Fast_transient.png)
 
-Fast transients with power-law indices \\(\alpha > 1\\) are consistent with GRB afterglow emission.
+Fast transients with power-law indices α > 1 are consistent with GRB afterglow emission.
 
 ## Synthetic Validation
 

@@ -14,7 +14,7 @@ Comparison of the O4 and O5c LIGO/Virgo/KAGRA observing scenarios for multi-mess
 | NSBH Events | 108 (60.7%) | 438 (58.3%) | 4.1x |
 | Mean Distance | 412 Mpc | 752 Mpc | 1.8x |
 | On-Axis GRBs | 5 (2.8%) | 20 (2.7%) | 4.0x |
-| >5\\(\sigma\\) Associations | 2 (1.1%) | 2 (0.3%) | 1.0x |
+| >5σ Associations | 2 (1.1%) | 2 (0.3%) | 1.0x |
 
 ## Distance Distribution
 
@@ -30,7 +30,7 @@ O5c's biggest gain is at >400 Mpc where optical follow-up becomes extremely chal
 
 ## GRB Detection
 
-Both scenarios show consistent on-axis fractions (~2.7--2.8%), suggesting jet opening angles \\(\theta_\text{core} \sim 7\text{--}8°\\). GRB beaming is distance-independent (geometric effect), so O5c produces 4x more on-axis GRBs simply due to 4.2x more total events.
+Both scenarios show consistent on-axis fractions (~2.7--2.8%), suggesting jet opening angles θ_core ~ 7-8°. GRB beaming is distance-independent (geometric effect), so O5c produces 4x more on-axis GRBs simply due to 4.2x more total events.
 
 ## Afterglow Detectability
 
@@ -55,7 +55,7 @@ Both scenarios show consistent on-axis fractions (~2.7--2.8%), suggesting jet op
 
 ## Implications
 
-The "golden events" (>5\\(\sigma\\)) are rare in both scenarios: ~1--2 per observing run. These require the combination of:
+The "golden events" (>5σ) are rare in both scenarios: ~1--2 per observing run. These require the combination of:
 
 - Nearby distance (<100 Mpc)
 - Good GW localization (<100 sq deg)
