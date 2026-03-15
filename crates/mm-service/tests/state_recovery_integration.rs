@@ -248,10 +248,12 @@ async fn test_correlator_state_recovery() {
     assert_eq!(state2.grb_events.len(), 1, "Should recover 1 GRB event");
 
     // Verify specific events
+    // Note: f64 values may lose precision during JSON serialization round-trip,
+    // so use approximate comparison for floating-point fields.
     let recovered_gw1 = state2.gw_events.get(&500).expect("GW 500 not recovered");
     assert_eq!(recovered_gw1.simulation_id, gw1.simulation_id);
-    assert_eq!(recovered_gw1.gpstime, gw1.gpstime);
-    assert_eq!(recovered_gw1.snr, gw1.snr);
+    assert!((recovered_gw1.gpstime - gw1.gpstime).abs() < 1e-4, "gpstime mismatch: {} vs {}", recovered_gw1.gpstime, gw1.gpstime);
+    assert!((recovered_gw1.snr - gw1.snr).abs() < 1e-10, "snr mismatch: {} vs {}", recovered_gw1.snr, gw1.snr);
 
     let recovered_gw2 = state2.gw_events.get(&501).expect("GW 501 not recovered");
     assert_eq!(recovered_gw2.simulation_id, gw2.simulation_id);
