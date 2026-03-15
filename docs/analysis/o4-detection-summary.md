@@ -20,7 +20,7 @@ All BNS/NSBH events in O4 sample are GW-detected (by definition). LIGO/Virgo/KAG
 
 ### Gamma-Ray Bursts: ~3% Detection
 
-Only visible when viewing angle is within jet cone (~10 deg). Observed rate (2.8%) is consistent with expected beaming fraction (~0.4--1.5% for θ_jet ~ 5-10°).
+Only visible when viewing angle is within jet cone (~10 deg). Observed rate (2.8%) is consistent with expected beaming fraction (~0.4--1.5% for \\(\theta_\text{jet} \sim 5\text{--}10°\\)).
 
 ### Optical Afterglows: 0% with ZTF
 

@@ -41,17 +41,17 @@ ORIGIN is structured as a Rust workspace with 9 crates, each handling a distinct
 
 The RAVEN-style joint false alarm rate combines temporal, spatial, and source-count information:
 
-```
-FAR_joint = R_bg * (1 / T_window) * P_spatial * N_trials * f_lc
-```
+\[
+\text{FAR}_\text{joint} = R_\text{bg} \times \frac{1}{T_\text{window}} \times P_\text{spatial} \times N_\text{trials} \times f_\text{lc}
+\]
 
 where:
 
-- **`R_bg`**: background optical transient rate (per day per sq deg)
-- **`T_window`**: temporal coincidence window
-- **`P_spatial`**: spatial coincidence probability (from skymap or point-source fallback)
-- **`N_trials`**: number of monitored surveys
-- **`f_lc`**: light curve penalty factor (1.0 if no LC filter, <1 if KN-like)
+- **\\(R_\text{bg}\\)**: background optical transient rate (per day per sq deg)
+- **\\(T_\text{window}\\)**: temporal coincidence window
+- **\\(P_\text{spatial}\\)**: spatial coincidence probability (from skymap or point-source fallback)
+- **\\(N_\text{trials}\\)**: number of monitored surveys
+- **\\(f_\text{lc}\\)**: light curve penalty factor (1.0 if no LC filter, <1 if KN-like)
 
 ## Superevent Lifecycle
 

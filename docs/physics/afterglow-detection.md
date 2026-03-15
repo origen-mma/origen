@@ -34,8 +34,8 @@ On-axis GRB afterglows at O4 distances (100--500 Mpc) typically peak at 22--27 m
 
 Peak apparent magnitude in R-band:
 
-```
-m_R = M_R + 5 × log₁₀(d / 10 pc) + A_R
-```
+\[
+m_R = M_R + 5\log_{10}\!\left(\frac{d}{10\,\text{pc}}\right) + A_R
+\]
 
-where `M_R` is the absolute magnitude (from afterglow physics), `d` is the luminosity distance, and `A_R` is Galactic extinction.
+where \\(M_R\\) is the absolute magnitude (from afterglow physics), \\(d\\) is the luminosity distance, and \\(A_R\\) is Galactic extinction.

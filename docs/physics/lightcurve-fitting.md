@@ -1,6 +1,6 @@
 # Light Curve Fitting
 
-The `mm-core::lightcurve_fitting` module extracts merger time (`t₀`) from optical transient light curves, enabling more accurate temporal correlation with gravitational wave events compared to using first detection times.
+The `mm-core::lightcurve_fitting` module extracts merger time (\\(t_0\\)) from optical transient light curves, enabling more accurate temporal correlation with gravitational wave events compared to using first detection times.
 
 ## Supported Models
 
@@ -8,10 +8,10 @@ ORIGIN fits four analytical models to incoming light curves:
 
 | Model | Use Case | Parameters |
 |-------|----------|------------|
-| **Bazin** | Type Ia supernovae | Amplitude, t₀, rise time, fall time |
+| **Bazin** | Type Ia supernovae | Amplitude, \\(t_0\\), rise time, fall time |
 | **Villar** | General transients | Similar to Bazin with different parameterization |
-| **PowerLaw** | Fast transients, afterglows | Amplitude, t₀, power-law index |
-| **MetzgerKN** | Kilonovae | M_ej, v_ej, κ, t₀ |
+| **PowerLaw** | Fast transients, afterglows | Amplitude, \\(t_0\\), power-law index |
+| **MetzgerKN** | Kilonovae | \\(M_\text{ej}\\), \\(v_\text{ej}\\), \\(\kappa\\), \\(t_0\\) |
 
 ## Classification Examples
 
@@ -19,7 +19,7 @@ ORIGIN fits four analytical models to incoming light curves:
 
 ![MetzgerKN fit](../plots/ZTF25aaabnwi_MetzgerKN_MetzgerKN_model_example.png)
 
-The MetzgerKN model captures the rapid rise and red-dominated decline characteristic of r-process powered emission. The extracted `t₀` localizes the merger time to within hours.
+The MetzgerKN model captures the rapid rise and red-dominated decline characteristic of r-process powered emission. The extracted \\(t_0\\) localizes the merger time to within hours.
 
 ![Kilonova classification](../plots/ZTF25aaabnwi_MetzgerKN_Kilonova_candidate.png)
 
@@ -52,4 +52,4 @@ if result.is_reliable() {
 }
 ```
 
-The fitter returns `t₀` estimates with uncertainty in both MJD and GPS time. Quality is assessed via `is_reliable()`, which checks that the uncertainty is below a configurable threshold.
+The fitter returns \\(t_0\\) estimates with uncertainty in both MJD and GPS time. Quality is assessed via `is_reliable()`, which checks that the uncertainty is below a configurable threshold.
