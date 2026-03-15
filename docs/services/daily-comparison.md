@@ -32,42 +32,42 @@ daily-comparison --config config/config.toml --boom --from-beginning --single-da
 
 ## Architecture
 
-```
-  GCN Kafka                          BOOM Kafka
-  (gcn.nasa.gov)                     (kaboom.caltech.edu)
-       │                                   │
-       ▼                                   ▼
-  ┌──────────┐      mpsc channel     ┌──────────┐
-  │  OAuth    │◄─────────────────────►│  SASL    │
-  │  Consumer │                       │  Consumer│
-  └─────┬─────┘                       └─────┬────┘
-        │                                   │
-        ▼                                   ▼
-  ┌─────────────────────────────────────────────┐
-  │              DayAccumulator                  │
-  │                                              │
-  │  gcn_inventory: Vec<InventoryEntry>          │
-  │  boom_inventory: Vec<InventoryEntry>         │
-  │  gcn_events: Vec<Event>      (RAVEN replay)  │
-  │  boom_lightcurves: Vec<(LC, Pos, ID)>        │
-  └─────────────────────┬───────────────────────┘
-                        │
-                   midnight UTC
-                        │
-                        ▼
-  ┌─────────────────────────────────────────────┐
-  │              Report Generation               │
-  │                                              │
-  │  1. cross_match_events()  -- spatial+temporal│
-  │  2. compute_completeness() -- per source     │
-  │  3. compute_latency_stats() -- who was first │
-  │  4. run_daily_correlation() -- RAVEN batch   │
-  └─────────────────────┬───────────────────────┘
-                        │
-              ┌─────────┼─────────┐
-              ▼                   ▼
-        JSON file            Redis store
-   daily_report_YYYY-MM-DD   daily_report:{date}
+```text
+GCN Kafka                           BOOM Kafka
+(gcn.nasa.gov)                      (kaboom.caltech.edu)
+     |                                    |
+     v                                    v
++----------+       mpsc channel     +----------+
+| OAuth    |<---------------------->| SASL     |
+| Consumer |                        | Consumer |
++----+-----+                        +----+-----+
+     |                                    |
+     v                                    v
++---------------------------------------------+
+|             DayAccumulator                   |
+|                                              |
+| gcn_inventory: Vec<InventoryEntry>           |
+| boom_inventory: Vec<InventoryEntry>          |
+| gcn_events: Vec<Event>       (RAVEN replay)  |
+| boom_lightcurves: Vec<(LC, Pos, ID)>         |
++----------------------+-----------------------+
+                       |
+                  midnight UTC
+                       |
+                       v
++---------------------------------------------+
+|             Report Generation                |
+|                                              |
+| 1. cross_match_events()  -- spatial+temporal |
+| 2. compute_completeness() -- per source      |
+| 3. compute_latency_stats() -- who was first  |
+| 4. run_daily_correlation() -- RAVEN batch    |
++----------------------+-----------------------+
+                       |
+             +---------+---------+
+             v                   v
+       JSON file            Redis store
+  daily_report_YYYY-MM-DD  daily_report:{date}
 ```
 
 ## Cross-Matching Algorithm
