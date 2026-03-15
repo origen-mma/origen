@@ -194,7 +194,7 @@ jobs:
         python-version: '3.12'
 
     - name: Install zensical
-      run: pip install zensical
+      run: pip install markupsafe zensical
 
     - name: Build documentation site
       run: zensical build --clean

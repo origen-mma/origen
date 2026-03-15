@@ -4,37 +4,37 @@ ORIGIN is structured as a Rust workspace with 9 crates, each handling a distinct
 
 ## Data Flow
 
-```
-                        Simulation Layer
- ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
- │  GW + GRB Event  │  │  O4 Observing    │  │  Optical Alert   │
- │  Generator       │  │  Scenario Sim    │  │  Streamer (ZTF)  │
- │  (stream-events) │  │  (stream-o4-sim) │  │  (stream-optical)│
- └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘
-          │                     │                      │
-          ▼                     ▼                      ▼
- ┌────────────────────────────────────────────────────────────────┐
- │                     Kafka Message Bus                          │
- │  igwn.gwalert  │  gcn.notices.grb  │  optical.alerts          │
- └────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
- ┌────────────────────────────────────────────────────────────────┐
- │               Superevent Correlator (mm-correlator)            │
- │                                                                │
- │  Temporal matching ──► Spatial matching ──► Joint FAR (RAVEN)  │
- │         │                    │                    │             │
- │         ▼                    ▼                    ▼             │
- │  SVI light curve    Early rate filter    GP feature extraction  │
- │  fitting (t0 est)   (KN vs SN pre-cut)  (background rejection) │
- └──────────────────────────┬─────────────────────────────────────┘
-                            │
-              ┌─────────────┼─────────────┐
-              ▼             ▼             ▼
- ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
- │    Redis     │  │  Prometheus  │  │  REST API    │
- │  (state)     │  │  + Grafana   │  │  (mm-api)    │
- └──────────────┘  └──────────────┘  └──────────────┘
+```text
+                       Simulation Layer
++------------------+  +------------------+  +------------------+
+| GW + GRB Event   |  | O4 Observing     |  | Optical Alert    |
+| Generator        |  | Scenario Sim     |  | Streamer (ZTF)   |
+| (stream-events)  |  | (stream-o4-sim)  |  | (stream-optical) |
++--------+---------+  +--------+---------+  +--------+---------+
+         |                      |                     |
+         v                      v                     v
++----------------------------------------------------------------+
+|                      Kafka Message Bus                         |
+|  igwn.gwalert  |  gcn.notices.grb  |  optical.alerts           |
++----------------------------+-----------------------------------+
+                             |
+                             v
++----------------------------------------------------------------+
+|            Superevent Correlator (mm-correlator)                |
+|                                                                |
+| Temporal matching --> Spatial matching --> Joint FAR (RAVEN)    |
+|        |                    |                    |              |
+|        v                    v                    v              |
+| SVI light curve     Early rate filter   GP feature extraction  |
+| fitting (t0 est)    (KN vs SN pre-cut)  (background rejection) |
++----------------------------+-----------------------------------+
+                             |
+               +-------------+-------------+
+               v             v             v
++--------------+  +--------------+  +--------------+
+|    Redis     |  |  Prometheus  |  |  REST API    |
+|   (state)    |  |  + Grafana   |  |  (mm-api)    |
++--------------+  +--------------+  +--------------+
 ```
 
 ## Joint FAR Calculation

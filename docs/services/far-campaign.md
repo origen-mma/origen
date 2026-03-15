@@ -34,20 +34,20 @@ python scripts/analysis/plot_far_campaign.py results.json
 
 For each of the N injections:
 
-```
-  1. Draw GW event         2. Compute ejecta        3. Generate KN light curve
-  ┌──────────────────┐    ┌──────────────────┐     ┌──────────────────────┐
-  │ distance ~ d^3   │    │ Kruger & Foucart │     │ MetzgerKN forward    │
-  │ cos(i) uniform   │───►│ fitting formulae │────►│ model + survey noise │
-  │ NS masses Gauss  │    │ -> M_ej, v_ej    │     │ + cadence sampling   │
-  └──────────────────┘    └──────────────────┘     └──────────┬───────────┘
-                                                              │
-  4. Generate background   5. Feed correlator       6. Record outcome
-  ┌──────────────────┐    ┌──────────────────┐     ┌──────────────────────┐
-  │ SNe Ia + shock   │    │ Fresh correlator │     │ recovered? joint_far?│
-  │ cooling at real  │───►│ per injection:   │────►│ false positives?     │
-  │ ZTF/LSST rates   │    │ GW -> optical LCs│     │ -> ROC curve         │
-  └──────────────────┘    └──────────────────┘     └──────────────────────┘
+```text
+1. Draw GW event        2. Compute ejecta       3. Generate KN light curve
++------------------+   +------------------+    +----------------------+
+| distance ~ d^3   |   | Kruger & Foucart |    | MetzgerKN forward    |
+| cos(i) uniform   |-->| fitting formulae |--->| model + survey noise |
+| NS masses Gauss  |   | -> M_ej, v_ej    |    | + cadence sampling   |
++------------------+   +------------------+    +----------+-----------+
+                                                          |
+4. Generate background  5. Feed correlator      6. Record outcome
++------------------+   +------------------+    +----------------------+
+| SNe Ia + shock   |   | Fresh correlator |    | recovered? joint_far?|
+| cooling at real  |-->| per injection:   |--->| false positives?     |
+| ZTF/LSST rates   |   | GW -> optical LCs|    | -> ROC curve         |
++------------------+   +------------------+    +----------------------+
 ```
 
 ## Physical Models
